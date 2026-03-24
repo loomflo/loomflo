@@ -20,7 +20,7 @@
 **Purpose**: Monorepo initialization and toolchain configuration
 
 - [x] T001 Create root package.json with workspace scripts (build, test, lint, dev, clean) in package.json
-- [ ] T002 Create pnpm-workspace.yaml defining packages/core, packages/cli, packages/dashboard, packages/sdk in pnpm-workspace.yaml
+- [x] T002 Create pnpm-workspace.yaml defining packages/core, packages/cli, packages/dashboard, packages/sdk in pnpm-workspace.yaml
 - [ ] T003 Create turbo.json with build/test/lint pipeline configuration in turbo.json
 - [ ] T004 Create shared TypeScript base config with strict mode in tsconfig.base.json
 - [ ] T005 [P] Create packages/core/package.json with dependencies (fastify, @fastify/websocket, zod, picomatch, async-mutex) and packages/core/tsconfig.json
