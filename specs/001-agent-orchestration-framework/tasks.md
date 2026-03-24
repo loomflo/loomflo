@@ -23,7 +23,7 @@
 - [x] T002 Create pnpm-workspace.yaml defining packages/core, packages/cli, packages/dashboard, packages/sdk in pnpm-workspace.yaml
 - [x] T003 Create turbo.json with build/test/lint pipeline configuration in turbo.json
 - [x] T004 Create shared TypeScript base config with strict mode in tsconfig.base.json
-- [ ] T005 [P] Create packages/core/package.json with dependencies (fastify, @fastify/websocket, zod, picomatch, async-mutex) and packages/core/tsconfig.json
+- [x] T005 [P] Create packages/core/package.json with dependencies (fastify, @fastify/websocket, zod, picomatch, async-mutex) and packages/core/tsconfig.json
 - [ ] T006 [P] Create packages/cli/package.json with dependencies (commander) and bin entry, packages/cli/tsconfig.json
 - [ ] T007 [P] Create packages/dashboard/package.json with dependencies (react, @xyflow/react, react-markdown, react-router-dom) and packages/dashboard/tsconfig.json
 - [ ] T008 [P] Create packages/sdk/package.json (name: loomflo-sdk) and packages/sdk/tsconfig.json
