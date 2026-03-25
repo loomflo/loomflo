@@ -62,8 +62,8 @@
 
 - [x] T022 Define LLMProvider interface and LLMResponse type (complete method with messages, system, tools, model, maxTokens) in packages/core/src/providers/base.ts
 - [x] T023 Implement AnthropicProvider (wrap @anthropic-ai/sdk, translate tool_use format, handle streaming, extract token usage) in packages/core/src/providers/anthropic.ts
-- [ ] T024 [P] Create OpenAI provider stub (implements interface, throws "not yet supported") in packages/core/src/providers/openai.ts
-- [ ] T025 [P] Create Ollama provider stub (implements interface, throws "not yet supported") in packages/core/src/providers/ollama.ts
+- [x] T024 [P] Create OpenAI provider stub (implements interface, throws "not yet supported") in packages/core/src/providers/openai.ts
+- [x] T025 [P] Create Ollama provider stub (implements interface, throws "not yet supported") in packages/core/src/providers/ollama.ts
 
 ### Tools
 
