@@ -70,7 +70,7 @@
 - [x] T026 Define Tool interface (name, description, inputSchema as zod, execute returning Promise<string>) in packages/core/src/tools/base.ts
 - [x] T027 [P] Implement read_file tool (read file content from workspace, path validation) in packages/core/src/tools/file-read.ts
 - [x] T028 [P] Implement write_file tool (create/overwrite file, scope enforcement via picomatch, workspace path validation) in packages/core/src/tools/file-write.ts
-- [ ] T029 [P] Implement edit_file tool (string replacement in file, scope enforcement, workspace path validation) in packages/core/src/tools/file-edit.ts
+- [x] T029 [P] Implement edit_file tool (string replacement in file, scope enforcement, workspace path validation) in packages/core/src/tools/file-edit.ts
 - [ ] T030 [P] Implement search_files tool (regex/glob content search within workspace) in packages/core/src/tools/file-search.ts
 - [ ] T031 [P] Implement list_files tool (glob pattern file listing within workspace) in packages/core/src/tools/file-list.ts
 - [ ] T032 [P] Implement exec_command tool (sandboxed shell exec, path traversal detection, symlink check, workspace restriction) in packages/core/src/tools/shell-exec.ts
