@@ -25,12 +25,12 @@
 - [x] T004 Create shared TypeScript base config with strict mode in tsconfig.base.json
 - [x] T005 [P] Create packages/core/package.json with dependencies (fastify, @fastify/websocket, zod, picomatch, async-mutex) and packages/core/tsconfig.json
 - [x] T006 [P] Create packages/cli/package.json with dependencies (commander) and bin entry, packages/cli/tsconfig.json
-- [ ] T007 [P] Create packages/dashboard/package.json with dependencies (react, @xyflow/react, react-markdown, react-router-dom) and packages/dashboard/tsconfig.json
-- [ ] T008 [P] Create packages/sdk/package.json (name: loomflo-sdk) and packages/sdk/tsconfig.json
-- [ ] T009 [P] Configure ESLint (strict TypeScript rules) and Prettier in root .eslintrc.cjs and .prettierrc
-- [ ] T010 [P] Configure Vitest in root vitest.config.ts and packages/core/vitest.config.ts
-- [ ] T011 [P] Create GitHub Actions CI workflow in .github/workflows/ci.yml (ESLint + tsc --noEmit + vitest)
-- [ ] T012 [P] Create .env.example with ANTHROPIC_API_KEY placeholder
+- [x] T007 [P] Create packages/dashboard/package.json with dependencies (react, @xyflow/react, react-markdown, react-router-dom) and packages/dashboard/tsconfig.json
+- [x] T008 [P] Create packages/sdk/package.json (name: loomflo-sdk) and packages/sdk/tsconfig.json
+- [x] T009 [P] Configure ESLint (strict TypeScript rules) and Prettier in root .eslintrc.cjs and .prettierrc
+- [x] T010 [P] Configure Vitest in root vitest.config.ts and packages/core/vitest.config.ts
+- [x] T011 [P] Create GitHub Actions CI workflow in .github/workflows/ci.yml (ESLint + tsc --noEmit + vitest)
+- [x] T012 [P] Create .env.example with ANTHROPIC_API_KEY placeholder
 
 ---
 
