@@ -56,7 +56,7 @@
 - [x] T018 Implement daemon lifecycle (Fastify server start on 127.0.0.1, stop, graceful shutdown, auto-generate auth token to ~/.loomflo/daemon.json) in packages/core/src/daemon.ts
 - [x] T019 Implement token-based auth middleware (read token from ~/.loomflo/daemon.json, validate Authorization header) in packages/core/src/api/auth.ts
 - [x] T020 Create Fastify server factory (register routes, WebSocket, auth middleware, CORS, static file serving for dashboard) in packages/core/src/api/server.ts
-- [ ] T021 Implement GET /health route (no auth, daemon status + uptime + workflow summary) in packages/core/src/api/routes/health.ts
+- [x] T021 Implement GET /health route (no auth, daemon status + uptime + workflow summary) in packages/core/src/api/routes/health.ts
 
 ### LLM Provider
 
