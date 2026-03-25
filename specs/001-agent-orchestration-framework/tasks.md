@@ -67,7 +67,7 @@
 
 ### Tools
 
-- [ ] T026 Define Tool interface (name, description, inputSchema as zod, execute returning Promise<string>) in packages/core/src/tools/base.ts
+- [x] T026 Define Tool interface (name, description, inputSchema as zod, execute returning Promise<string>) in packages/core/src/tools/base.ts
 - [ ] T027 [P] Implement read_file tool (read file content from workspace, path validation) in packages/core/src/tools/file-read.ts
 - [ ] T028 [P] Implement write_file tool (create/overwrite file, scope enforcement via picomatch, workspace path validation) in packages/core/src/tools/file-write.ts
 - [ ] T029 [P] Implement edit_file tool (string replacement in file, scope enforcement, workspace path validation) in packages/core/src/tools/file-edit.ts
