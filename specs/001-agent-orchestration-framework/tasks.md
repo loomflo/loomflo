@@ -48,14 +48,14 @@
 
 ### Persistence
 
-- [ ] T016 [P] Implement workflow state persistence (load/save workflow.json, debounced writes) in packages/core/src/persistence/state.ts
-- [ ] T017 [P] Implement event log (append to events.jsonl, event type schemas, query by type/nodeId with filtering) in packages/core/src/persistence/events.ts
+- [x] T016 [P] Implement workflow state persistence (load/save workflow.json, debounced writes) in packages/core/src/persistence/state.ts
+- [x] T017 [P] Implement event log (append to events.jsonl, event type schemas, query by type/nodeId with filtering) in packages/core/src/persistence/events.ts
 
 ### Daemon & API Server
 
-- [ ] T018 Implement daemon lifecycle (Fastify server start on 127.0.0.1, stop, graceful shutdown, auto-generate auth token to ~/.loomflo/daemon.json) in packages/core/src/daemon.ts
-- [ ] T019 Implement token-based auth middleware (read token from ~/.loomflo/daemon.json, validate Authorization header) in packages/core/src/api/auth.ts
-- [ ] T020 Create Fastify server factory (register routes, WebSocket, auth middleware, CORS, static file serving for dashboard) in packages/core/src/api/server.ts
+- [x] T018 Implement daemon lifecycle (Fastify server start on 127.0.0.1, stop, graceful shutdown, auto-generate auth token to ~/.loomflo/daemon.json) in packages/core/src/daemon.ts
+- [x] T019 Implement token-based auth middleware (read token from ~/.loomflo/daemon.json, validate Authorization header) in packages/core/src/api/auth.ts
+- [x] T020 Create Fastify server factory (register routes, WebSocket, auth middleware, CORS, static file serving for dashboard) in packages/core/src/api/server.ts
 - [ ] T021 Implement GET /health route (no auth, daemon status + uptime + workflow summary) in packages/core/src/api/routes/health.ts
 
 ### LLM Provider
