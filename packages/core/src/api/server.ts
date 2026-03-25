@@ -1,0 +1,211 @@
+import { existsSync } from 'node:fs';
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from 'fastify';
+import fastifyWebsocket from '@fastify/websocket';
+import fastifyCors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Version string sent in the WebSocket welcome message. */
+const VERSION = '0.1.0';
+
+/** WebSocket close code for unauthorized connections. */
+const WS_CLOSE_UNAUTHORIZED = 4001;
+
+/** Numeric value of WebSocket.OPEN readyState. */
+const WS_OPEN = 1;
+
+/** Prefix for the Authorization header value. */
+const BEARER_PREFIX = 'Bearer ';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Minimal WebSocket client interface for connection tracking.
+ *
+ * Defined locally to avoid a hard dependency on `@types/ws`.
+ * Matches the subset of `ws.WebSocket` used by this module.
+ */
+interface SocketClient {
+  /** The current connection state (1 = OPEN). */
+  readonly readyState: number;
+  /** Send a UTF-8 message to the client. */
+  send(data: string): void;
+  /** Close the connection with an optional code and reason. */
+  close(code?: number, reason?: string): void;
+  /** Register an event listener on the socket. */
+  on(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+/** Configuration options for the Fastify server factory. */
+export interface ServerOptions {
+  /** Cryptographic auth token for API and WebSocket access. */
+  token: string;
+  /** Absolute path to the project workspace. */
+  projectPath: string;
+  /** Absolute path to the dashboard static files directory, or null if not available. */
+  dashboardPath: string | null;
+}
+
+/** Return value of {@link createServer}. */
+export interface ServerResult {
+  /** The configured Fastify instance (not yet listening). */
+  server: FastifyInstance;
+  /** Broadcast a JSON event to all connected WebSocket clients. */
+  broadcast: (event: Record<string, unknown>) => void;
+}
+
+// ============================================================================
+// Server Factory
+// ============================================================================
+
+/**
+ * Create and configure a Fastify server with WebSocket support, CORS,
+ * optional static file serving, and token-based authentication.
+ *
+ * The server is returned in a non-listening state — call `server.listen()`
+ * to begin accepting connections.
+ *
+ * Authentication:
+ * - HTTP routes use Bearer token in the `Authorization` header.
+ * - WebSocket connections authenticate via `?token=xxx` query parameter.
+ * - `GET /health` is unauthenticated.
+ *
+ * @param options - Server configuration options.
+ * @returns The configured server instance and a broadcast function.
+ */
+export async function createServer(options: ServerOptions): Promise<ServerResult> {
+  const { token, dashboardPath } = options;
+
+  const server = Fastify({ logger: false });
+
+  // ---------------------------------------------------------------------------
+  // Plugins
+  // ---------------------------------------------------------------------------
+
+  await server.register(fastifyWebsocket);
+  await server.register(fastifyCors, { origin: true });
+
+  if (dashboardPath && existsSync(dashboardPath)) {
+    await server.register(fastifyStatic, {
+      root: dashboardPath,
+      prefix: '/',
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth middleware — Bearer token on all HTTP routes except GET /health.
+  // WebSocket upgrade requests are excluded because WS clients authenticate
+  // via query parameter inside the WebSocket handler.
+  // ---------------------------------------------------------------------------
+
+  server.addHook(
+    'onRequest',
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      if (request.method === 'GET' && request.url === '/health') {
+        return;
+      }
+
+      if (request.url === '/ws' || request.url.startsWith('/ws?')) {
+        return;
+      }
+
+      const header = request.headers.authorization;
+
+      if (!header || !header.startsWith(BEARER_PREFIX)) {
+        await reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (header.slice(BEARER_PREFIX.length) !== token) {
+        await reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Error handler — return structured { error } JSON for all failures.
+  // ---------------------------------------------------------------------------
+
+  server.setErrorHandler(
+    async (
+      error: Error & { statusCode?: number },
+      _request: FastifyRequest,
+      reply: FastifyReply,
+    ): Promise<void> => {
+      const statusCode = error.statusCode ?? 500;
+      await reply.code(statusCode).send({ error: error.message });
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Routes
+  // ---------------------------------------------------------------------------
+
+  /** Health check endpoint (unauthenticated). */
+  server.get('/health', async (): Promise<{ status: string }> => {
+    return { status: 'ok' };
+  });
+
+  // ---------------------------------------------------------------------------
+  // WebSocket endpoint with query-param token auth
+  // ---------------------------------------------------------------------------
+
+  const clients = new Set<SocketClient>();
+
+  server.get(
+    '/ws',
+    { websocket: true },
+    (socket: SocketClient, _request: FastifyRequest): void => {
+      const url = new URL(
+        _request.url,
+        `http://${_request.headers.host ?? 'localhost'}`,
+      );
+      const queryToken = url.searchParams.get('token');
+
+      if (queryToken !== token) {
+        socket.close(WS_CLOSE_UNAUTHORIZED, 'Unauthorized');
+        return;
+      }
+
+      clients.add(socket);
+
+      socket.send(JSON.stringify({ type: 'connected', version: VERSION }));
+
+      socket.on('close', (): void => {
+        clients.delete(socket);
+      });
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Broadcast
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Send a JSON-stringified event to every connected WebSocket client.
+   *
+   * Clients whose connection is no longer open are silently skipped.
+   *
+   * @param event - The event payload to broadcast.
+   */
+  const broadcast = (event: Record<string, unknown>): void => {
+    const data = JSON.stringify(event);
+    for (const client of clients) {
+      if (client.readyState === WS_OPEN) {
+        client.send(data);
+      }
+    }
+  };
+
+  return { server, broadcast };
+}
