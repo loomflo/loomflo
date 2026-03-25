@@ -7,6 +7,7 @@ import Fastify, {
 import fastifyWebsocket from '@fastify/websocket';
 import fastifyCors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
+import { healthRoutes, type HealthRoutesOptions } from './routes/health.js';
 
 // ============================================================================
 // Constants
@@ -53,6 +54,8 @@ export interface ServerOptions {
   projectPath: string;
   /** Absolute path to the dashboard static files directory, or null if not available. */
   dashboardPath: string | null;
+  /** Callbacks for the health endpoint. When omitted, defaults to process uptime and no workflow. */
+  health?: HealthRoutesOptions;
 }
 
 /** Return value of {@link createServer}. */
@@ -151,10 +154,14 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // Routes
   // ---------------------------------------------------------------------------
 
-  /** Health check endpoint (unauthenticated). */
-  server.get('/health', async (): Promise<{ status: string }> => {
-    return { status: 'ok' };
-  });
+  await server.register(
+    healthRoutes(
+      options.health ?? {
+        getUptime: (): number => Math.floor(process.uptime()),
+        getWorkflow: (): null => null,
+      },
+    ),
+  );
 
   // ---------------------------------------------------------------------------
   // WebSocket endpoint with query-param token auth
