@@ -72,7 +72,7 @@
 - [x] T028 [P] Implement write_file tool (create/overwrite file, scope enforcement via picomatch, workspace path validation) in packages/core/src/tools/file-write.ts
 - [x] T029 [P] Implement edit_file tool (string replacement in file, scope enforcement, workspace path validation) in packages/core/src/tools/file-edit.ts
 - [x] T030 [P] Implement search_files tool (regex/glob content search within workspace) in packages/core/src/tools/file-search.ts
-- [ ] T031 [P] Implement list_files tool (glob pattern file listing within workspace) in packages/core/src/tools/file-list.ts
+- [x] T031 [P] Implement list_files tool (glob pattern file listing within workspace) in packages/core/src/tools/file-list.ts
 - [ ] T032 [P] Implement exec_command tool (sandboxed shell exec, path traversal detection, symlink check, workspace restriction) in packages/core/src/tools/shell-exec.ts
 - [ ] T033 [P] Implement read_memory tool (read shared memory .md file) in packages/core/src/tools/memory-read.ts
 - [ ] T034 [P] Implement write_memory tool (append to shared memory .md file, daemon-serialized) in packages/core/src/tools/memory-write.ts
