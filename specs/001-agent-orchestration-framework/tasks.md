@@ -42,7 +42,7 @@
 
 ### Core Types & Schemas
 
-- [ ] T013 Define all core TypeScript types and zod schemas (Workflow, WorkflowStatus, Node, NodeStatus, Graph, Edge, TopologyType, AgentInfo, AgentRole, AgentStatus, ReviewReport, TaskVerification, Event, EventType, Message, Config, Tool, ToolDefinition, LLMProvider, LLMResponse, ContentBlock, SharedMemoryFile) in packages/core/src/types.ts
+- [x] T013 Define all core TypeScript types and zod schemas (Workflow, WorkflowStatus, Node, NodeStatus, Graph, Edge, TopologyType, AgentInfo, AgentRole, AgentStatus, ReviewReport, TaskVerification, Event, EventType, Message, Config, Tool, ToolDefinition, LLMProvider, LLMResponse, ContentBlock, SharedMemoryFile) in packages/core/src/types.ts
 - [ ] T014 Define config zod schema with all configurable parameters and defaults in packages/core/src/config.ts
 - [ ] T015 Implement 3-level config loading (global ~/.loomflo/config.json → project .loomflo/config.json → CLI overrides) with deep merge in packages/core/src/config.ts
 
