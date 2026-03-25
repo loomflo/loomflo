@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ConfigSchema } from './config.js';
 
 // ============================================================================
 // Enums / Literals
@@ -354,20 +355,9 @@ export const GraphSchema = z.object({
 /** The directed acyclic graph defining workflow execution topology. */
 export type Graph = z.infer<typeof GraphSchema>;
 
-/**
- * Zod schema for workflow configuration.
- *
- * This is a passthrough schema — the full Config type with defaults and
- * validation is defined in config.ts (T014). This placeholder allows the
- * Workflow schema to accept any config object at the types layer.
- */
-export const ConfigSchema = z.record(z.string(), z.unknown());
-
-/**
- * Placeholder for the full Config type defined in config.ts.
- * Import the concrete Config type from config.ts for typed access.
- */
-export type Config = z.infer<typeof ConfigSchema>;
+// Re-export the full Config type from config.ts.
+// ConfigSchema is imported above for use in WorkflowSchema and exported from config.ts via index.ts.
+export type { Config } from './config.js';
 
 /** Zod schema for the top-level workflow entity. */
 export const WorkflowSchema = z.object({
