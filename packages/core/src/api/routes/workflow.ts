@@ -56,6 +56,11 @@ interface InitResponse {
   description: string;
 }
 
+/** Shape of the POST /workflow/start JSON response. */
+interface StartResponse {
+  status: string;
+}
+
 /** Shape of the GET /workflow JSON response. */
 interface GetWorkflowResponse {
   id: string;
@@ -77,6 +82,7 @@ interface GetWorkflowResponse {
  *
  * T055: POST /workflow/init — start Phase 1 (spec generation).
  * T056: GET /workflow — return current workflow state including graph.
+ * T057: POST /workflow/start — confirm spec and begin Phase 2 execution.
  *
  * @param options - Callbacks that supply runtime data and services.
  * @returns A Fastify plugin suitable for `server.register()`.
@@ -170,6 +176,37 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
         status: workflow.status,
         description: workflow.description,
       } satisfies InitResponse);
+    });
+
+    /**
+     * POST /workflow/start
+     *
+     * Confirm the spec and transition the workflow from 'building' to 'running',
+     * beginning Phase 2 (execution).
+     */
+    fastify.post('/workflow/start', async (_request, reply): Promise<void> => {
+      const workflow = getWorkflow();
+
+      if (workflow === null) {
+        await reply.code(404).send({ error: 'No active workflow' });
+        return;
+      }
+
+      if (workflow.status !== 'building') {
+        await reply.code(400).send({ error: 'Workflow not in building state' });
+        return;
+      }
+
+      const updated: Workflow = {
+        ...workflow,
+        status: 'running',
+        updatedAt: new Date().toISOString(),
+      };
+
+      setWorkflow(updated);
+      await saveWorkflowState(updated.projectPath, updated);
+
+      await reply.code(200).send({ status: 'running' } satisfies StartResponse);
     });
   };
 
