@@ -122,7 +122,7 @@
 - [x] T052 [US1] Implement clarification handling (detect ambiguity markers, ask user via chat API max 3 questions, resume with answers) in packages/core/src/spec/spec-engine.ts
 - [x] T053 [US1] Implement graph builder from tasks (automatic node grouping, dependency analysis, topology detection, cost estimation) in packages/core/src/spec/spec-engine.ts
 - [x] T054 [US1] Implement Loom agent spec-generation mode (drives spec engine, manages Phase 1 flow, writes artifacts to .loomflo/specs/) in packages/core/src/agents/loom.ts
-- [ ] T055 [US1] Implement POST /workflow/init route (accept description + projectPath + config, launch Loom spec generation, return workflow ID) in packages/core/src/api/routes/workflow.ts
+- [x] T055 [US1] Implement POST /workflow/init route (accept description + projectPath + config, launch Loom spec generation, return workflow ID) in packages/core/src/api/routes/workflow.ts
 - [ ] T056 [US1] Implement GET /workflow route (return current workflow state including graph) in packages/core/src/api/routes/workflow.ts
 - [ ] T057 [US1] Implement POST /workflow/start route (confirm spec, transition to execution phase) in packages/core/src/api/routes/workflow.ts
 - [ ] T058 [US1] Implement GET /specs and GET /specs/:name routes (list and read spec artifacts) in packages/core/src/api/routes/specs.ts
