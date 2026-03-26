@@ -117,7 +117,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T050 [US1] Implement spec engine 6-step pipeline (constitution → specify → plan → tasks → analyze → build graph) in packages/core/src/spec/spec-engine.ts
+- [x] T050 [US1] Implement spec engine 6-step pipeline (constitution → specify → plan → tasks → analyze → build graph) in packages/core/src/spec/spec-engine.ts
 - [ ] T051 [US1] Write system prompts for each spec generation phase (constitution prompt, spec prompt, plan prompt, tasks prompt, analysis prompt, graph builder prompt) in packages/core/src/spec/prompts.ts
 - [ ] T052 [US1] Implement clarification handling (detect ambiguity markers, ask user via chat API max 3 questions, resume with answers) in packages/core/src/spec/spec-engine.ts
 - [ ] T053 [US1] Implement graph builder from tasks (automatic node grouping, dependency analysis, topology detection, cost estimation) in packages/core/src/spec/spec-engine.ts
