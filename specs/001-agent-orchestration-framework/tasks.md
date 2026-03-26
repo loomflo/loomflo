@@ -97,7 +97,7 @@
 
 ### Foundational Tests
 
-- [ ] T043 [P] Write unit tests for config loading (3-level merge, zod validation, defaults) in packages/core/tests/unit/config.test.ts
+- [x] T043 [P] Write unit tests for config loading (3-level merge, zod validation, defaults) in packages/core/tests/unit/config.test.ts
 - [ ] T044 [P] Write unit tests for persistence (state save/load, event append/query) in packages/core/tests/unit/persistence.test.ts
 - [ ] T045 [P] Write unit tests for all 11 tools (scope enforcement, sandbox, error strings) in packages/core/tests/unit/tools.test.ts
 - [ ] T046 [P] Write unit tests for base agent loop with mock LLMProvider (tool_use cycle, end_turn, timeout, token cap) in packages/core/tests/unit/agent.test.ts
