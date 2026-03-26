@@ -1,3 +1,91 @@
 #!/usr/bin/env node
 
-console.log("loomflo cli");
+import { Command } from 'commander';
+
+import { createInitCommand } from './commands/init.js';
+
+/**
+ * Create and configure the loomflo CLI program.
+ *
+ * Registers all subcommands (both implemented and placeholder stubs)
+ * and configures global program metadata. The init command is fully
+ * implemented; remaining commands are stubs that will be wired up
+ * in later tasks.
+ *
+ * @returns The configured commander Program instance.
+ */
+function createProgram(): Command {
+  const program = new Command()
+    .name('loomflo')
+    .description('AI Agent Orchestration Framework')
+    .version('0.1.0');
+
+  // Implemented commands
+  program.addCommand(createInitCommand());
+
+  // Placeholder commands — implementations provided by future tasks
+  program
+    .command('start')
+    .description('Start the Loomflo daemon')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('stop')
+    .description('Stop the Loomflo daemon')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('chat')
+    .description('Chat with the Loom architect agent')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('status')
+    .description('Show workflow status and costs')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('resume')
+    .description('Resume a paused or interrupted workflow')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('config')
+    .description('Get or set configuration')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('logs')
+    .description('View agent logs')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  program
+    .command('dashboard')
+    .description('Open the web dashboard')
+    .action((): void => {
+      console.log('Not yet implemented');
+    });
+
+  return program;
+}
+
+const program = createProgram();
+program.parse(process.argv);
+
+if (program.args.length === 0 && process.argv.length <= 2) {
+  program.help();
+}
