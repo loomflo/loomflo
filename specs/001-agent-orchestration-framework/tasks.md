@@ -77,7 +77,7 @@
 - [x] T033 [P] Implement read_memory tool (read shared memory .md file) in packages/core/src/tools/memory-read.ts
 - [x] T034 [P] Implement write_memory tool (append to shared memory .md file, daemon-serialized) in packages/core/src/tools/memory-write.ts
 - [x] T035 [P] Implement send_message tool (send message via MessageBus to agent in same node) in packages/core/src/tools/send-message.ts
-- [ ] T036 [P] Implement report_complete tool (Looma signals task completion) in packages/core/src/tools/report-complete.ts
+- [x] T036 [P] Implement report_complete tool (Looma signals task completion) in packages/core/src/tools/report-complete.ts
 - [ ] T037 [P] Implement escalate tool (Loomi requests graph modification from Loom) in packages/core/src/tools/escalate.ts
 
 ### Agent Framework
