@@ -7,3 +7,4 @@ export { AnthropicProvider } from './providers/anthropic.js';
 export { OpenAIProvider } from './providers/openai.js';
 export { OllamaProvider } from './providers/ollama.js';
 export * from './agents/base-agent.js';
+export { MessageBus } from './agents/message-bus.js';
