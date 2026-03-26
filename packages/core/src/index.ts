@@ -9,3 +9,4 @@ export { OllamaProvider } from './providers/ollama.js';
 export * from './agents/base-agent.js';
 export { MessageBus } from './agents/message-bus.js';
 export * from './agents/prompts.js';
+export * from './costs/tracker.js';
