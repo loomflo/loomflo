@@ -82,7 +82,7 @@
 
 ### Agent Framework
 
-- [ ] T038 Implement base agent loop (collect context → call LLM → process tool_use → repeat → end_turn, with timeout and token cap enforcement) in packages/core/src/agents/base-agent.ts
+- [x] T038 Implement base agent loop (collect context → call LLM → process tool_use → repeat → end_turn, with timeout and token cap enforcement) in packages/core/src/agents/base-agent.ts
 - [ ] T039 Implement MessageBus (Map<agentId, AsyncQueue>, send/broadcast/collect, message logging) in packages/core/src/agents/message-bus.ts
 - [ ] T040 Define structured prompt templates for each agent role (role/task/context/reasoning/stop_conditions/output sections) in packages/core/src/agents/prompts.ts
 
