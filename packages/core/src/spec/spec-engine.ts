@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import type { ModelPricing } from '../costs/tracker.js';
+import { DEFAULT_PRICING } from '../costs/tracker.js';
 import type { LLMProvider } from '../providers/base.js';
 import type { Graph, LLMResponse, Node, Edge, TopologyType } from '../types.js';
 import { SPEC_PROMPTS } from './prompts.js';
@@ -138,6 +140,101 @@ export class SpecPipelineError extends Error {
   }
 }
 
+
+// ============================================================================
+// GraphValidationError
+// ============================================================================
+
+/**
+ * Validation error codes for graph integrity checks.
+ *
+ * - `cycle_detected`: The graph contains a cycle (not a valid DAG).
+ * - `duplicate_node_id`: Two or more nodes share the same ID.
+ * - `invalid_edge_reference`: An edge references a non-existent node.
+ * - `no_root_node`: No node exists without incoming edges.
+ * - `orphan_nodes`: One or more nodes have no edges at all in a multi-node graph.
+ * - `empty_graph`: The graph contains zero nodes.
+ */
+export type GraphValidationCode =
+  | 'cycle_detected'
+  | 'duplicate_node_id'
+  | 'invalid_edge_reference'
+  | 'no_root_node'
+  | 'orphan_nodes'
+  | 'empty_graph';
+
+/**
+ * Error thrown when graph validation fails.
+ *
+ * Contains a machine-readable {@link code} identifying the failure type
+ * and an optional list of {@link involvedNodes} for targeted debugging.
+ */
+export class GraphValidationError extends Error {
+  /** Machine-readable validation failure code. */
+  public readonly code: GraphValidationCode;
+  /** Node IDs involved in the validation failure, if applicable. */
+  public readonly involvedNodes: string[];
+
+  /**
+   * @param code - Machine-readable validation failure code.
+   * @param message - Human-readable description of the failure.
+   * @param involvedNodes - Node IDs involved in the failure.
+   */
+  constructor(code: GraphValidationCode, message: string, involvedNodes: string[] = []) {
+    super(message);
+    this.name = 'GraphValidationError';
+    this.code = code;
+    this.involvedNodes = involvedNodes;
+  }
+}
+
+// ============================================================================
+// Cost Estimation Types
+// ============================================================================
+
+/**
+ * Configuration for graph node cost estimation.
+ *
+ * Controls how many tokens are estimated per task and what pricing
+ * to apply. Uses {@link ModelPricing} from `costs/tracker` for consistency.
+ * These are rough estimates for user guidance, not exact billing.
+ *
+ * @param estimatedInputTokensPerTask - Estimated input tokens consumed per task.
+ * @param estimatedOutputTokensPerTask - Estimated output tokens produced per task.
+ * @param modelPricing - Per-model pricing table (model ID → pricing).
+ * @param model - Model ID to look up in the pricing table.
+ */
+export interface CostEstimationConfig {
+  /** Estimated input tokens consumed per task (default: 4000). */
+  estimatedInputTokensPerTask: number;
+  /** Estimated output tokens produced per task (default: 2000). */
+  estimatedOutputTokensPerTask: number;
+  /** Per-model pricing table keyed by model identifier (reuses costs/tracker ModelPricing). */
+  modelPricing: Record<string, ModelPricing>;
+  /** Model identifier to use for cost lookup. */
+  model: string;
+}
+
+/** Default cost estimation config using Anthropic Claude pricing via the shared pricing table. */
+export const DEFAULT_COST_ESTIMATION_CONFIG: CostEstimationConfig = {
+  estimatedInputTokensPerTask: 4000,
+  estimatedOutputTokensPerTask: 2000,
+  modelPricing: DEFAULT_PRICING,
+  model: 'claude-sonnet-4-6',
+};
+
+/**
+ * Result of graph validation and cost estimation.
+ *
+ * @param graph - The validated graph with updated topology and per-node costs.
+ * @param estimatedTotalCost - Sum of all node cost estimates in USD.
+ */
+export interface ValidatedGraph {
+  /** The validated graph with per-node cost estimates and verified topology. */
+  graph: Graph;
+  /** Estimated total cost in USD across all nodes. */
+  estimatedTotalCost: number;
+}
 
 // ============================================================================
 // Internal Types
@@ -322,6 +419,231 @@ function detectTopology(nodeIds: string[], edges: Edge[]): TopologyType {
   }
   if (divergentCount === 0 && convergentCount > 0) return 'convergent';
   return 'mixed';
+}
+
+/**
+ * Count the approximate number of discrete tasks in a node's instructions.
+ *
+ * Uses heuristics: numbered list items, bullet points, or markdown headings.
+ * Falls back to 1 if no list structure is detected.
+ *
+ * @param instructions - Markdown instructions for a graph node.
+ * @returns Estimated number of tasks (minimum 1).
+ */
+function countTasksInInstructions(instructions: string): number {
+  const numberedItems = instructions.match(/^\s*\d+\.\s/gm);
+  if (numberedItems != null && numberedItems.length > 0) {
+    return numberedItems.length;
+  }
+
+  const bulletItems = instructions.match(/^\s*[-*]\s/gm);
+  if (bulletItems != null && bulletItems.length > 0) {
+    return bulletItems.length;
+  }
+
+  const headings = instructions.match(/^#+\s/gm);
+  if (headings != null && headings.length > 0) {
+    return headings.length;
+  }
+
+  return 1;
+}
+
+// ============================================================================
+// Graph Validation & Cost Estimation (Public API)
+// ============================================================================
+
+/**
+ * Validate that a graph is a directed acyclic graph (DAG) using Kahn's algorithm.
+ *
+ * Performs a topological sort by iteratively removing nodes with zero in-degree.
+ * If all nodes are removed, the graph is a valid DAG. If nodes remain, a cycle
+ * exists among the remaining nodes.
+ *
+ * @param nodes - Map of node IDs to Node objects.
+ * @param edges - All directed edges in the graph.
+ * @throws {GraphValidationError} With code `cycle_detected` if a cycle exists.
+ */
+export function validateDag(nodes: Record<string, Node>, edges: Edge[]): void {
+  const nodeIds = Object.keys(nodes);
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+
+  for (const id of nodeIds) {
+    inDegree.set(id, 0);
+    adjacency.set(id, []);
+  }
+
+  for (const edge of edges) {
+    adjacency.get(edge.from)?.push(edge.to);
+    inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
+  }
+
+  const queue: string[] = [];
+  for (const [id, degree] of inDegree) {
+    if (degree === 0) {
+      queue.push(id);
+    }
+  }
+
+  let visited = 0;
+  let current = queue.shift();
+  while (current != null) {
+    visited++;
+
+    for (const neighbor of adjacency.get(current) ?? []) {
+      const newDegree = (inDegree.get(neighbor) ?? 0) - 1;
+      inDegree.set(neighbor, newDegree);
+      if (newDegree === 0) {
+        queue.push(neighbor);
+      }
+    }
+    current = queue.shift();
+  }
+
+  if (visited !== nodeIds.length) {
+    const cycleNodes = [...inDegree.entries()]
+      .filter(([, degree]) => degree > 0)
+      .map(([id]) => id);
+    throw new GraphValidationError(
+      'cycle_detected',
+      `Graph contains a cycle involving nodes: ${cycleNodes.join(', ')}`,
+      cycleNodes,
+    );
+  }
+}
+
+/**
+ * Validate the structural integrity of a graph.
+ *
+ * Checks:
+ * 1. The graph has at least one node.
+ * 2. All node IDs in the nodes map are unique (guaranteed by Record keys).
+ * 3. All edge references point to existing nodes.
+ * 4. At least one root node exists (no incoming edges).
+ * 5. In multi-node graphs, no node is completely disconnected (orphan).
+ *
+ * @param graph - The graph to validate.
+ * @throws {GraphValidationError} With a descriptive code if any check fails.
+ */
+export function validateGraphIntegrity(graph: Graph): void {
+  const nodeIds = new Set(Object.keys(graph.nodes));
+
+  if (nodeIds.size === 0) {
+    throw new GraphValidationError(
+      'empty_graph',
+      'Graph must contain at least one node',
+    );
+  }
+
+  for (const edge of graph.edges) {
+    if (!nodeIds.has(edge.from)) {
+      throw new GraphValidationError(
+        'invalid_edge_reference',
+        `Edge references non-existent source node "${edge.from}"`,
+        [edge.from],
+      );
+    }
+    if (!nodeIds.has(edge.to)) {
+      throw new GraphValidationError(
+        'invalid_edge_reference',
+        `Edge references non-existent target node "${edge.to}"`,
+        [edge.to],
+      );
+    }
+  }
+
+  const nodesWithIncoming = new Set(graph.edges.map((e) => e.to));
+  const rootNodes = [...nodeIds].filter((id) => !nodesWithIncoming.has(id));
+  if (rootNodes.length === 0) {
+    throw new GraphValidationError(
+      'no_root_node',
+      'Graph must have at least one root node (no incoming edges)',
+    );
+  }
+
+  if (nodeIds.size > 1) {
+    const nodesWithOutgoing = new Set(graph.edges.map((e) => e.from));
+    const connectedNodes = new Set([...nodesWithIncoming, ...nodesWithOutgoing]);
+    const orphanNodes = [...nodeIds].filter((id) => !connectedNodes.has(id));
+    if (orphanNodes.length > 0) {
+      throw new GraphValidationError(
+        'orphan_nodes',
+        `Graph contains orphan nodes with no edges: ${orphanNodes.join(', ')}`,
+        orphanNodes,
+      );
+    }
+  }
+}
+
+/**
+ * Estimate the cost of executing a single graph node.
+ *
+ * Counts the approximate number of tasks in the node's instructions,
+ * multiplies by the configured token estimates, and applies model pricing.
+ * This is a rough estimate for user guidance, not an exact billing prediction.
+ *
+ * If the configured model is not found in the pricing table, falls back
+ * to Sonnet-tier pricing ($3/$15 per million tokens).
+ *
+ * @param node - The graph node to estimate cost for.
+ * @param config - Cost estimation configuration with token estimates and pricing.
+ * @returns Estimated cost in USD.
+ */
+export function estimateNodeCost(node: Node, config: CostEstimationConfig): number {
+  const taskCount = countTasksInInstructions(node.instructions);
+
+  const totalInputTokens = taskCount * config.estimatedInputTokensPerTask;
+  const totalOutputTokens = taskCount * config.estimatedOutputTokensPerTask;
+
+  const pricing = config.modelPricing[config.model] ?? {
+    inputPricePerMToken: 3,
+    outputPricePerMToken: 15,
+  };
+
+  return (
+    (totalInputTokens * pricing.inputPricePerMToken) / 1_000_000 +
+    (totalOutputTokens * pricing.outputPricePerMToken) / 1_000_000
+  );
+}
+
+/**
+ * Validate a graph and annotate it with topology detection and cost estimates.
+ *
+ * Runs all validation checks in order:
+ * 1. Structural integrity (non-empty, valid references, roots, no orphans)
+ * 2. DAG validation (no cycles via Kahn's algorithm)
+ * 3. Topology re-detection
+ * 4. Per-node cost estimation
+ *
+ * If any validation step fails, a {@link GraphValidationError} is thrown
+ * before subsequent steps run. On success, returns the graph with updated
+ * topology, per-node cost fields, and an aggregate cost total.
+ *
+ * @param graph - The graph to validate and annotate.
+ * @param costConfig - Cost estimation configuration (defaults to Anthropic Claude pricing).
+ * @returns The validated graph and estimated total cost.
+ * @throws {GraphValidationError} If the graph fails any validation check.
+ */
+export function validateAndOptimizeGraph(
+  graph: Graph,
+  costConfig: CostEstimationConfig = DEFAULT_COST_ESTIMATION_CONFIG,
+): ValidatedGraph {
+  validateGraphIntegrity(graph);
+  validateDag(graph.nodes, graph.edges);
+
+  const topology = detectTopology(Object.keys(graph.nodes), graph.edges);
+
+  let estimatedTotalCost = 0;
+  for (const node of Object.values(graph.nodes)) {
+    node.cost = estimateNodeCost(node, costConfig);
+    estimatedTotalCost += node.cost;
+  }
+
+  return {
+    graph: { ...graph, topology },
+    estimatedTotalCost,
+  };
 }
 
 /**
@@ -908,13 +1230,14 @@ export class SpecEngine {
    * Step 6: Build the workflow execution graph from tasks and plan.
    *
    * Calls the LLM to parse the task list into execution nodes with
-   * dependencies, then constructs a valid {@link Graph} with edges
-   * and topology detection.
+   * dependencies, then constructs a valid {@link Graph} with edges,
+   * topology detection, and cost estimates. The graph is fully validated
+   * (DAG check, reference integrity, root/orphan checks) before being returned.
    *
    * @param tasks - Previously generated task list content.
    * @param plan - Previously generated plan content.
-   * @returns A validated Graph object with nodes, edges, and topology.
-   * @throws If the LLM response cannot be parsed into a valid graph.
+   * @returns A validated Graph object with nodes, edges, topology, and cost estimates.
+   * @throws {GraphValidationError} If the LLM produces an invalid graph (cycles, missing references, etc.).
    */
   private async buildGraph(tasks: string, plan: string): Promise<Graph> {
     const userMessage = [
@@ -933,6 +1256,19 @@ export class SpecEngine {
     const parsed = extractJson(responseText);
     const graphDef = validateGraphDefinition(parsed);
 
+    // Check for duplicate node IDs before building the map
+    const seenIds = new Set<string>();
+    for (const def of graphDef.nodes) {
+      if (seenIds.has(def.id)) {
+        throw new GraphValidationError(
+          'duplicate_node_id',
+          `Duplicate node ID "${def.id}" in LLM graph output`,
+          [def.id],
+        );
+      }
+      seenIds.add(def.id);
+    }
+
     // Build the node map
     const nodes: Record<string, Node> = {};
     for (const def of graphDef.nodes) {
@@ -941,22 +1277,30 @@ export class SpecEngine {
 
     // Build edges from dependency declarations
     const edges: Edge[] = [];
-    const nodeIds = new Set(Object.keys(nodes));
-
     for (const def of graphDef.nodes) {
       for (const depId of def.dependencies) {
-        if (!nodeIds.has(depId)) {
-          throw new Error(
+        if (!seenIds.has(depId)) {
+          throw new GraphValidationError(
+            'invalid_edge_reference',
             `Graph node "${def.id}" depends on unknown node "${depId}"`,
+            [def.id, depId],
           );
         }
         edges.push({ from: depId, to: def.id });
       }
     }
 
-    // Detect topology
-    const topology = detectTopology(Array.from(nodeIds), edges);
+    // Preliminary topology (will be re-verified by validateAndOptimizeGraph)
+    const topology = detectTopology(Array.from(seenIds), edges);
+    const rawGraph: Graph = { nodes, edges, topology };
 
-    return { nodes, edges, topology };
+    // Full validation: DAG check, integrity, topology re-detection, cost estimation
+    const costConfig: CostEstimationConfig = {
+      ...DEFAULT_COST_ESTIMATION_CONFIG,
+      model: this.config.model,
+    };
+    const { graph } = validateAndOptimizeGraph(rawGraph, costConfig);
+
+    return graph;
   }
 }
