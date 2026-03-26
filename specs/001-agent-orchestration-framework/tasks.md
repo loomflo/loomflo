@@ -88,7 +88,7 @@
 
 ### Cost Tracking
 
-- [ ] T041 Implement cost tracker (per-call token tracking, configurable model pricing table, per-node aggregation, total cost, budget enforcement with pause) in packages/core/src/costs/tracker.ts
+- [x] T041 Implement cost tracker (per-call token tracking, configurable model pricing table, per-node aggregation, total cost, budget enforcement with pause) in packages/core/src/costs/tracker.ts
 - [ ] T041a Implement per-agent LLM API rate limiter (configurable max calls per minute per agent, token-bucket algorithm, reject with structured error when exceeded) in packages/core/src/costs/rate-limiter.ts
 
 ### Shared Memory
