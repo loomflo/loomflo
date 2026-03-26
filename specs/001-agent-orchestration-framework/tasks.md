@@ -101,7 +101,7 @@
 - [x] T044 [P] Write unit tests for persistence (state save/load, event append/query) in packages/core/tests/unit/persistence.test.ts
 - [x] T045 [P] Write unit tests for all 11 tools (scope enforcement, sandbox, error strings) in packages/core/tests/unit/tools.test.ts
 - [x] T046 [P] Write unit tests for base agent loop with mock LLMProvider (tool_use cycle, end_turn, timeout, token cap) in packages/core/tests/unit/agent.test.ts
-- [ ] T047 [P] Write unit tests for MessageBus (send, collect, broadcast, cross-node rejection) in packages/core/tests/unit/message-bus.test.ts
+- [x] T047 [P] Write unit tests for MessageBus (send, collect, broadcast, cross-node rejection) in packages/core/tests/unit/message-bus.test.ts
 - [ ] T048 [P] Write unit tests for cost tracker (per-call tracking, budget enforcement, pause trigger) in packages/core/tests/unit/costs.test.ts
 - [ ] T049 [P] Write unit tests for shared memory (serialized writes, concurrent access, format) in packages/core/tests/unit/shared-memory.test.ts
 
