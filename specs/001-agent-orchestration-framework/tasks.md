@@ -126,7 +126,7 @@
 - [x] T056 [US1] Implement GET /workflow route (return current workflow state including graph) in packages/core/src/api/routes/workflow.ts
 - [x] T057 [US1] Implement POST /workflow/start route (confirm spec, transition to execution phase) in packages/core/src/api/routes/workflow.ts
 - [x] T058 [US1] Implement GET /specs and GET /specs/:name routes (list and read spec artifacts) in packages/core/src/api/routes/specs.ts
-- [ ] T059 [US1] Implement CLI `loomflo init "prompt"` command (call POST /workflow/init, show progress, report completion) in packages/cli/src/commands/init.ts
+- [x] T059 [US1] Implement CLI `loomflo init "prompt"` command (call POST /workflow/init, show progress, report completion) in packages/cli/src/commands/init.ts
 - [ ] T060 [US1] Implement CLI entry point with commander setup and command registration in packages/cli/src/index.ts
 - [ ] T061 [US1] Implement CLI HTTP + WebSocket client (connect to daemon, auth token, request/response) in packages/cli/src/client.ts
 - [ ] T062 [US1] Implement CLI `loomflo start` command (spawn daemon as detached child process, write daemon.json) in packages/cli/src/commands/start.ts
