@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { LLMProvider } from '../providers/base.js';
 import type { Graph, LLMResponse, Node, Edge, TopologyType } from '../types.js';
+import { SPEC_PROMPTS } from './prompts.js';
 
 // ============================================================================
 // Types
@@ -98,66 +99,6 @@ export class SpecPipelineError extends Error {
   }
 }
 
-// ============================================================================
-// Placeholder Prompts (actual prompts defined in T051 — spec/prompts.ts)
-// ============================================================================
-
-/**
- * System prompts for each spec pipeline step.
- *
- * These are placeholder strings. The actual prompt content will be
- * implemented in T051 (spec/prompts.ts) and imported here.
- */
-export const SPEC_PROMPTS = {
-  constitution: [
-    'You are Loomprint, a specification agent that generates foundational quality principles.',
-    'Given a project description, produce a constitution document defining non-negotiable',
-    'quality principles, delivery standards, technology constraints, and governance rules.',
-    'Output a complete Markdown document.',
-  ].join(' '),
-
-  spec: [
-    'You are Loomscope, a specification agent that generates functional specifications.',
-    'Given a project description and its constitution, produce a specification document with',
-    'user stories, features, functional requirements, constraints, assumptions, and out-of-scope',
-    'items. Focus on WHAT the system does, not HOW it is implemented.',
-    'Output a complete Markdown document.',
-  ].join(' '),
-
-  plan: [
-    'You are Loomcraft, a planning agent that generates technical implementation plans.',
-    'Given a project description, its constitution, and functional specification, produce a',
-    'technical plan covering stack decisions, project structure, data model, architecture',
-    'decisions, build phases, and key implementation decisions.',
-    'Output a complete Markdown document.',
-  ].join(' '),
-
-  tasks: [
-    'You are Loompath, a task planning agent that generates ordered task breakdowns.',
-    'Given a project description, its constitution, specification, and plan, produce an',
-    'ordered task list with task IDs, descriptions, file paths, dependencies, parallelism',
-    'flags, and user story associations. Each task must be concrete and actionable.',
-    'Output a complete Markdown document.',
-  ].join(' '),
-
-  analysis: [
-    'You are Loomscan, an analysis agent that audits coherence across specification artifacts.',
-    'Given the constitution, specification, plan, and tasks, check for: coverage gaps between',
-    'spec requirements and tasks, contradictions between artifacts, ambiguities that could cause',
-    'implementation issues, and constitution violations. Produce a coverage matrix and list all',
-    'findings. Output a complete Markdown document.',
-  ].join(' '),
-
-  graph: [
-    'You are Loomkit, a graph building agent that constructs execution workflow graphs.',
-    'Given the task list and plan, group related tasks into execution nodes and determine',
-    'their dependencies. Output ONLY a JSON object (no surrounding text) with this structure:',
-    '{ "nodes": [{ "id": "node-1", "title": "Node Title", "instructions": "Markdown instructions",',
-    '"dependencies": ["node-id-of-dependency"] }] }.',
-    'Each node groups tasks that should be executed together. Dependencies reference other node IDs.',
-    'The first node must have no dependencies. Ensure the graph is a valid DAG with no cycles.',
-  ].join(' '),
-} as const;
 
 // ============================================================================
 // Internal Types

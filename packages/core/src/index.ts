@@ -10,3 +10,6 @@ export * from './agents/base-agent.js';
 export { MessageBus } from './agents/message-bus.js';
 export * from './agents/prompts.js';
 export * from './costs/tracker.js';
+export * from './memory/shared-memory.js';
+export * from './spec/spec-engine.js';
+export * from './spec/prompts.js';
