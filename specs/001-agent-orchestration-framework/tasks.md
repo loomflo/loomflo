@@ -93,7 +93,7 @@
 
 ### Shared Memory
 
-- [ ] T042 Implement shared memory manager (read/write .md files with async mutex serialization, initialize 7 standard files, format enforcement) in packages/core/src/memory/shared-memory.ts
+- [x] T042 Implement shared memory manager (read/write .md files with async mutex serialization, initialize 7 standard files, format enforcement) in packages/core/src/memory/shared-memory.ts
 
 ### Foundational Tests
 
