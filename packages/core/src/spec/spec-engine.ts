@@ -26,7 +26,44 @@ export interface SpecEngineConfig {
   projectPath: string;
   /** Maximum tokens per LLM completion call. */
   maxTokens?: number;
+  /**
+   * Optional callback for handling clarification questions.
+   *
+   * When the LLM detects ambiguity in the project description, it includes
+   * `[CLARIFICATION_NEEDED]` markers in its output. If this callback is set,
+   * the engine extracts the questions (max 3), invokes the callback, and
+   * re-runs the step with the user's answers. If not set, the engine uses
+   * the LLM's best-guess defaults.
+   */
+  clarificationCallback?: ClarificationCallback;
 }
+
+/**
+ * A clarification question extracted from LLM output ambiguity markers.
+ *
+ * @param question - The clarification question text.
+ * @param context - Additional context explaining why this question matters.
+ */
+export interface ClarificationQuestion {
+  /** The clarification question text. */
+  question: string;
+  /** Additional context explaining why this question matters. */
+  context: string;
+}
+
+/**
+ * Callback invoked when the spec engine detects ambiguity and needs user input.
+ *
+ * Receives an array of questions (max 3) and must return an array of answers
+ * in the same order. The callback is responsible for presenting the questions
+ * to the user and collecting responses.
+ *
+ * @param questions - Array of clarification questions (max 3).
+ * @returns Promise resolving to an array of answer strings in corresponding order.
+ */
+export type ClarificationCallback = (
+  questions: ClarificationQuestion[],
+) => Promise<string[]>;
 
 /**
  * A single spec artifact produced by the pipeline.
@@ -62,7 +99,9 @@ export type SpecStepEvent =
   | { type: 'spec_step_started'; stepName: string; stepIndex: number }
   | { type: 'spec_step_completed'; stepName: string; stepIndex: number; artifactPath: string }
   | { type: 'spec_step_error'; stepName: string; stepIndex: number; error: Error }
-  | { type: 'spec_pipeline_completed'; artifacts: SpecArtifact[]; graph: Graph };
+  | { type: 'spec_pipeline_completed'; artifacts: SpecArtifact[]; graph: Graph }
+  | { type: 'clarification_requested'; questions: ClarificationQuestion[]; stepName: string }
+  | { type: 'clarification_answered'; answers: string[]; stepName: string };
 
 /** Callback for receiving spec pipeline progress events. */
 export type SpecStepCallback = (event: SpecStepEvent) => void;
@@ -116,6 +155,19 @@ interface GraphNodeDefinition {
 interface GraphDefinition {
   nodes: GraphNodeDefinition[];
 }
+
+// ============================================================================
+// Clarification Constants
+// ============================================================================
+
+/** Opening marker the LLM uses to signal ambiguity in its output. */
+const CLARIFICATION_MARKER_START = '[CLARIFICATION_NEEDED]';
+
+/** Closing marker the LLM uses to end the ambiguity block. */
+const CLARIFICATION_MARKER_END = '[/CLARIFICATION_NEEDED]';
+
+/** Maximum number of clarification questions per step (FR-007). */
+const MAX_CLARIFICATION_QUESTIONS = 3;
 
 // ============================================================================
 // Helper Functions
@@ -367,20 +419,34 @@ export class SpecEngine {
 
     const artifacts: SpecArtifact[] = [];
 
-    // Step 0: Generate constitution
+    // Step 0: Generate constitution (with clarification support)
     const constitution = await this.executeStep(
       0, 'constitution',
-      () => this.generateConstitution(description),
+      async () => {
+        const output = await this.generateConstitution(description);
+        return this.handleClarification(
+          'constitution', description, output,
+          (augmented) => this.generateConstitution(augmented),
+          onProgress,
+        );
+      },
       onProgress,
     );
     const constitutionArtifact = await this.writeArtifact('constitution.md', constitution);
     artifacts.push(constitutionArtifact);
     this.notifyStepCompleted(0, 'constitution', constitutionArtifact.path, onProgress);
 
-    // Step 1: Generate spec
+    // Step 1: Generate spec (with clarification support)
     const spec = await this.executeStep(
       1, 'spec',
-      () => this.generateSpec(description, constitution),
+      async () => {
+        const output = await this.generateSpec(description, constitution);
+        return this.handleClarification(
+          'spec', description, output,
+          (augmented) => this.generateSpec(augmented, constitution),
+          onProgress,
+        );
+      },
       onProgress,
     );
     const specArtifact = await this.writeArtifact('spec.md', spec);
@@ -519,6 +585,177 @@ export class SpecEngine {
     const artifactPath = join(this.specsDir, name);
     await writeFile(artifactPath, content, 'utf-8');
     return { name, path: artifactPath, content };
+  }
+
+  /**
+   * Detect `[CLARIFICATION_NEEDED]` markers in LLM output and extract questions.
+   *
+   * Parses the block between `[CLARIFICATION_NEEDED]` and `[/CLARIFICATION_NEEDED]`
+   * for numbered questions (Q1:, Q2:, etc.) with optional `Context:` lines.
+   *
+   * Expected marker format:
+   * ```
+   * [CLARIFICATION_NEEDED]
+   * Q1: Question text here?
+   * Context: Why this matters.
+   * Q2: Another question?
+   * Context: Additional context.
+   * [/CLARIFICATION_NEEDED]
+   * ```
+   *
+   * @param text - The raw LLM output text to scan.
+   * @returns Array of extracted clarification questions, empty if no markers found.
+   */
+  private detectAmbiguityMarkers(text: string): ClarificationQuestion[] {
+    const startIdx = text.indexOf(CLARIFICATION_MARKER_START);
+    const endIdx = text.indexOf(CLARIFICATION_MARKER_END);
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+      return [];
+    }
+
+    const block = text
+      .substring(startIdx + CLARIFICATION_MARKER_START.length, endIdx)
+      .trim();
+
+    if (block.length === 0) {
+      return [];
+    }
+
+    const lines = block.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    const questions: ClarificationQuestion[] = [];
+    let currentQuestion: string | null = null;
+    let currentContext = '';
+
+    for (const line of lines) {
+      const qMatch = /^Q\d+:\s*(.+)$/.exec(line);
+      const cMatch = /^Context:\s*(.+)$/.exec(line);
+
+      if (qMatch?.[1] != null) {
+        // Flush the previous question before starting a new one
+        if (currentQuestion !== null) {
+          questions.push({ question: currentQuestion, context: currentContext });
+        }
+        currentQuestion = qMatch[1];
+        currentContext = '';
+      } else if (cMatch?.[1] != null) {
+        currentContext = cMatch[1];
+      }
+    }
+
+    // Flush the last question
+    if (currentQuestion !== null) {
+      questions.push({ question: currentQuestion, context: currentContext });
+    }
+
+    return questions;
+  }
+
+  /**
+   * Remove the `[CLARIFICATION_NEEDED]...[/CLARIFICATION_NEEDED]` block from text.
+   *
+   * Returns the remaining text (the LLM's best-guess output) with the marker
+   * block stripped out and surrounding whitespace normalized.
+   *
+   * @param text - The raw LLM output containing clarification markers.
+   * @returns The text with the clarification block removed.
+   */
+  private stripClarificationMarkers(text: string): string {
+    const startIdx = text.indexOf(CLARIFICATION_MARKER_START);
+    const endIdx = text.indexOf(CLARIFICATION_MARKER_END);
+
+    if (startIdx === -1 || endIdx === -1) {
+      return text;
+    }
+
+    const before = text.substring(0, startIdx);
+    const after = text.substring(endIdx + CLARIFICATION_MARKER_END.length);
+    return (before + after).trim();
+  }
+
+  /**
+   * Handle clarification for a pipeline step's LLM output.
+   *
+   * Detects ambiguity markers in the output and, if found:
+   * - With a callback: asks the user (max 3 questions), augments the description
+   *   with answers, and re-runs the step exactly once.
+   * - Without a callback: logs a warning and returns the output with markers stripped.
+   * - On callback failure: logs a warning and returns the output with markers stripped.
+   *
+   * If no markers are found, returns the output unchanged.
+   *
+   * Only one clarification round occurs per step — the re-run output is returned
+   * as-is regardless of whether it contains markers.
+   *
+   * @param stepName - Name of the current pipeline step (for logging and events).
+   * @param description - The original project description.
+   * @param llmOutput - The raw LLM output that may contain clarification markers.
+   * @param rerunFn - Function to re-run the step with an augmented description.
+   * @param onProgress - Optional progress callback for emitting clarification events.
+   * @returns The final step output (either original, stripped, or re-run result).
+   */
+  private async handleClarification(
+    stepName: string,
+    description: string,
+    llmOutput: string,
+    rerunFn: (augmentedDescription: string) => Promise<string>,
+    onProgress?: SpecStepCallback,
+  ): Promise<string> {
+    const questions = this.detectAmbiguityMarkers(llmOutput);
+
+    if (questions.length === 0) {
+      return llmOutput;
+    }
+
+    const limitedQuestions = questions.slice(0, MAX_CLARIFICATION_QUESTIONS);
+
+    if (this.config.clarificationCallback == null) {
+      // No callback configured — use LLM's best guesses
+      console.warn(
+        `[SpecEngine] Clarification needed in "${stepName}" step but no callback configured. Using LLM defaults.`,
+      );
+      return this.stripClarificationMarkers(llmOutput);
+    }
+
+    // Emit clarification_requested event
+    onProgress?.({
+      type: 'clarification_requested',
+      questions: limitedQuestions,
+      stepName,
+    });
+
+    let answers: string[];
+    try {
+      answers = await this.config.clarificationCallback(limitedQuestions);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[SpecEngine] Clarification callback failed in "${stepName}" step: ${message}. Using LLM defaults.`,
+      );
+      return this.stripClarificationMarkers(llmOutput);
+    }
+
+    // Emit clarification_answered event
+    onProgress?.({
+      type: 'clarification_answered',
+      answers,
+      stepName,
+    });
+
+    // Build augmented description with Q&A pairs
+    const clarificationLines = limitedQuestions
+      .map((q, i) => `Q: ${q.question}\nA: ${answers[i] ?? 'No answer provided'}`)
+      .join('\n\n');
+
+    const augmentedDescription = [
+      description,
+      '',
+      '## Clarifications',
+      clarificationLines,
+    ].join('\n');
+
+    // Re-run the step once with the augmented description
+    return rerunFn(augmentedDescription);
   }
 
   /**
