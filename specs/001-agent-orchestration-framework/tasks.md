@@ -73,7 +73,7 @@
 - [x] T029 [P] Implement edit_file tool (string replacement in file, scope enforcement, workspace path validation) in packages/core/src/tools/file-edit.ts
 - [x] T030 [P] Implement search_files tool (regex/glob content search within workspace) in packages/core/src/tools/file-search.ts
 - [x] T031 [P] Implement list_files tool (glob pattern file listing within workspace) in packages/core/src/tools/file-list.ts
-- [ ] T032 [P] Implement exec_command tool (sandboxed shell exec, path traversal detection, symlink check, workspace restriction) in packages/core/src/tools/shell-exec.ts
+- [x] T032 [P] Implement exec_command tool (sandboxed shell exec, path traversal detection, symlink check, workspace restriction) in packages/core/src/tools/shell-exec.ts
 - [ ] T033 [P] Implement read_memory tool (read shared memory .md file) in packages/core/src/tools/memory-read.ts
 - [ ] T034 [P] Implement write_memory tool (append to shared memory .md file, daemon-serialized) in packages/core/src/tools/memory-write.ts
 - [ ] T035 [P] Implement send_message tool (send message via MessageBus to agent in same node) in packages/core/src/tools/send-message.ts
