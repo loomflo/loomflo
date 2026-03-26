@@ -56,6 +56,18 @@ interface InitResponse {
   description: string;
 }
 
+/** Shape of the GET /workflow JSON response. */
+interface GetWorkflowResponse {
+  id: string;
+  status: string;
+  description: string;
+  projectPath: string;
+  totalCost: number;
+  createdAt: string;
+  updatedAt: string;
+  graph: Workflow['graph'];
+}
+
 // ============================================================================
 // Plugin Factory
 // ============================================================================
@@ -64,7 +76,7 @@ interface InitResponse {
  * Create a Fastify route plugin that registers workflow routes.
  *
  * T055: POST /workflow/init — start Phase 1 (spec generation).
- * T056/T057 routes will be added in subsequent tasks.
+ * T056: GET /workflow — return current workflow state including graph.
  *
  * @param options - Callbacks that supply runtime data and services.
  * @returns A Fastify plugin suitable for `server.register()`.
@@ -73,6 +85,32 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
   const { getWorkflow, setWorkflow } = options;
 
   const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+    /**
+     * GET /workflow
+     *
+     * Returns the current workflow state including the execution graph.
+     * Returns 404 if no workflow is active.
+     */
+    fastify.get('/workflow', async (_request, reply): Promise<void> => {
+      const workflow = getWorkflow();
+
+      if (workflow === null) {
+        await reply.code(404).send({ error: 'No active workflow' });
+        return;
+      }
+
+      await reply.code(200).send({
+        id: workflow.id,
+        status: workflow.status,
+        description: workflow.description,
+        projectPath: workflow.projectPath,
+        totalCost: workflow.totalCost,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
+        graph: workflow.graph,
+      } satisfies GetWorkflowResponse);
+    });
+
     /**
      * POST /workflow/init
      *
