@@ -4,6 +4,7 @@ import { Command } from 'commander';
 
 import { createInitCommand } from './commands/init.js';
 import { createStartCommand } from './commands/start.js';
+import { createStopCommand } from './commands/stop.js';
 
 /**
  * Create and configure the loomflo CLI program.
@@ -24,13 +25,7 @@ function createProgram(): Command {
   // Implemented commands
   program.addCommand(createInitCommand());
   program.addCommand(createStartCommand());
-
-  program
-    .command('stop')
-    .description('Stop the Loomflo daemon')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
+  program.addCommand(createStopCommand());
 
   program
     .command('chat')
