@@ -154,7 +154,7 @@
 - [x] T068 [US2] Implement Workflow state machine (init → spec → building → running → paused → done, state transitions, persistence after each change) in packages/core/src/workflow/workflow.ts
 - [x] T069 [US2] Implement Scheduler (delay management with setTimeout, resumeAt timestamp persistence, remaining time on restart, immediate execute if past) in packages/core/src/workflow/scheduler.ts
 - [x] T070 [US2] Implement Loomi agent (read node instructions, plan team size/roles, assign file scopes via picomatch non-overlapping validation, spawn Loomas via Promise.all, handle report_complete signals) in packages/core/src/agents/loomi.ts
-- [ ] T071 [US2] Implement Looma agent (receive structured prompt + write scope + tools, execute task within scope, communicate via MessageBus, report completion) in packages/core/src/agents/looma.ts
+- [x] T071 [US2] Implement Looma agent (receive structured prompt + write scope + tools, execute task within scope, communicate via MessageBus, report completion) in packages/core/src/agents/looma.ts
 - [ ] T072 [US2] Implement Loomex agent (receive node instructions + spec + files produced, inspect work quality, generate structured verdict PASS/FAIL/BLOCKED with task-level details) in packages/core/src/agents/loomex.ts
 - [ ] T073 [US2] Implement retry logic in Loomi (on FAIL: generate adapted prompt from Loomex feedback, relaunch only failed Loomas, track retry count, enforce maxRetriesPerNode/maxRetriesPerTask) in packages/core/src/agents/loomi.ts
 - [ ] T074 [US2] Implement escalation logic (on BLOCKED or max retries: Loomi escalates to Loom, Loom modifies graph to work around issue) in packages/core/src/agents/loomi.ts
