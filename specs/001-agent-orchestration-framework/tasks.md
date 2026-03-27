@@ -130,7 +130,7 @@
 - [x] T060 [US1] Implement CLI entry point with commander setup and command registration in packages/cli/src/index.ts
 - [x] T061 [US1] Implement CLI HTTP + WebSocket client (connect to daemon, auth token, request/response) in packages/cli/src/client.ts
 - [x] T062 [US1] Implement CLI `loomflo start` command (spawn daemon as detached child process, write daemon.json) in packages/cli/src/commands/start.ts
-- [ ] T063 [US1] Implement CLI `loomflo stop` command (call daemon shutdown, wait for active calls to finish) in packages/cli/src/commands/stop.ts
+- [x] T063 [US1] Implement CLI `loomflo stop` command (call daemon shutdown, wait for active calls to finish) in packages/cli/src/commands/stop.ts
 
 ### Tests for User Story 1
 
