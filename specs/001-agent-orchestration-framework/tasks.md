@@ -157,7 +157,7 @@
 - [x] T071 [US2] Implement Looma agent (receive structured prompt + write scope + tools, execute task within scope, communicate via MessageBus, report completion) in packages/core/src/agents/looma.ts
 - [x] T072 [US2] Implement Loomex agent (receive node instructions + spec + files produced, inspect work quality, generate structured verdict PASS/FAIL/BLOCKED with task-level details) in packages/core/src/agents/loomex.ts
 - [x] T073 [US2] Implement retry logic in Loomi (on FAIL: generate adapted prompt from Loomex feedback, relaunch only failed Loomas, track retry count, enforce maxRetriesPerNode/maxRetriesPerTask) in packages/core/src/agents/loomi.ts
-- [ ] T074 [US2] Implement escalation logic (on BLOCKED or max retries: Loomi escalates to Loom, Loom modifies graph to work around issue) in packages/core/src/agents/loomi.ts
+- [x] T074 [US2] Implement escalation logic (on BLOCKED or max retries: Loomi escalates to Loom, Loom modifies graph to work around issue) in packages/core/src/agents/loomi.ts
 - [ ] T075 [US2] Implement Loom agent execution mode (monitor shared memory asynchronously, handle escalations, insert/remove/modify graph nodes, log changes to ARCHITECTURE_CHANGES.md) in packages/core/src/agents/loom.ts
 - [ ] T076 [US2] Implement File Ownership System (scope assignment validation for non-overlap, write enforcement in tools, temporary lock protocol via MessageBus) in packages/core/src/workflow/node.ts
 - [ ] T077 [US2] Implement workflow execution engine (iterate graph by topology, activate nodes when predecessors done, handle parallel/convergent/divergent paths, never deadlock) in packages/core/src/workflow/workflow.ts
