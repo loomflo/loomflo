@@ -134,7 +134,7 @@
 
 ### Tests for User Story 1
 
-- [ ] T064 [P] [US1] Write unit tests for spec engine (mock LLM, verify 6 artifacts produced, graph validity) in packages/core/tests/unit/spec-engine.test.ts
+- [x] T064 [P] [US1] Write unit tests for spec engine (mock LLM, verify 6 artifacts produced, graph validity) in packages/core/tests/unit/spec-engine.test.ts
 - [ ] T065 [P] [US1] Write integration test for workflow init API route in packages/core/tests/integration/workflow-init.test.ts
 
 **Checkpoint**: Developer can init a project, generate specs, and review them. MVP complete.
