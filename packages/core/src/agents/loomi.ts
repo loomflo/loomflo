@@ -822,6 +822,47 @@ async function handleEscalation(
 }
 
 // ============================================================================
+// Per-Task Retry Limits
+// ============================================================================
+
+/**
+ * Increment per-task retry counters and partition workers into eligible and exhausted.
+ *
+ * Workers already in the permanently failed set are excluded before processing.
+ * Each remaining worker's counter is incremented. Workers exceeding the per-task
+ * limit are classified as exhausted.
+ *
+ * @param workers - Failed worker plans to evaluate.
+ * @param taskRetryTracker - Map of worker ID to cumulative retry count.
+ * @param maxRetriesPerTask - Maximum retries allowed per individual task.
+ * @param permanentlyFailed - Worker IDs already permanently failed.
+ * @returns Partitioned workers: eligible for retry and newly exhausted.
+ */
+function applyPerTaskRetryLimits(
+  workers: WorkerPlan[],
+  taskRetryTracker: Map<string, number>,
+  maxRetriesPerTask: number,
+  permanentlyFailed: string[],
+): { eligible: WorkerPlan[]; exhausted: WorkerPlan[] } {
+  const failedSet = new Set(permanentlyFailed);
+  const retryable = workers.filter((p) => !failedSet.has(p.id));
+
+  for (const plan of retryable) {
+    const current = taskRetryTracker.get(plan.id) ?? 0;
+    taskRetryTracker.set(plan.id, current + 1);
+  }
+
+  const eligible = retryable.filter(
+    (p) => (taskRetryTracker.get(p.id) ?? 0) <= maxRetriesPerTask,
+  );
+  const exhausted = retryable.filter(
+    (p) => (taskRetryTracker.get(p.id) ?? 0) > maxRetriesPerTask,
+  );
+
+  return { eligible, exhausted };
+}
+
+// ============================================================================
 // runLoomi
 // ============================================================================
 
@@ -851,6 +892,9 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
   const maxRetries = config.config.maxRetriesPerNode;
   let retryCount = 0;
   const allCompletedAgents: string[] = [];
+  const taskRetryTracker = new Map<string, number>();
+  const maxRetriesPerTask = config.config.maxRetriesPerTask;
+  const permanentlyFailedAgents: string[] = [];
 
   // ---- Phase 1: Plan the team ----
 
@@ -944,11 +988,17 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
         ? `This is retry attempt ${String(retryCount)}. Address the issues from the previous attempt.`
         : undefined;
 
+      const retryDetails = retryCount > 0
+        ? '\n' + activePlans
+            .map((p) => `  - ${p.id} (task retry ${String(taskRetryTracker.get(p.id) ?? 0)}/${String(maxRetriesPerTask)})`)
+            .join('\n') + '\n'
+        : '';
+
       await writeProgress(
         config,
         loomiAgentId,
         retryCount > 0
-          ? `## Retry ${String(retryCount)} — Relaunching ${String(activePlans.length)} worker(s)\n`
+          ? `## Retry ${String(retryCount)} — Relaunching ${String(activePlans.length)} worker(s)${retryDetails}\n`
           : `## Spawning ${String(activePlans.length)} worker(s)\n`,
       );
 
@@ -1046,9 +1096,9 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
               config,
               loomiAgentId,
               `Node "${config.nodeTitle}" exhausted ${String(maxRetries)} retries: ${reviewReport.details}`,
-              reviewReport.recommendation,
+              `${reviewReport.recommendation}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed workers (per-task limit): ${permanentlyFailedAgents.join(', ')}` : ''}`,
               allCompletedAgents,
-              [],
+              permanentlyFailedAgents,
               retryCount,
             );
           }
@@ -1062,12 +1112,42 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
             (p) => failedTaskIds.includes(p.id) || failedTaskIds.length === 0,
           );
 
-          activePlans =
+          const candidatePlans =
             failedWorkerPlans.length > 0 ? failedWorkerPlans : [...teamPlan.workers];
+
+          // Apply per-task retry limits
+          const { eligible: reviewEligible, exhausted: reviewExhausted } =
+            applyPerTaskRetryLimits(candidatePlans, taskRetryTracker, maxRetriesPerTask, permanentlyFailedAgents);
+
+          if (reviewExhausted.length > 0) {
+            permanentlyFailedAgents.push(...reviewExhausted.map((p) => p.id));
+            await writeProgress(
+              config,
+              loomiAgentId,
+              `## Per-task retry limit reached\n` +
+                `Permanently failed: ${reviewExhausted.map((p) => p.id).join(', ')}\n`,
+            );
+          }
+
+          if (reviewEligible.length === 0) {
+            return await handleEscalation(
+              config,
+              loomiAgentId,
+              `Node "${config.nodeTitle}" — all failed workers exhausted per-task retry limit (${String(maxRetriesPerTask)})`,
+              `Permanently failed workers: ${permanentlyFailedAgents.join(', ')}`,
+              allCompletedAgents,
+              permanentlyFailedAgents,
+              retryCount,
+            );
+          }
+
+          activePlans = reviewEligible;
 
           await logEvent(config, loomiAgentId, 'retry_triggered', {
             retryCount: retryCount + 1,
             failedWorkers: activePlans.map((p) => p.id),
+            taskRetryCounts: Object.fromEntries(taskRetryTracker),
+            permanentlyFailed: permanentlyFailedAgents,
           });
 
           const feedback = `${reviewReport.details}\n\nRecommendation: ${reviewReport.recommendation}`;
@@ -1098,23 +1178,53 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
       // Some workers failed — retry if possible
       if (retryCount >= maxRetries) {
+        const allFailed = [...new Set([...failedIds, ...permanentlyFailedAgents])];
         return await handleEscalation(
           config,
           loomiAgentId,
           `Node "${config.nodeTitle}" has ${String(failedIds.length)} failed worker(s) after ${String(maxRetries)} retries`,
-          `Failed workers: ${failedIds.join(', ')}`,
+          `Failed workers: ${failedIds.join(', ')}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed (per-task limit): ${permanentlyFailedAgents.join(', ')}` : ''}`,
           allCompletedAgents,
-          failedIds,
+          allFailed,
           retryCount,
         );
       }
 
       const failedWorkerPlans = teamPlan.workers.filter((p) => failedIds.includes(p.id));
-      activePlans = failedWorkerPlans;
+
+      // Apply per-task retry limits
+      const { eligible: workerEligible, exhausted: workerExhausted } =
+        applyPerTaskRetryLimits(failedWorkerPlans, taskRetryTracker, maxRetriesPerTask, permanentlyFailedAgents);
+
+      if (workerExhausted.length > 0) {
+        permanentlyFailedAgents.push(...workerExhausted.map((p) => p.id));
+        await writeProgress(
+          config,
+          loomiAgentId,
+          `## Per-task retry limit reached\n` +
+            `Permanently failed: ${workerExhausted.map((p) => p.id).join(', ')}\n`,
+        );
+      }
+
+      if (workerEligible.length === 0) {
+        return await handleEscalation(
+          config,
+          loomiAgentId,
+          `Node "${config.nodeTitle}" — all failed workers exhausted per-task retry limit (${String(maxRetriesPerTask)})`,
+          `Permanently failed workers: ${permanentlyFailedAgents.join(', ')}`,
+          allCompletedAgents,
+          permanentlyFailedAgents,
+          retryCount,
+        );
+      }
+
+      activePlans = workerEligible;
 
       await logEvent(config, loomiAgentId, 'retry_triggered', {
         retryCount: retryCount + 1,
-        failedWorkers: failedIds,
+        failedWorkers: activePlans.map((p) => p.id),
+        taskRetryCounts: Object.fromEntries(taskRetryTracker),
+        permanentlyFailed: permanentlyFailedAgents,
       });
 
       retryCount++;
@@ -1126,7 +1236,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
   return {
     status: 'failed',
     completedAgents: allCompletedAgents,
-    failedAgents: [],
+    failedAgents: permanentlyFailedAgents,
     retryCount,
   };
 }
