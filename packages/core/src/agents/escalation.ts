@@ -107,7 +107,7 @@ const ESCALATION_AGENT_ID = 'loom-escalation';
 function buildEscalationSystemPrompt(): string {
   return [
     'You are Loom, the Architect agent in the Loomflo framework.',
-    'An Orchestrator (Loomi) has escalated an issue to you. A node in the workflow has failed or is blocked.',
+    'An Orchestrator (Loomi) has submitted an escalation to you. A node in the workflow has failed or is blocked.',
     '',
     'Your task is to decide how to modify the workflow graph to work around the issue.',
     'The workflow must NEVER deadlock — you must always choose an action that allows forward progress.',
@@ -340,9 +340,20 @@ export class EscalationManager implements EscalationHandlerLike {
       };
     }
 
-    // Apply the modification
+    // Apply the modification (skip for no_action)
+    if (modification.action === 'no_action') {
+      // Log but don't modify the graph
+      await this.logEvent('graph_modified', {
+        action: 'no_action',
+        nodeId: modification.nodeId ?? request.nodeId,
+        reason: modification.reason,
+      });
+    }
+
     try {
-      await this.config.graphModifier.applyModification(modification);
+      if (modification.action !== 'no_action') {
+        await this.config.graphModifier.applyModification(modification);
+      }
     } catch {
       // Graph modification failed — log but don't re-throw
       await this.logEvent('graph_modified', {
@@ -363,14 +374,32 @@ export class EscalationManager implements EscalationHandlerLike {
     });
 
     // Write to ARCHITECTURE_CHANGES.md
-    const changeEntry = [
+    const changeParts = [
       `## Escalation: ${modification.action}`,
       `**Node:** ${modification.nodeId ?? request.nodeId}`,
       `**Reason:** ${modification.reason}`,
+      `**Escalated by:** ${request.agentId}`,
       `**Original escalation:** ${request.reason}`,
-      `**Timestamp:** ${new Date().toISOString()}`,
-      '',
-    ].join('\n');
+    ];
+
+    if (modification.newNode !== undefined) {
+      changeParts.push(`**New Node Title:** ${modification.newNode.title}`);
+      changeParts.push(`**New Node Instructions:** ${modification.newNode.instructions}`);
+      if (modification.newNode.insertAfter !== undefined) {
+        changeParts.push(`**Insert after:** ${modification.newNode.insertAfter}`);
+      }
+      if (modification.newNode.insertBefore !== undefined) {
+        changeParts.push(`**Insert before:** ${modification.newNode.insertBefore}`);
+      }
+    }
+
+    if (modification.modifiedInstructions !== undefined) {
+      changeParts.push(`**Modified Instructions:** ${modification.modifiedInstructions}`);
+    }
+
+    changeParts.push(`**Timestamp:** ${new Date().toISOString()}`, '');
+
+    const changeEntry = changeParts.join('\n');
 
     try {
       await this.config.sharedMemory.write(

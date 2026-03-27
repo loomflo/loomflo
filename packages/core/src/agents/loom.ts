@@ -4,13 +4,12 @@
  * There is exactly one Loom per project. It persists for the entire workflow
  * lifetime and is responsible for:
  * - Driving the SpecEngine pipeline (Phase 1: spec generation)
- * - Managing the transition from Phase 1 to Phase 2 (execution)
- * - Writing all artifacts to `.loomflo/specs/`
+ * - Handling escalations from Loomi orchestrators (Phase 2: execution)
+ * - Monitoring shared memory for critical issues and proactive intervention
+ * - Responding to user chat messages
+ * - Managing graph modifications
  * - Logging events to the EventLog
  * - Tracking costs via CostTracker
- *
- * This module implements ONLY the spec-generation mode. Execution mode
- * (monitoring, escalation handling, chat) will be added in T075.
  */
 
 import type { CostTracker } from '../costs/tracker.js';
@@ -23,6 +22,9 @@ import type {
   ClarificationCallback,
 } from '../spec/spec-engine.js';
 import { SpecEngine } from '../spec/spec-engine.js';
+import type { EscalationRequest } from '../tools/escalate.js';
+import type { GraphModification, GraphModifierLike } from './escalation.js';
+import type { EventType } from '../types.js';
 
 // ============================================================================
 // Constants
@@ -34,6 +36,9 @@ const DEFAULT_LOOM_MODEL = 'claude-opus-4-6';
 /** Agent ID used for event logging and shared memory attribution. */
 const LOOM_AGENT_ID = 'loom';
 
+/** Shared memory files monitored for critical issues. */
+const MONITORED_MEMORY_FILES = ['ERRORS.md', 'ISSUES.md', 'PROGRESS.md'];
+
 // ============================================================================
 // LoomAgentStatus
 // ============================================================================
@@ -43,10 +48,18 @@ const LOOM_AGENT_ID = 'loom';
  *
  * - `created`: Agent instantiated but no work started.
  * - `running_spec`: Spec-generation pipeline is executing.
- * - `running_execution`: Execution mode is active (T075).
+ * - `running_execution`: Execution mode is active.
+ * - `handling_escalation`: Processing an escalation from a Loomi.
+ * - `handling_chat`: Responding to a user chat message.
  * - `idle`: Work completed or awaiting further instructions.
  */
-export type LoomAgentStatus = 'created' | 'running_spec' | 'running_execution' | 'idle';
+export type LoomAgentStatus =
+  | 'created'
+  | 'running_spec'
+  | 'running_execution'
+  | 'handling_escalation'
+  | 'handling_chat'
+  | 'idle';
 
 // ============================================================================
 // LoomConfig
@@ -54,15 +67,6 @@ export type LoomAgentStatus = 'created' | 'running_spec' | 'running_execution' |
 
 /**
  * Configuration for creating a Loom agent instance.
- *
- * @param provider - LLM provider for making completion calls.
- * @param model - Model identifier (defaults to claude-opus-4-6).
- * @param projectPath - Absolute path to the project workspace.
- * @param eventLog - Event log for persisting workflow events.
- * @param sharedMemory - Shared memory manager for cross-agent state.
- * @param costTracker - Cost tracker for LLM usage accounting.
- * @param maxTokensPerCall - Maximum tokens per LLM call (optional).
- * @param clarificationCallback - Callback for handling ambiguity questions (optional).
  */
 export interface LoomConfig {
   /** LLM provider for making completion calls. */
@@ -84,6 +88,222 @@ export interface LoomConfig {
   maxTokensPerCall?: number;
   /** Callback for handling clarification questions during spec generation. */
   clarificationCallback?: ClarificationCallback;
+  /** Callback for applying graph modifications (execution mode). */
+  graphModifier?: GraphModifierLike;
+  /** Summary of the current graph state for context (execution mode). */
+  graphSummary?: string;
+}
+
+// ============================================================================
+// EscalationResult
+// ============================================================================
+
+/**
+ * Result of handling an escalation request.
+ */
+export interface EscalationResult {
+  /** Whether the escalation was handled successfully. */
+  success: boolean;
+  /** The decided graph modification, or null if handling failed. */
+  modification: GraphModification | null;
+  /** Error message if handling failed. */
+  error?: string;
+}
+
+// ============================================================================
+// ChatResult
+// ============================================================================
+
+/**
+ * Result of handling a user chat message.
+ */
+export interface ChatResult {
+  /** The response text from Loom. */
+  response: string;
+  /** Graph modification if the user requested one, or null. */
+  modification: GraphModification | null;
+  /** Error message if chat handling failed. */
+  error?: string;
+}
+
+// ============================================================================
+// MonitoringResult
+// ============================================================================
+
+/**
+ * Result of shared memory monitoring.
+ */
+export interface MonitoringResult {
+  /** Whether critical issues were detected. */
+  issuesDetected: boolean;
+  /** Proactive graph modification if intervention is needed, or null. */
+  modification: GraphModification | null;
+  /** Summary of findings. */
+  summary: string;
+}
+
+// ============================================================================
+// Escalation Prompt Helpers
+// ============================================================================
+
+/**
+ * Build the system prompt for escalation handling.
+ *
+ * @returns System prompt for the architect to decide on graph modifications.
+ */
+function buildEscalationHandlingPrompt(): string {
+  return [
+    'You are Loom, the Architect agent in the Loomflo AI agent orchestration framework.',
+    'An Orchestrator agent (Loomi) has escalated an issue to you because a node is blocked or has exhausted all retries.',
+    '',
+    'Your job is to decide how to modify the workflow graph to resolve the issue and ensure forward progress.',
+    'The workflow must NEVER deadlock.',
+    '',
+    'Available actions:',
+    '- add_node: Insert a new node to handle the work differently.',
+    '- modify_node: Change the failed node\'s instructions for a fresh approach.',
+    '- remove_node: Remove the node if its work is not critical.',
+    '- skip_node: Mark as done and move on (for optional or deferrable work).',
+    '- no_action: No graph change needed.',
+    '',
+    'Respond with ONLY a JSON object:',
+    '{"action": "...", "nodeId": "...", "newNode": {"title": "...", "instructions": "...", "insertAfter": "...", "insertBefore": "..."}, "modifiedInstructions": "...", "reason": "..."}',
+    'Include only the fields relevant to your chosen action.',
+  ].join('\n');
+}
+
+/**
+ * Build the system prompt for shared memory monitoring.
+ *
+ * @returns System prompt for proactive monitoring.
+ */
+function buildMonitoringPrompt(): string {
+  return [
+    'You are Loom, the Architect agent monitoring the Loomflo workflow for critical issues.',
+    '',
+    'Review the shared memory content below. Look for:',
+    '- Repeated failures or errors that suggest a systemic problem',
+    '- Contradictions between agents or decisions',
+    '- Blockers that agents have reported but not escalated',
+    '- Architecture issues that need proactive intervention',
+    '',
+    'If you detect a critical issue requiring graph modification, respond with a JSON object:',
+    '{"issuesDetected": true, "action": "add_node|modify_node|remove_node|skip_node", "nodeId": "...", "reason": "...", "summary": "..."}',
+    '',
+    'If no critical issues are found, respond with:',
+    '{"issuesDetected": false, "summary": "Brief summary of current state"}',
+  ].join('\n');
+}
+
+/**
+ * Build the system prompt for chat handling.
+ *
+ * @returns System prompt for conversational interaction.
+ */
+function buildChatHandlingPrompt(): string {
+  return [
+    'You are Loom, the Architect agent in the Loomflo framework.',
+    'A developer is chatting with you about their project.',
+    '',
+    'You can:',
+    '1. Answer questions about the project, its architecture, and current status',
+    '2. Relay instructions to orchestrators (note what needs to change)',
+    '3. Propose graph modifications if the developer requests structural changes',
+    '',
+    'If the developer requests a graph change (add/remove/modify nodes), include a JSON block in your response:',
+    '```json',
+    '{"graphChange": {"action": "...", "nodeId": "...", "reason": "..."}}',
+    '```',
+    '',
+    'Otherwise, just respond naturally and helpfully.',
+  ].join('\n');
+}
+
+// ============================================================================
+// JSON Extraction
+// ============================================================================
+
+/**
+ * Extract a JSON object from text that may contain markdown fences.
+ *
+ * @param text - Raw text from the LLM response.
+ * @returns Parsed JSON value, or null if extraction fails.
+ */
+function extractJson(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    // Fall through
+  }
+
+  const fenceMatch = /```(?:json)?\s*\n?([\s\S]*?)```/i.exec(trimmed);
+  if (fenceMatch?.[1] !== undefined) {
+    try {
+      return JSON.parse(fenceMatch[1].trim()) as Record<string, unknown>;
+    } catch {
+      // Fall through
+    }
+  }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+    } catch {
+      // Fall through
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse a graph modification from a JSON object.
+ *
+ * @param json - Parsed JSON object from LLM response.
+ * @param fallbackNodeId - Node ID to use if not specified in the response.
+ * @returns Parsed graph modification.
+ */
+function parseGraphModification(
+  json: Record<string, unknown>,
+  fallbackNodeId: string,
+): GraphModification {
+  const action = json['action'] as GraphModification['action'] | undefined;
+  const validActions = new Set(['add_node', 'modify_node', 'remove_node', 'skip_node', 'no_action']);
+
+  const modification: GraphModification = {
+    action: action !== undefined && validActions.has(action) ? action : 'skip_node',
+    reason: typeof json['reason'] === 'string' ? json['reason'] : 'No reason provided',
+  };
+
+  if (typeof json['nodeId'] === 'string') {
+    modification.nodeId = json['nodeId'];
+  } else if (modification.action !== 'add_node' && modification.action !== 'no_action') {
+    modification.nodeId = fallbackNodeId;
+  }
+
+  if (modification.action === 'add_node' && typeof json['newNode'] === 'object' && json['newNode'] !== null) {
+    const newNode = json['newNode'] as Record<string, unknown>;
+    modification.newNode = {
+      title: typeof newNode['title'] === 'string' ? newNode['title'] : 'Recovery Node',
+      instructions: typeof newNode['instructions'] === 'string' ? newNode['instructions'] : '',
+    };
+    if (typeof newNode['insertAfter'] === 'string') {
+      modification.newNode.insertAfter = newNode['insertAfter'];
+    }
+    if (typeof newNode['insertBefore'] === 'string') {
+      modification.newNode.insertBefore = newNode['insertBefore'];
+    }
+  }
+
+  if (modification.action === 'modify_node' && typeof json['modifiedInstructions'] === 'string') {
+    modification.modifiedInstructions = json['modifiedInstructions'];
+  }
+
+  return modification;
 }
 
 // ============================================================================
@@ -93,12 +313,12 @@ export interface LoomConfig {
 /**
  * The Loom (Architect) agent — top-level agent, one per project.
  *
- * In spec-generation mode, Loom drives the {@link SpecEngine} pipeline,
- * logs events, tracks costs, and writes progress updates to shared memory.
- *
- * The agent does NOT use the base agent loop for spec generation — it
- * drives the SpecEngine directly. The base agent loop will be used in
- * execution mode (T075) for responding to escalations and chat.
+ * Operates in two modes:
+ * - **Spec generation** (Phase 1): Drives the {@link SpecEngine} pipeline to
+ *   produce specification artifacts and the workflow graph.
+ * - **Execution** (Phase 2): Handles escalations from Loomi orchestrators,
+ *   monitors shared memory for critical issues, responds to user chat,
+ *   and manages graph modifications.
  *
  * @example
  * ```typescript
@@ -110,7 +330,13 @@ export interface LoomConfig {
  *   costTracker: tracker,
  * });
  *
+ * // Phase 1
  * const result = await loom.runSpecGeneration('Build a REST API with auth');
+ *
+ * // Phase 2
+ * const chatResult = await loom.handleChat('How is auth implemented?');
+ * const escalationResult = await loom.handleEscalation(request);
+ * const monitorResult = await loom.monitorSharedMemory();
  * ```
  */
 export class LoomAgent {
@@ -202,12 +428,299 @@ export class LoomAgent {
   }
 
   /**
+   * Handle an escalation request from a Loomi orchestrator.
+   *
+   * Makes an LLM call to analyze the escalation, decides on a graph
+   * modification, applies it via the graphModifier callback, and logs
+   * the change to shared memory (ARCHITECTURE_CHANGES.md).
+   *
+   * This method never throws — all errors produce an {@link EscalationResult}
+   * with success=false.
+   *
+   * @param request - The escalation request from the Loomi.
+   * @returns Result with the decided graph modification.
+   */
+  async handleEscalation(request: EscalationRequest): Promise<EscalationResult> {
+    this.status = 'handling_escalation';
+
+    try {
+      await this.logEventGeneric('escalation_triggered', {
+        nodeId: request.nodeId,
+        agentId: request.agentId,
+        reason: request.reason,
+        suggestedAction: request.suggestedAction ?? null,
+      });
+
+      // Build escalation context
+      const userMessage = [
+        '## Escalation Report',
+        `**Node:** ${request.nodeId}`,
+        `**Agent:** ${request.agentId}`,
+        `**Reason:** ${request.reason}`,
+        request.suggestedAction !== undefined ? `**Suggested:** ${request.suggestedAction}` : '',
+        request.details !== undefined ? `\n**Details:**\n${request.details}` : '',
+        this.config.graphSummary !== undefined ? `\n## Current Graph\n${this.config.graphSummary}` : '',
+      ].filter((l) => l.length > 0).join('\n');
+
+      // LLM call to decide
+      const response = await this.config.provider.complete({
+        messages: [{ role: 'user', content: userMessage }],
+        system: buildEscalationHandlingPrompt(),
+        model: this.model,
+      });
+
+      this.config.costTracker.recordCall(
+        this.model,
+        response.usage.inputTokens,
+        response.usage.outputTokens,
+        LOOM_AGENT_ID,
+        request.nodeId,
+      );
+
+      const textBlocks = response.content.filter(
+        (block): block is { type: 'text'; text: string } => block.type === 'text',
+      );
+      const responseText = textBlocks.map((b) => b.text).join('\n');
+
+      const json = extractJson(responseText);
+      const modification = json !== null
+        ? parseGraphModification(json, request.nodeId)
+        : {
+            action: 'skip_node' as const,
+            nodeId: request.nodeId,
+            reason: 'Failed to parse architect response — skipping node for forward progress',
+          };
+
+      // Apply modification if graphModifier is available
+      if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+        try {
+          await this.config.graphModifier.applyModification(modification);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await this.writeProgress(`## Escalation — Graph modification failed\n${msg}\n`);
+        }
+      }
+
+      // Log the graph modification
+      await this.logEventGeneric('graph_modified', {
+        action: modification.action,
+        nodeId: modification.nodeId ?? request.nodeId,
+        reason: modification.reason,
+      });
+
+      // Write to ARCHITECTURE_CHANGES.md
+      const changeEntry = [
+        `## Escalation Resolution: ${modification.action}`,
+        `**Node:** ${modification.nodeId ?? request.nodeId}`,
+        `**Reason:** ${modification.reason}`,
+        `**Original Issue:** ${request.reason}`,
+        `**Timestamp:** ${new Date().toISOString()}`,
+        '',
+      ].join('\n');
+
+      await this.writeMemory('ARCHITECTURE_CHANGES.md', changeEntry);
+
+      this.status = 'idle';
+      return { success: true, modification };
+    } catch (err: unknown) {
+      this.status = 'idle';
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, modification: null, error: message };
+    }
+  }
+
+  /**
+   * Monitor shared memory files for critical issues requiring proactive intervention.
+   *
+   * Reads ERRORS.md, ISSUES.md, and PROGRESS.md from shared memory. If content
+   * suggests critical issues (repeated failures, contradictions, blockers), makes
+   * an LLM call to decide on a proactive graph modification.
+   *
+   * This method never throws — all errors produce a safe {@link MonitoringResult}.
+   *
+   * @returns Result with findings and optional graph modification.
+   */
+  async monitorSharedMemory(): Promise<MonitoringResult> {
+    try {
+      // Read monitored files
+      const memoryContents: string[] = [];
+      for (const fileName of MONITORED_MEMORY_FILES) {
+        try {
+          const file = await this.config.sharedMemory.read(fileName);
+          if (file.content.length > 0) {
+            memoryContents.push(`## ${fileName}\n${file.content}`);
+          }
+        } catch {
+          // File may not exist yet — skip
+        }
+      }
+
+      if (memoryContents.length === 0) {
+        return { issuesDetected: false, modification: null, summary: 'No shared memory content to monitor' };
+      }
+
+      const userMessage = memoryContents.join('\n\n');
+
+      const response = await this.config.provider.complete({
+        messages: [{ role: 'user', content: userMessage }],
+        system: buildMonitoringPrompt(),
+        model: this.model,
+      });
+
+      this.config.costTracker.recordCall(
+        this.model,
+        response.usage.inputTokens,
+        response.usage.outputTokens,
+        LOOM_AGENT_ID,
+        null as unknown as string,
+      );
+
+      const textBlocks = response.content.filter(
+        (block): block is { type: 'text'; text: string } => block.type === 'text',
+      );
+      const responseText = textBlocks.map((b) => b.text).join('\n');
+
+      const json = extractJson(responseText);
+      if (json === null) {
+        return { issuesDetected: false, modification: null, summary: 'Could not parse monitoring response' };
+      }
+
+      const issuesDetected = json['issuesDetected'] === true;
+      const summary = typeof json['summary'] === 'string' ? json['summary'] : 'No summary';
+
+      if (!issuesDetected) {
+        return { issuesDetected: false, modification: null, summary };
+      }
+
+      const modification = parseGraphModification(json, '');
+
+      // Apply modification if possible
+      if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+        try {
+          await this.config.graphModifier.applyModification(modification);
+          await this.logEventGeneric('graph_modified', {
+            action: modification.action,
+            nodeId: modification.nodeId ?? 'proactive',
+            reason: modification.reason,
+            source: 'monitoring',
+          });
+        } catch {
+          // Non-critical
+        }
+      }
+
+      return { issuesDetected: true, modification, summary };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { issuesDetected: false, modification: null, summary: `Monitoring error: ${message}` };
+    }
+  }
+
+  /**
+   * Handle a user chat message and produce a response.
+   *
+   * Makes an LLM call with the chat context to respond to the user. If the
+   * user requests a graph change, extracts and applies it.
+   *
+   * This method never throws — all errors produce a safe {@link ChatResult}.
+   *
+   * @param message - The user's chat message.
+   * @param chatHistory - Optional formatted chat history for context.
+   * @returns Result with response text and optional graph modification.
+   */
+  async handleChat(message: string, chatHistory?: string): Promise<ChatResult> {
+    this.status = 'handling_chat';
+
+    try {
+      const contextParts = [message];
+      if (chatHistory !== undefined && chatHistory.length > 0) {
+        contextParts.unshift(`## Previous Chat\n${chatHistory}\n\n## New Message`);
+      }
+      if (this.config.graphSummary !== undefined) {
+        contextParts.push(`\n\n## Current Workflow Graph\n${this.config.graphSummary}`);
+      }
+
+      const userMessage = contextParts.join('\n');
+
+      const response = await this.config.provider.complete({
+        messages: [{ role: 'user', content: userMessage }],
+        system: buildChatHandlingPrompt(),
+        model: this.model,
+      });
+
+      this.config.costTracker.recordCall(
+        this.model,
+        response.usage.inputTokens,
+        response.usage.outputTokens,
+        LOOM_AGENT_ID,
+        null as unknown as string,
+      );
+
+      const textBlocks = response.content.filter(
+        (block): block is { type: 'text'; text: string } => block.type === 'text',
+      );
+      const responseText = textBlocks.map((b) => b.text).join('\n');
+
+      // Check for embedded graph change request
+      let modification: GraphModification | null = null;
+      const graphChangeMatch = /```json\s*\n?\s*\{[\s\S]*?"graphChange"[\s\S]*?\}\s*\n?\s*```/i.exec(responseText);
+      if (graphChangeMatch !== null) {
+        const changeJson = extractJson(graphChangeMatch[0]);
+        if (changeJson !== null && typeof changeJson['graphChange'] === 'object' && changeJson['graphChange'] !== null) {
+          modification = parseGraphModification(
+            changeJson['graphChange'] as Record<string, unknown>,
+            '',
+          );
+
+          if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+            try {
+              await this.config.graphModifier.applyModification(modification);
+              await this.logEventGeneric('graph_modified', {
+                action: modification.action,
+                nodeId: modification.nodeId ?? 'chat-requested',
+                reason: modification.reason,
+                source: 'chat',
+              });
+            } catch {
+              // Non-critical
+            }
+          }
+        }
+      }
+
+      // Clean response text (remove JSON blocks if present)
+      const cleanResponse = responseText.replace(/```json[\s\S]*?```/g, '').trim();
+
+      await this.logEventGeneric('message_sent', {
+        direction: 'outbound',
+        content: cleanResponse.slice(0, 500),
+      });
+
+      this.status = 'idle';
+      return { response: cleanResponse, modification };
+    } catch (err: unknown) {
+      this.status = 'idle';
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      return { response: `I encountered an error processing your message: ${errorMsg}`, modification: null, error: errorMsg };
+    }
+  }
+
+  /**
    * Returns the current lifecycle status of the Loom agent.
    *
    * @returns The agent's current status.
    */
   getStatus(): LoomAgentStatus {
     return this.status;
+  }
+
+  /**
+   * Update the graph summary used for context in escalation and chat handling.
+   *
+   * @param summary - New graph summary string.
+   */
+  updateGraphSummary(summary: string): void {
+    (this.config as { graphSummary?: string }).graphSummary = summary;
   }
 
   // ==========================================================================
@@ -276,9 +789,9 @@ export class LoomAgent {
   }
 
   /**
-   * Log an event to the project's events.jsonl file.
+   * Log a spec-phase event to the project's events.jsonl file.
    *
-   * @param type - Event type identifier.
+   * @param type - Event type identifier (spec_phase_started or spec_phase_completed).
    * @param details - Event-specific payload data.
    */
   private async logEvent(
@@ -296,11 +809,48 @@ export class LoomAgent {
   }
 
   /**
+   * Log a generic event to the project's events.jsonl file.
+   *
+   * @param type - Event type identifier.
+   * @param details - Event-specific payload data.
+   */
+  private async logEventGeneric(
+    type: EventType,
+    details: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const event = createEvent({
+        type,
+        workflowId: this.config.eventLog.workflowId,
+        agentId: LOOM_AGENT_ID,
+        details,
+      });
+      await appendEvent(this.config.projectPath, event);
+    } catch {
+      // Event logging failure is non-critical
+    }
+  }
+
+  /**
    * Write a progress update to the PROGRESS.md shared memory file.
    *
    * @param content - Markdown content to append.
    */
   private async writeProgress(content: string): Promise<void> {
     await this.config.sharedMemory.write('PROGRESS.md', content, LOOM_AGENT_ID);
+  }
+
+  /**
+   * Write content to a named shared memory file.
+   *
+   * @param fileName - Shared memory file name.
+   * @param content - Markdown content to append.
+   */
+  private async writeMemory(fileName: string, content: string): Promise<void> {
+    try {
+      await this.config.sharedMemory.write(fileName, content, LOOM_AGENT_ID);
+    } catch {
+      // Non-critical
+    }
   }
 }
