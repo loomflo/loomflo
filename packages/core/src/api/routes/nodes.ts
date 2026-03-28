@@ -130,6 +130,7 @@ function toNodeDetail(node: Node): NodeDetail {
  *
  * T078: GET /nodes — list all nodes with status/cost summaries.
  * T078: GET /nodes/:id — get detailed node info with agents/scopes/logs.
+ * T079: GET /nodes/:id/review — get the Loomex review report for a node.
  *
  * @param options - Callbacks that supply runtime data.
  * @returns A Fastify plugin suitable for `server.register()`.
@@ -188,6 +189,44 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
       }
 
       await reply.code(200).send(toNodeDetail(node));
+    });
+
+    /**
+     * GET /nodes/:id/review
+     *
+     * Returns the Loomex review report for a specific node.
+     * Returns 404 if no workflow is active, the node is not found, or no review report exists.
+     */
+    fastify.get('/nodes/:id/review', async (request, reply): Promise<void> => {
+      const workflow = getWorkflow();
+
+      if (workflow === null) {
+        await reply.code(404).send({ error: 'No active workflow' });
+        return;
+      }
+
+      const parseResult = NodeParamsSchema.safeParse(request.params);
+      if (!parseResult.success) {
+        await reply.code(400).send({
+          error: 'Invalid node ID',
+          details: parseResult.error.issues,
+        });
+        return;
+      }
+
+      const node: Node | undefined = workflow.graph.nodes[parseResult.data.id];
+
+      if (node === undefined) {
+        await reply.code(404).send({ error: 'Node not found' });
+        return;
+      }
+
+      if (node.reviewReport === null) {
+        await reply.code(404).send({ error: 'No review report for this node' });
+        return;
+      }
+
+      await reply.code(200).send(node.reviewReport);
     });
   };
 
