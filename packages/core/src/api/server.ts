@@ -12,6 +12,7 @@ import { memoryRoutes, type MemoryRoutesOptions } from './routes/memory.js';
 import { eventsRoutes, type EventsRoutesOptions } from './routes/events.js';
 import { nodesRoutes, type NodesRoutesOptions } from './routes/nodes.js';
 import { workflowRoutes, type WorkflowRoutesOptions } from './routes/workflow.js';
+import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 
 // ============================================================================
 // Constants
@@ -42,6 +43,7 @@ const API_ROUTE_PREFIXES = [
   '/memory',
   '/events',
   '/specs',
+  '/chat',
 ];
 
 // ============================================================================
@@ -83,6 +85,8 @@ export interface ServerOptions {
   memory?: MemoryRoutesOptions;
   /** Callbacks for the events routes. When omitted, events routes are not registered. */
   events?: EventsRoutesOptions;
+  /** Callbacks for the chat routes. When omitted, chat routes are not registered. */
+  chat?: ChatRoutesOptions;
 }
 
 /** Return value of {@link createServer}. */
@@ -221,6 +225,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   if (options.events) {
     await server.register(eventsRoutes(options.events));
+  }
+
+  if (options.chat) {
+    await server.register(chatRoutes(options.chat));
   }
 
   // ---------------------------------------------------------------------------
