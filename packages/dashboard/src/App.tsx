@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Routes, Route, NavLink, Outlet } from "react-router-dom";
 
 import { HomePage } from "./pages/Home.js";
+import { MemoryPage } from "./pages/Memory.js";
 import { NodePage } from "./pages/Node.js";
 import { SpecsPage } from "./pages/Specs.js";
 
@@ -59,11 +60,6 @@ function Graph(): ReactElement {
 }
 
 /** Placeholder page component. */
-function Memory(): ReactElement {
-  return <h2 className="text-2xl font-semibold">Memory</h2>;
-}
-
-/** Placeholder page component. */
 function Chat(): ReactElement {
   return <h2 className="text-2xl font-semibold">Chat</h2>;
 }
@@ -91,7 +87,7 @@ export function App(): ReactElement {
         <Route path="graph" element={<Graph />} />
         <Route path="node/:id" element={<NodePage />} />
         <Route path="specs" element={<SpecsPage />} />
-        <Route path="memory" element={<Memory />} />
+        <Route path="memory" element={<MemoryPage />} />
         <Route path="chat" element={<Chat />} />
         <Route path="costs" element={<Costs />} />
         <Route path="config" element={<Config />} />
