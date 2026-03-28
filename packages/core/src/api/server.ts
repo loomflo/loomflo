@@ -9,6 +9,7 @@ import fastifyCors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import { healthRoutes, type HealthRoutesOptions } from './routes/health.js';
 import { memoryRoutes, type MemoryRoutesOptions } from './routes/memory.js';
+import { eventsRoutes, type EventsRoutesOptions } from './routes/events.js';
 import { nodesRoutes, type NodesRoutesOptions } from './routes/nodes.js';
 import { workflowRoutes, type WorkflowRoutesOptions } from './routes/workflow.js';
 
@@ -65,6 +66,8 @@ export interface ServerOptions {
   nodes?: NodesRoutesOptions;
   /** Callbacks for the memory routes. When omitted, memory routes are not registered. */
   memory?: MemoryRoutesOptions;
+  /** Callbacks for the events routes. When omitted, events routes are not registered. */
+  events?: EventsRoutesOptions;
 }
 
 /** Return value of {@link createServer}. */
@@ -182,6 +185,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   if (options.memory) {
     await server.register(memoryRoutes(options.memory));
+  }
+
+  if (options.events) {
+    await server.register(eventsRoutes(options.events));
   }
 
   // ---------------------------------------------------------------------------
