@@ -168,10 +168,10 @@
 ### Tests for User Story 2
 
 - [x] T081 [P] [US2] Write unit tests for Graph (add/remove nodes, DAG validation, cycle rejection, topology detection) in packages/core/tests/unit/graph.test.ts
-- [ ] T082 [P] [US2] Write unit tests for Node lifecycle (state transitions, invalid transition rejection) in packages/core/tests/unit/node.test.ts
-- [ ] T083 [P] [US2] Write unit tests for Scheduler (delay timing, resumeAt persistence, past-due immediate execute) in packages/core/tests/unit/scheduler.test.ts
+- [x] T082 [P] [US2] Write unit tests for Node lifecycle (state transitions, invalid transition rejection) in packages/core/tests/unit/node.test.ts
+- [x] T083 [P] [US2] Write unit tests for Scheduler (delay timing, resumeAt persistence, past-due immediate execute) in packages/core/tests/unit/scheduler.test.ts
 - [ ] T084 [P] [US2] Write unit tests for retry cycle (FAIL → adapted prompt → relaunch, max retries → escalation) in packages/core/tests/unit/retry.test.ts
-- [ ] T085 [P] [US2] Write unit tests for File Ownership (scope validation, overlap rejection, write enforcement) in packages/core/tests/unit/file-ownership.test.ts
+- [x] T085 [P] [US2] Write unit tests for File Ownership (scope validation, overlap rejection, write enforcement) in packages/core/tests/unit/file-ownership.test.ts
 
 **Checkpoint**: Full workflow execution works. Nodes run in order, agents produce files, review/retry/escalation cycle functions.
 
