@@ -1,13 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-
-/**
- * Root application component placeholder.
- * Will be replaced with router and layout once dashboard pages are implemented.
- */
-function App(): React.ReactElement {
-  return <h1>Loomflo Dashboard</h1>;
-}
+import { BrowserRouter } from "react-router-dom";
+import { App } from "./App";
+import "./index.css";
 
 const root = document.getElementById("root");
 if (!root) {
@@ -16,6 +11,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 );
