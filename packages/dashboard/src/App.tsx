@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Outlet } from "react-router-dom";
 
 import { HomePage } from "./pages/Home.js";
 import { NodePage } from "./pages/Node.js";
+import { SpecsPage } from "./pages/Specs.js";
 
 /** Navigation items displayed in the sidebar. */
 const NAV_ITEMS: readonly { path: string; label: string }[] = [
@@ -58,11 +59,6 @@ function Graph(): ReactElement {
 }
 
 /** Placeholder page component. */
-function Specs(): ReactElement {
-  return <h2 className="text-2xl font-semibold">Specs</h2>;
-}
-
-/** Placeholder page component. */
 function Memory(): ReactElement {
   return <h2 className="text-2xl font-semibold">Memory</h2>;
 }
@@ -94,7 +90,7 @@ export function App(): ReactElement {
         <Route index element={<HomePage />} />
         <Route path="graph" element={<Graph />} />
         <Route path="node/:id" element={<NodePage />} />
-        <Route path="specs" element={<Specs />} />
+        <Route path="specs" element={<SpecsPage />} />
         <Route path="memory" element={<Memory />} />
         <Route path="chat" element={<Chat />} />
         <Route path="costs" element={<Costs />} />
