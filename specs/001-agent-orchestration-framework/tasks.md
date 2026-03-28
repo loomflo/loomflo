@@ -189,7 +189,7 @@
 - [x] T087 [US3] Implement shared types in packages/dashboard/src/lib/types.ts (mirror core types for Workflow, Node, Agent, ReviewReport, Event, Config, Cost)
 - [x] T088 [US3] Implement REST API client (fetch wrapper with auth token, typed responses) in packages/dashboard/src/lib/api.ts
 - [x] T089 [US3] Implement useWebSocket hook (connect to WS /ws with auth, dispatch events to subscribers, reconnect with backoff) in packages/dashboard/src/hooks/useWebSocket.ts
-- [ ] T090 [US3] Implement useWorkflow hook (fetch workflow state via REST, update on WS events) in packages/dashboard/src/hooks/useWorkflow.ts
+- [x] T090 [US3] Implement useWorkflow hook (fetch workflow state via REST, update on WS events) in packages/dashboard/src/hooks/useWorkflow.ts
 - [ ] T091 [US3] Implement GraphView component (React Flow wrapper: custom node layout, edge styling, auto-layout, programmatic updates) in packages/dashboard/src/components/GraphView.tsx
 - [ ] T092 [US3] Implement NodeCard component (title, status badge with colors per status, agent count, cost, click to navigate) in packages/dashboard/src/components/NodeCard.tsx
 - [ ] T093 [US3] Implement AgentStatus component (role icon, state indicator, current task description) in packages/dashboard/src/components/AgentStatus.tsx
