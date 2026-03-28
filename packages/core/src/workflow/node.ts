@@ -7,6 +7,7 @@
 
 import picomatch from 'picomatch';
 import type { AgentInfo, Node, NodeStatus, ReviewReport } from '../types.js';
+import { FileOwnershipManager, generateTestPaths } from './file-ownership.js';
 
 /**
  * Valid state transitions for the node lifecycle.
@@ -280,6 +281,34 @@ export class WorkflowNode {
   }
 
   /**
+   * Creates a {@link FileOwnershipManager} initialized with this node's
+   * current permanent file ownership assignments.
+   *
+   * The returned manager is independent — changes to it do not automatically
+   * propagate back to the node. Use {@link applyFileOwnershipState} to
+   * persist manager state back to the node when needed.
+   *
+   * @returns A new FileOwnershipManager reflecting the node's current scopes.
+   */
+  createFileOwnershipManager(): FileOwnershipManager {
+    return new FileOwnershipManager(this.data.fileOwnership);
+  }
+
+  /**
+   * Applies permanent scope assignments from a {@link FileOwnershipManager}
+   * back to this node's file ownership data.
+   *
+   * Replaces all existing ownership entries with the manager's current scopes.
+   * Temporary locks are not persisted in the node data — they live only in the
+   * manager during execution.
+   *
+   * @param manager - The FileOwnershipManager whose scopes to apply.
+   */
+  applyFileOwnershipState(manager: FileOwnershipManager): void {
+    this.data.fileOwnership = manager.getAllScopes();
+  }
+
+  /**
    * Serializes the node to a plain {@link Node} object.
    *
    * @returns A copy of the underlying node data.
@@ -333,32 +362,3 @@ export class WorkflowNode {
   }
 }
 
-/**
- * Generates representative file paths from glob patterns for overlap testing.
- *
- * Converts glob patterns into concrete paths by replacing wildcard segments
- * with literal placeholders, producing paths that the original glob would match.
- *
- * @param patterns - Glob patterns to derive test paths from.
- * @returns Array of concrete test paths.
- */
-function generateTestPaths(patterns: string[]): string[] {
-  const paths = new Set<string>();
-
-  for (const pattern of patterns) {
-    // Replace ** with a representative deep path segment
-    let path = pattern.replace(/\*\*/g, 'a/b');
-    // Replace remaining * with a representative filename
-    path = path.replace(/\*/g, 'test.file');
-    // Replace character classes with first char or a representative
-    path = path.replace(/\{([^}]+)\}/g, (_match, group: string) => {
-      const first = group.split(',')[0];
-      return first ?? 'x';
-    });
-    // Replace ? with a single character
-    path = path.replace(/\?/g, 'x');
-    paths.add(path);
-  }
-
-  return Array.from(paths);
-}
