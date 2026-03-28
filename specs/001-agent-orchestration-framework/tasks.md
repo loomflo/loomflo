@@ -201,7 +201,7 @@
 - [x] T099 [US3] Implement Home page (overview: workflow status, active nodes summary, cost summary, recent events) in packages/dashboard/src/pages/Home.tsx
 - [x] T100 [US3] Implement Specs page (list spec artifacts, render selected artifact as markdown) in packages/dashboard/src/pages/Specs.tsx
 - [x] T101 [US3] Implement Memory page (list shared memory files, render selected file as markdown, show last modified timestamp) in packages/dashboard/src/pages/Memory.tsx
-- [ ] T102 [US3] Implement GET /memory and GET /memory/:name routes in packages/core/src/api/routes/memory.ts
+- [x] T102 [US3] Implement GET /memory and GET /memory/:name routes in packages/core/src/api/routes/memory.ts
 - [ ] T103 [US3] Implement GET /events route (query event log with type/nodeId filtering, pagination) in packages/core/src/api/routes/events.ts
 - [ ] T104 [US3] Configure Fastify to serve built dashboard as static files at root path in packages/core/src/api/server.ts
 
