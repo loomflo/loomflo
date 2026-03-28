@@ -186,7 +186,7 @@
 ### Implementation for User Story 3
 
 - [x] T086 [US3] Initialize Vite + React 19 + TailwindCSS 4.x project with React Router in packages/dashboard/ (main.tsx, App.tsx with routes, index.html, vite.config.ts, tailwind.config.ts)
-- [ ] T087 [US3] Implement shared types in packages/dashboard/src/lib/types.ts (mirror core types for Workflow, Node, Agent, ReviewReport, Event, Config, Cost)
+- [x] T087 [US3] Implement shared types in packages/dashboard/src/lib/types.ts (mirror core types for Workflow, Node, Agent, ReviewReport, Event, Config, Cost)
 - [ ] T088 [US3] Implement REST API client (fetch wrapper with auth token, typed responses) in packages/dashboard/src/lib/api.ts
 - [ ] T089 [US3] Implement useWebSocket hook (connect to WS /ws with auth, dispatch events to subscribers, reconnect with backoff) in packages/dashboard/src/hooks/useWebSocket.ts
 - [ ] T090 [US3] Implement useWorkflow hook (fetch workflow state via REST, update on WS events) in packages/dashboard/src/hooks/useWorkflow.ts
