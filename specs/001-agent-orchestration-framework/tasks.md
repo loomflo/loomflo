@@ -218,8 +218,8 @@
 ### Implementation for User Story 4
 
 - [x] T105 [US4] Implement Loom routing logic (classify user message as question/instruction/graph-change, route to appropriate handler) in packages/core/src/agents/loom.ts
-- [ ] T106 [US4] Implement POST /chat route (send message to Loom, return response + optional action taken) in packages/core/src/api/routes/chat.ts
-- [ ] T107 [US4] Implement GET /chat/history route (return persisted conversation history) in packages/core/src/api/routes/chat.ts
+- [x] T106 [US4] Implement POST /chat route (send message to Loom, return response + optional action taken) in packages/core/src/api/routes/chat.ts
+- [x] T107 [US4] Implement GET /chat/history route (return persisted conversation history) in packages/core/src/api/routes/chat.ts
 - [ ] T108 [US4] Implement chat_response WebSocket event (broadcast Loom responses to dashboard) in packages/core/src/api/websocket.ts
 - [ ] T109 [US4] Implement CLI `loomflo chat "message"` command (call POST /chat, display response, show action if taken) in packages/cli/src/commands/chat.ts
 - [ ] T110 [US4] Implement ChatInterface component (message list, text input, typing/streaming indicator) in packages/dashboard/src/components/ChatInterface.tsx
