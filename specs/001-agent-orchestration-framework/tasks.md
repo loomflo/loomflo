@@ -203,7 +203,7 @@
 - [x] T101 [US3] Implement Memory page (list shared memory files, render selected file as markdown, show last modified timestamp) in packages/dashboard/src/pages/Memory.tsx
 - [x] T102 [US3] Implement GET /memory and GET /memory/:name routes in packages/core/src/api/routes/memory.ts
 - [x] T103 [US3] Implement GET /events route (query event log with type/nodeId filtering, pagination) in packages/core/src/api/routes/events.ts
-- [ ] T104 [US3] Configure Fastify to serve built dashboard as static files at root path in packages/core/src/api/server.ts
+- [x] T104 [US3] Configure Fastify to serve built dashboard as static files at root path in packages/core/src/api/server.ts
 
 **Checkpoint**: Dashboard shows live workflow with graph, agents, messages, specs, memory, costs.
 
