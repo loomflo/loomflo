@@ -161,7 +161,7 @@
 - [x] T075 [US2] Implement Loom agent execution mode (monitor shared memory asynchronously, handle escalations, insert/remove/modify graph nodes, log changes to ARCHITECTURE_CHANGES.md) in packages/core/src/agents/loom.ts
 - [x] T076 [US2] Implement File Ownership System (scope assignment validation for non-overlap, write enforcement in tools, temporary lock protocol via MessageBus) in packages/core/src/workflow/node.ts
 - [x] T077 [US2] Implement workflow execution engine (iterate graph by topology, activate nodes when predecessors done, handle parallel/convergent/divergent paths, never deadlock) in packages/core/src/workflow/workflow.ts
-- [ ] T078 [US2] Implement GET /nodes and GET /nodes/:id routes (list nodes with status/cost, node detail with agents/scopes/logs) in packages/core/src/api/routes/nodes.ts
+- [x] T078 [US2] Implement GET /nodes and GET /nodes/:id routes (list nodes with status/cost, node detail with agents/scopes/logs) in packages/core/src/api/routes/nodes.ts
 - [ ] T079 [US2] Implement GET /nodes/:id/review route (Loomex review report) in packages/core/src/api/routes/nodes.ts
 - [ ] T080 [US2] Implement WebSocket event broadcasting (emit node_status, agent_status, agent_message, review_verdict, graph_modified events to connected clients) in packages/core/src/api/websocket.ts
 
