@@ -197,7 +197,7 @@
 - [x] T095 [US3] Implement ReviewReport component (verdict badge PASS/FAIL/BLOCKED, task checklist, details, recommendation) in packages/dashboard/src/components/ReviewReport.tsx
 - [x] T096 [US3] Implement MarkdownViewer component (react-markdown with syntax highlighting via rehype-highlight) in packages/dashboard/src/components/MarkdownViewer.tsx
 - [x] T097 [US3] Implement Graph page (full-screen graph view with live status updates, click node for detail) in packages/dashboard/src/pages/Graph.tsx
-- [ ] T098 [US3] Implement Node detail page (agent list, file scopes, log stream, review report, retry count, cost) in packages/dashboard/src/pages/Node.tsx
+- [x] T098 [US3] Implement Node detail page (agent list, file scopes, log stream, review report, retry count, cost) in packages/dashboard/src/pages/Node.tsx
 - [ ] T099 [US3] Implement Home page (overview: workflow status, active nodes summary, cost summary, recent events) in packages/dashboard/src/pages/Home.tsx
 - [ ] T100 [US3] Implement Specs page (list spec artifacts, render selected artifact as markdown) in packages/dashboard/src/pages/Specs.tsx
 - [ ] T101 [US3] Implement Memory page (list shared memory files, render selected file as markdown, show last modified timestamp) in packages/dashboard/src/pages/Memory.tsx
