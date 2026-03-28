@@ -29,6 +29,21 @@ const WS_OPEN = 1;
 /** Prefix for the Authorization header value. */
 const BEARER_PREFIX = 'Bearer ';
 
+/**
+ * URL prefixes for authenticated API routes.
+ *
+ * GET requests to paths outside these prefixes are served without
+ * authentication when the dashboard is active, allowing static assets
+ * and SPA client-side routes to load without a Bearer token.
+ */
+const API_ROUTE_PREFIXES = [
+  '/workflow',
+  '/nodes',
+  '/memory',
+  '/events',
+  '/specs',
+];
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -102,6 +117,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   const server = Fastify({ logger: false });
 
+  /** Resolved dashboard build directory when it exists on disk, otherwise null. */
+  const dashboardRoot =
+    dashboardPath && existsSync(dashboardPath) ? dashboardPath : null;
+
   // ---------------------------------------------------------------------------
   // Plugins
   // ---------------------------------------------------------------------------
@@ -109,9 +128,9 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   await server.register(fastifyWebsocket);
   await server.register(fastifyCors, { origin: true });
 
-  if (dashboardPath && existsSync(dashboardPath)) {
+  if (dashboardRoot) {
     await server.register(fastifyStatic, {
-      root: dashboardPath,
+      root: dashboardRoot,
       prefix: '/',
     });
   }
@@ -131,6 +150,19 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
       if (request.url === '/ws' || request.url.startsWith('/ws?')) {
         return;
+      }
+
+      // When the dashboard is active, skip auth for GET requests to non-API
+      // paths. Static assets and SPA client-side routes do not carry a Bearer
+      // token; the dashboard includes it only in its API fetch/XHR calls.
+      if (dashboardRoot && request.method === 'GET') {
+        const isApiRoute = API_ROUTE_PREFIXES.some(
+          (p) =>
+            request.url === p ||
+            request.url.startsWith(p + '/') ||
+            request.url.startsWith(p + '?'),
+        );
+        if (!isApiRoute) return;
       }
 
       const header = request.headers.authorization;
@@ -219,6 +251,33 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       socket.on('close', (): void => {
         clients.delete(socket);
       });
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Not-found handler — SPA fallback for the dashboard.
+  //
+  // When the dashboard is active, unmatched GET requests that accept text/html
+  // receive index.html so React Router can handle client-side navigation.
+  // Existing static files are already served by @fastify/static before this
+  // handler is reached (the static plugin calls reply.callNotFound() only when
+  // the requested file does not exist on disk).
+  //
+  // All other unmatched requests (non-GET, or requests that do not accept HTML)
+  // receive a structured JSON 404 response.
+  // ---------------------------------------------------------------------------
+
+  server.setNotFoundHandler(
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      if (
+        dashboardRoot &&
+        request.method === 'GET' &&
+        request.headers.accept?.includes('text/html')
+      ) {
+        reply.sendFile('index.html');
+        return;
+      }
+      await reply.code(404).send({ error: 'Not found' });
     },
   );
 
