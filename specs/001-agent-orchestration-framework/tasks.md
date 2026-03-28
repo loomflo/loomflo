@@ -195,7 +195,7 @@
 - [x] T093 [US3] Implement AgentStatus component (role icon, state indicator, current task description) in packages/dashboard/src/components/AgentStatus.tsx
 - [x] T094 [US3] Implement LogStream component (real-time log viewer with agent filtering, auto-scroll) in packages/dashboard/src/components/LogStream.tsx
 - [x] T095 [US3] Implement ReviewReport component (verdict badge PASS/FAIL/BLOCKED, task checklist, details, recommendation) in packages/dashboard/src/components/ReviewReport.tsx
-- [ ] T096 [US3] Implement MarkdownViewer component (react-markdown with syntax highlighting via rehype-highlight) in packages/dashboard/src/components/MarkdownViewer.tsx
+- [x] T096 [US3] Implement MarkdownViewer component (react-markdown with syntax highlighting via rehype-highlight) in packages/dashboard/src/components/MarkdownViewer.tsx
 - [ ] T097 [US3] Implement Graph page (full-screen graph view with live status updates, click node for detail) in packages/dashboard/src/pages/Graph.tsx
 - [ ] T098 [US3] Implement Node detail page (agent list, file scopes, log stream, review report, retry count, cost) in packages/dashboard/src/pages/Node.tsx
 - [ ] T099 [US3] Implement Home page (overview: workflow status, active nodes summary, cost summary, recent events) in packages/dashboard/src/pages/Home.tsx
