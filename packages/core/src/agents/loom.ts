@@ -39,6 +39,12 @@ const LOOM_AGENT_ID = 'loom';
 /** Shared memory files monitored for critical issues. */
 const MONITORED_MEMORY_FILES = ['ERRORS.md', 'ISSUES.md', 'PROGRESS.md'];
 
+/** Maximum tokens for the lightweight classification LLM call. */
+const CLASSIFICATION_MAX_TOKENS = 150;
+
+/** Shared memory files read for project context in question handling. */
+const CONTEXT_MEMORY_FILES = ['DECISIONS.md', 'PROGRESS.md', 'ARCHITECTURE_CHANGES.md'];
+
 // ============================================================================
 // LoomAgentStatus
 // ============================================================================
@@ -111,6 +117,31 @@ export interface EscalationResult {
 }
 
 // ============================================================================
+// Chat Message Classification
+// ============================================================================
+
+/**
+ * Category of a user chat message for routing.
+ *
+ * - `question`: Asking about the project, its state, or architecture.
+ * - `instruction`: Giving a directive to be relayed to orchestrators.
+ * - `graph_change`: Requesting structural changes to the workflow graph.
+ */
+export type ChatMessageCategory = 'question' | 'instruction' | 'graph_change';
+
+/**
+ * Result of classifying a user chat message.
+ */
+export interface ChatClassification {
+  /** The determined category of the message. */
+  category: ChatMessageCategory;
+  /** Confidence score from the LLM (0.0 to 1.0). */
+  confidence: number;
+  /** Brief reasoning for the classification. */
+  reasoning: string;
+}
+
+// ============================================================================
 // ChatResult
 // ============================================================================
 
@@ -120,6 +151,8 @@ export interface EscalationResult {
 export interface ChatResult {
   /** The response text from Loom. */
   response: string;
+  /** Category the message was classified as. */
+  category: ChatMessageCategory;
   /** Graph modification if the user requested one, or null. */
   modification: GraphModification | null;
   /** Error message if chat handling failed. */
@@ -196,26 +229,74 @@ function buildMonitoringPrompt(): string {
 }
 
 /**
- * Build the system prompt for chat handling.
+ * Build the system prompt for message classification.
  *
- * @returns System prompt for conversational interaction.
+ * @returns System prompt for the lightweight classification call.
  */
-function buildChatHandlingPrompt(): string {
+function buildClassificationPrompt(): string {
+  return [
+    'Classify the following user message into exactly one category:',
+    '- question: Asking about the project, its state, architecture, or progress.',
+    '- instruction: Giving a directive or preference (e.g., "use bcrypt", "prefer PostgreSQL").',
+    '- graph_change: Requesting structural workflow changes (e.g., "add a node", "remove the docs step").',
+    '',
+    'Respond with ONLY a JSON object:',
+    '{"category": "question|instruction|graph_change", "confidence": 0.0-1.0, "reasoning": "brief explanation"}',
+  ].join('\n');
+}
+
+/**
+ * Build the system prompt for question handling.
+ *
+ * @returns System prompt for answering developer questions.
+ */
+function buildQuestionHandlingPrompt(): string {
   return [
     'You are Loom, the Architect agent in the Loomflo framework.',
-    'A developer is chatting with you about their project.',
+    'A developer is asking you a question about their project.',
     '',
-    'You can:',
-    '1. Answer questions about the project, its architecture, and current status',
-    '2. Relay instructions to orchestrators (note what needs to change)',
-    '3. Propose graph modifications if the developer requests structural changes',
+    'Answer using the project context provided (shared memory, graph state, specifications).',
+    'Be informative, specific, and concise.',
+    'Reference concrete details from the context when available.',
+  ].join('\n');
+}
+
+/**
+ * Build the system prompt for instruction handling.
+ *
+ * @returns System prompt for processing developer directives.
+ */
+function buildInstructionHandlingPrompt(): string {
+  return [
+    'You are Loom, the Architect agent in the Loomflo framework.',
+    'A developer has given you an instruction or directive about their project.',
     '',
-    'If the developer requests a graph change (add/remove/modify nodes), include a JSON block in your response:',
+    'Your job is to:',
+    '1. Acknowledge the instruction clearly.',
+    '2. Explain how it will be applied (which nodes or agents it affects).',
+    '3. Confirm that the instruction has been recorded in project decisions.',
+    '',
+    'Be concise and action-oriented.',
+  ].join('\n');
+}
+
+/**
+ * Build the system prompt for graph change handling.
+ *
+ * @returns System prompt for processing structural graph modifications.
+ */
+function buildGraphChangeHandlingPrompt(): string {
+  return [
+    'You are Loom, the Architect agent in the Loomflo framework.',
+    'A developer has requested a structural change to the workflow graph.',
+    '',
+    'Analyze the request and respond with:',
+    '1. A brief confirmation of the change.',
+    '2. A JSON block describing the modification:',
     '```json',
-    '{"graphChange": {"action": "...", "nodeId": "...", "reason": "..."}}',
+    '{"graphChange": {"action": "add_node|modify_node|remove_node|skip_node", "nodeId": "...", "newNode": {"title": "...", "instructions": "...", "insertAfter": "...", "insertBefore": "..."}, "modifiedInstructions": "...", "reason": "..."}}',
     '```',
-    '',
-    'Otherwise, just respond naturally and helpfully.',
+    'Include only the fields relevant to the action.',
   ].join('\n');
 }
 
@@ -619,33 +700,71 @@ export class LoomAgent {
   /**
    * Handle a user chat message and produce a response.
    *
-   * Makes an LLM call with the chat context to respond to the user. If the
-   * user requests a graph change, extracts and applies it.
-   *
-   * This method never throws — all errors produce a safe {@link ChatResult}.
+   * Classifies the message into one of three categories (question, instruction,
+   * graph_change) via a lightweight LLM call, then routes to the appropriate
+   * handler. This method never throws — all errors produce a safe {@link ChatResult}.
    *
    * @param message - The user's chat message.
    * @param chatHistory - Optional formatted chat history for context.
-   * @returns Result with response text and optional graph modification.
+   * @returns Result with response text, category, and optional graph modification.
    */
   async handleChat(message: string, chatHistory?: string): Promise<ChatResult> {
     this.status = 'handling_chat';
 
     try {
-      const contextParts = [message];
-      if (chatHistory !== undefined && chatHistory.length > 0) {
-        contextParts.unshift(`## Previous Chat\n${chatHistory}\n\n## New Message`);
-      }
-      if (this.config.graphSummary !== undefined) {
-        contextParts.push(`\n\n## Current Workflow Graph\n${this.config.graphSummary}`);
+      const classification = await this.classifyMessage(message);
+
+      let result: ChatResult;
+      switch (classification.category) {
+        case 'question':
+          result = await this.handleQuestion(message, chatHistory);
+          break;
+        case 'instruction':
+          result = await this.handleInstruction(message, chatHistory);
+          break;
+        case 'graph_change':
+          result = await this.handleGraphChange(message, chatHistory);
+          break;
       }
 
-      const userMessage = contextParts.join('\n');
+      await this.logEventGeneric('message_sent', {
+        direction: 'outbound',
+        category: classification.category,
+        confidence: classification.confidence,
+        content: result.response.slice(0, 500),
+      });
 
+      this.status = 'idle';
+      return result;
+    } catch (err: unknown) {
+      this.status = 'idle';
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      return {
+        response: `I encountered an error processing your message: ${errorMsg}`,
+        category: 'question',
+        modification: null,
+        error: errorMsg,
+      };
+    }
+  }
+
+  /**
+   * Classify a user message into a routing category.
+   *
+   * Makes a lightweight LLM call with minimal prompt and low token limit
+   * to determine whether the message is a question, instruction, or graph
+   * change request. Falls back to `'question'` if parsing fails (safest default).
+   *
+   * @param message - The user's chat message to classify.
+   * @returns Classification result with category, confidence, and reasoning.
+   */
+  async classifyMessage(message: string): Promise<ChatClassification> {
+    try {
       const response = await this.config.provider.complete({
-        messages: [{ role: 'user', content: userMessage }],
-        system: buildChatHandlingPrompt(),
+        messages: [{ role: 'user', content: message }],
+        system: buildClassificationPrompt(),
         model: this.model,
+        maxTokens: CLASSIFICATION_MAX_TOKENS,
       });
 
       this.config.costTracker.recordCall(
@@ -661,47 +780,22 @@ export class LoomAgent {
       );
       const responseText = textBlocks.map((b) => b.text).join('\n');
 
-      // Check for embedded graph change request
-      let modification: GraphModification | null = null;
-      const graphChangeMatch = /```json\s*\n?\s*\{[\s\S]*?"graphChange"[\s\S]*?\}\s*\n?\s*```/i.exec(responseText);
-      if (graphChangeMatch !== null) {
-        const changeJson = extractJson(graphChangeMatch[0]);
-        if (changeJson !== null && typeof changeJson['graphChange'] === 'object' && changeJson['graphChange'] !== null) {
-          modification = parseGraphModification(
-            changeJson['graphChange'] as Record<string, unknown>,
-            '',
-          );
-
-          if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
-            try {
-              await this.config.graphModifier.applyModification(modification);
-              await this.logEventGeneric('graph_modified', {
-                action: modification.action,
-                nodeId: modification.nodeId ?? 'chat-requested',
-                reason: modification.reason,
-                source: 'chat',
-              });
-            } catch {
-              // Non-critical
-            }
-          }
+      const json = extractJson(responseText);
+      if (json !== null) {
+        const category = json['category'] as string;
+        const validCategories = new Set<string>(['question', 'instruction', 'graph_change']);
+        if (validCategories.has(category)) {
+          return {
+            category: category as ChatMessageCategory,
+            confidence: typeof json['confidence'] === 'number' ? json['confidence'] : 0.5,
+            reasoning: typeof json['reasoning'] === 'string' ? json['reasoning'] : '',
+          };
         }
       }
 
-      // Clean response text (remove JSON blocks if present)
-      const cleanResponse = responseText.replace(/```json[\s\S]*?```/g, '').trim();
-
-      await this.logEventGeneric('message_sent', {
-        direction: 'outbound',
-        content: cleanResponse.slice(0, 500),
-      });
-
-      this.status = 'idle';
-      return { response: cleanResponse, modification };
-    } catch (err: unknown) {
-      this.status = 'idle';
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      return { response: `I encountered an error processing your message: ${errorMsg}`, modification: null, error: errorMsg };
+      return { category: 'question', confidence: 0, reasoning: 'Classification parsing failed — defaulting to question' };
+    } catch {
+      return { category: 'question', confidence: 0, reasoning: 'Classification call failed — defaulting to question' };
     }
   }
 
@@ -724,8 +818,211 @@ export class LoomAgent {
   }
 
   // ==========================================================================
+  // Chat Routing Handlers (Private)
+  // ==========================================================================
+
+  /**
+   * Handle a message classified as a question.
+   *
+   * Answers using project context gathered from shared memory, the current
+   * graph state, and chat history.
+   *
+   * @param message - The user's question.
+   * @param chatHistory - Optional formatted chat history for context.
+   * @returns Chat result with the answer.
+   */
+  private async handleQuestion(message: string, chatHistory?: string): Promise<ChatResult> {
+    const contextParts = [message];
+    if (chatHistory !== undefined && chatHistory.length > 0) {
+      contextParts.unshift(`## Previous Chat\n${chatHistory}\n\n## New Message`);
+    }
+    if (this.config.graphSummary !== undefined) {
+      contextParts.push(`\n\n## Current Workflow Graph\n${this.config.graphSummary}`);
+    }
+
+    const memoryContext = await this.readSharedMemoryContext();
+    if (memoryContext.length > 0) {
+      contextParts.push(`\n\n## Project Context (Shared Memory)\n${memoryContext}`);
+    }
+
+    const response = await this.config.provider.complete({
+      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      system: buildQuestionHandlingPrompt(),
+      model: this.model,
+    });
+
+    this.config.costTracker.recordCall(
+      this.model,
+      response.usage.inputTokens,
+      response.usage.outputTokens,
+      LOOM_AGENT_ID,
+      null as unknown as string,
+    );
+
+    const textBlocks = response.content.filter(
+      (block): block is { type: 'text'; text: string } => block.type === 'text',
+    );
+
+    return {
+      response: textBlocks.map((b) => b.text).join('\n').trim(),
+      category: 'question',
+      modification: null,
+    };
+  }
+
+  /**
+   * Handle a message classified as an instruction.
+   *
+   * Generates an acknowledgement via LLM, then records the instruction in
+   * DECISIONS.md shared memory so orchestrators can read it.
+   *
+   * @param message - The user's instruction.
+   * @param chatHistory - Optional formatted chat history for context.
+   * @returns Chat result with the acknowledgement.
+   */
+  private async handleInstruction(message: string, chatHistory?: string): Promise<ChatResult> {
+    const contextParts = [message];
+    if (chatHistory !== undefined && chatHistory.length > 0) {
+      contextParts.unshift(`## Previous Chat\n${chatHistory}\n\n## New Message`);
+    }
+    if (this.config.graphSummary !== undefined) {
+      contextParts.push(`\n\n## Current Workflow Graph\n${this.config.graphSummary}`);
+    }
+
+    const response = await this.config.provider.complete({
+      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      system: buildInstructionHandlingPrompt(),
+      model: this.model,
+    });
+
+    this.config.costTracker.recordCall(
+      this.model,
+      response.usage.inputTokens,
+      response.usage.outputTokens,
+      LOOM_AGENT_ID,
+      null as unknown as string,
+    );
+
+    const textBlocks = response.content.filter(
+      (block): block is { type: 'text'; text: string } => block.type === 'text',
+    );
+    const responseText = textBlocks.map((b) => b.text).join('\n').trim();
+
+    const decisionEntry = [
+      `## Developer Instruction`,
+      `**Instruction:** ${message}`,
+      `**Timestamp:** ${new Date().toISOString()}`,
+      '',
+    ].join('\n');
+
+    await this.writeMemory('DECISIONS.md', decisionEntry);
+
+    return {
+      response: responseText,
+      category: 'instruction',
+      modification: null,
+    };
+  }
+
+  /**
+   * Handle a message classified as a graph change request.
+   *
+   * Uses a targeted LLM prompt to produce a graph modification JSON block,
+   * extracts and applies it via the graphModifier callback.
+   *
+   * @param message - The user's graph change request.
+   * @param chatHistory - Optional formatted chat history for context.
+   * @returns Chat result with confirmation and the applied modification.
+   */
+  private async handleGraphChange(message: string, chatHistory?: string): Promise<ChatResult> {
+    const contextParts = [message];
+    if (chatHistory !== undefined && chatHistory.length > 0) {
+      contextParts.unshift(`## Previous Chat\n${chatHistory}\n\n## New Message`);
+    }
+    if (this.config.graphSummary !== undefined) {
+      contextParts.push(`\n\n## Current Workflow Graph\n${this.config.graphSummary}`);
+    }
+
+    const response = await this.config.provider.complete({
+      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      system: buildGraphChangeHandlingPrompt(),
+      model: this.model,
+    });
+
+    this.config.costTracker.recordCall(
+      this.model,
+      response.usage.inputTokens,
+      response.usage.outputTokens,
+      LOOM_AGENT_ID,
+      null as unknown as string,
+    );
+
+    const textBlocks = response.content.filter(
+      (block): block is { type: 'text'; text: string } => block.type === 'text',
+    );
+    const responseText = textBlocks.map((b) => b.text).join('\n');
+
+    let modification: GraphModification | null = null;
+    const graphChangeMatch = /```json\s*\n?\s*\{[\s\S]*?"graphChange"[\s\S]*?\}\s*\n?\s*```/i.exec(responseText);
+    if (graphChangeMatch !== null) {
+      const changeJson = extractJson(graphChangeMatch[0]);
+      if (changeJson !== null && typeof changeJson['graphChange'] === 'object' && changeJson['graphChange'] !== null) {
+        modification = parseGraphModification(
+          changeJson['graphChange'] as Record<string, unknown>,
+          '',
+        );
+
+        if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+          try {
+            await this.config.graphModifier.applyModification(modification);
+            await this.logEventGeneric('graph_modified', {
+              action: modification.action,
+              nodeId: modification.nodeId ?? 'chat-requested',
+              reason: modification.reason,
+              source: 'chat',
+            });
+          } catch {
+            // Non-critical — graph modification failure doesn't block response
+          }
+        }
+      }
+    }
+
+    const cleanResponse = responseText.replace(/```json[\s\S]*?```/g, '').trim();
+
+    return {
+      response: cleanResponse,
+      category: 'graph_change',
+      modification,
+    };
+  }
+
+  // ==========================================================================
   // Private Helpers
   // ==========================================================================
+
+  /**
+   * Read shared memory files to build project context for answering questions.
+   *
+   * Reads DECISIONS.md, PROGRESS.md, and ARCHITECTURE_CHANGES.md. Missing
+   * or empty files are silently skipped.
+   *
+   * @returns Concatenated markdown context from shared memory, or empty string.
+   */
+  private async readSharedMemoryContext(): Promise<string> {
+    const parts: string[] = [];
+    for (const fileName of CONTEXT_MEMORY_FILES) {
+      try {
+        const file = await this.config.sharedMemory.read(fileName);
+        if (file.content.length > 0) {
+          parts.push(`### ${fileName}\n${file.content}`);
+        }
+      } catch {
+        // File may not exist yet — skip
+      }
+    }
+    return parts.join('\n\n');
+  }
 
   /**
    * Handle a spec pipeline progress event.
