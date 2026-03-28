@@ -24,3 +24,4 @@ export * from './workflow/node.js';
 export * from './workflow/scheduler.js';
 export * from './workflow/workflow.js';
 export * from './workflow/execution-engine.js';
+export * from './api/websocket.js';
