@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { Routes, Route, NavLink, Outlet } from "react-router-dom";
 
+import { NodePage } from "./pages/Node.js";
+
 /** Navigation items displayed in the sidebar. */
 const NAV_ITEMS: readonly { path: string; label: string }[] = [
   { path: "/", label: "Home" },
@@ -60,11 +62,6 @@ function Graph(): ReactElement {
 }
 
 /** Placeholder page component. */
-function NodeDetail(): ReactElement {
-  return <h2 className="text-2xl font-semibold">Node Detail</h2>;
-}
-
-/** Placeholder page component. */
 function Specs(): ReactElement {
   return <h2 className="text-2xl font-semibold">Specs</h2>;
 }
@@ -100,7 +97,7 @@ export function App(): ReactElement {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="graph" element={<Graph />} />
-        <Route path="node/:id" element={<NodeDetail />} />
+        <Route path="node/:id" element={<NodePage />} />
         <Route path="specs" element={<Specs />} />
         <Route path="memory" element={<Memory />} />
         <Route path="chat" element={<Chat />} />
