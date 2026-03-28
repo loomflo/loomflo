@@ -11,7 +11,8 @@ export type WsEventType =
   | 'agent_message'
   | 'review_verdict'
   | 'graph_modified'
-  | 'cost_update';
+  | 'cost_update'
+  | 'chat_response';
 
 /** Base shape shared by all WebSocket events. */
 export interface WsEventBase {
@@ -96,6 +97,25 @@ export interface WsCostUpdateEvent extends WsEventBase {
   budgetRemaining?: number;
 }
 
+/** Describes a graph modification action included in a chat response. */
+export interface WsChatAction {
+  /** The type of graph modification (e.g. 'add_node', 'modify_node'). */
+  type: string;
+  /** Additional details about the modification. */
+  details: Record<string, unknown>;
+}
+
+/** Payload broadcast when Loom sends a chat response to the dashboard. */
+export interface WsChatResponseEvent extends WsEventBase {
+  type: 'chat_response';
+  /** The text response from Loom. */
+  response: string;
+  /** Category the message was classified as (question, instruction, or graph_change). */
+  category: string;
+  /** Graph modification action if the message triggered one, or null. */
+  action: WsChatAction | null;
+}
+
 /** Union of all WebSocket event payloads. */
 export type WsEvent =
   | WsNodeStatusEvent
@@ -103,7 +123,8 @@ export type WsEvent =
   | WsAgentMessageEvent
   | WsReviewVerdictEvent
   | WsGraphModifiedEvent
-  | WsCostUpdateEvent;
+  | WsCostUpdateEvent
+  | WsChatResponseEvent;
 
 /** Broadcast function signature matching the one returned by {@link createServer}. */
 export type BroadcastFn = (event: Record<string, unknown>) => void;
@@ -262,6 +283,24 @@ export class WebSocketBroadcaster {
       nodeCost,
       totalCost,
       ...(budgetRemaining !== undefined && { budgetRemaining }),
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast a Loom chat response to all connected clients.
+   *
+   * @param response - The text response from Loom.
+   * @param category - The classified category (question, instruction, or graph_change).
+   * @param action - Graph modification action if the message triggered one, or null.
+   */
+  emitChatResponse(response: string, category: string, action: WsChatAction | null): void {
+    const event: WsChatResponseEvent = {
+      type: 'chat_response',
+      timestamp: new Date().toISOString(),
+      response,
+      category,
+      action,
     };
     this.emit(event);
   }
