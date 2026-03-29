@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 
+import { createChatCommand } from './commands/chat.js';
 import { createInitCommand } from './commands/init.js';
 import { createStartCommand } from './commands/start.js';
 import { createStopCommand } from './commands/stop.js';
@@ -10,9 +11,9 @@ import { createStopCommand } from './commands/stop.js';
  * Create and configure the loomflo CLI program.
  *
  * Registers all subcommands (both implemented and placeholder stubs)
- * and configures global program metadata. The init command is fully
- * implemented; remaining commands are stubs that will be wired up
- * in later tasks.
+ * and configures global program metadata. Implemented commands include
+ * init, start, stop, and chat; remaining commands are stubs that will
+ * be wired up in later tasks.
  *
  * @returns The configured commander Program instance.
  */
@@ -26,13 +27,7 @@ function createProgram(): Command {
   program.addCommand(createInitCommand());
   program.addCommand(createStartCommand());
   program.addCommand(createStopCommand());
-
-  program
-    .command('chat')
-    .description('Chat with the Loom architect agent')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
+  program.addCommand(createChatCommand());
 
   program
     .command('status')
