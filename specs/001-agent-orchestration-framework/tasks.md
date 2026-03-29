@@ -315,7 +315,7 @@
 - [x] T139 Implement CLI `loomflo logs [node-id]` command (fetch and display agent logs) in packages/cli/src/commands/logs.ts
 - [x] T140 [P] Create Dockerfile (multi-stage build: build all packages, serve daemon + dashboard) in Dockerfile
 - [x] T141 [P] Create docker-compose.yml (daemon service with env vars and port mapping) in docker-compose.yml
-- [ ] T142 Write end-to-end test (init → spec generation → confirm → execute 3-node linear graph → complete, using mock LLM provider) in packages/core/tests/integration/e2e.test.ts
+- [x] T142 Write end-to-end test (init → spec generation → confirm → execute 3-node linear graph → complete, using mock LLM provider) in packages/core/tests/integration/e2e.test.ts
 - [ ] T143 Write README.md (architecture diagram in Mermaid, 3-command quickstart, real usage example, configuration reference, agent hierarchy diagram) in README.md
 - [ ] T144 [P] Create LICENSE file (MIT) in LICENSE
 - [ ] T145 Run quickstart.md validation (verify install → start → init works as documented) as manual verification
