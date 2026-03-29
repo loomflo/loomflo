@@ -14,6 +14,7 @@ import { nodesRoutes, type NodesRoutesOptions } from './routes/nodes.js';
 import { workflowRoutes, type WorkflowRoutesOptions } from './routes/workflow.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { configRoutes, type ConfigRoutesOptions } from './routes/config.js';
+import { costsRoutes, type CostsRoutesOptions } from './routes/costs.js';
 
 // ============================================================================
 // Constants
@@ -46,6 +47,7 @@ const API_ROUTE_PREFIXES = [
   '/specs',
   '/chat',
   '/config',
+  '/costs',
 ];
 
 // ============================================================================
@@ -91,6 +93,8 @@ export interface ServerOptions {
   chat?: ChatRoutesOptions;
   /** Callbacks for the config routes. When omitted, config routes are not registered. */
   config?: ConfigRoutesOptions;
+  /** Callbacks for the costs routes. When omitted, costs routes are not registered. */
+  costs?: CostsRoutesOptions;
 }
 
 /** Return value of {@link createServer}. */
@@ -237,6 +241,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   if (options.config) {
     await server.register(configRoutes(options.config));
+  }
+
+  if (options.costs) {
+    await server.register(costsRoutes(options.costs));
   }
 
   // ---------------------------------------------------------------------------
