@@ -309,7 +309,7 @@
 
 - [x] T134 [P] Implement SDK LoomfloClient class (connect, init, chat, status, onEvent, disconnect) in packages/sdk/src/client.ts
 - [x] T135 [P] Define and export all public SDK types in packages/sdk/src/types.ts
-- [ ] T136 [P] Create SDK public exports (index.ts) in packages/sdk/src/index.ts
+- [x] T136 [P] Create SDK public exports (index.ts) in packages/sdk/src/index.ts
 - [ ] T137 [P] Create core public exports (index.ts with all types and key classes) in packages/core/src/index.ts
 - [ ] T138 Implement CLI `loomflo dashboard` command (open browser at daemon URL) in packages/cli/src/commands/dashboard.ts
 - [ ] T139 Implement CLI `loomflo logs [node-id]` command (fetch and display agent logs) in packages/cli/src/commands/logs.ts
