@@ -116,6 +116,7 @@ export async function saveWorkflowState(projectPath: string, workflow: Workflow)
       clearTimeout(existing.timer);
       existing.workflow = workflow;
       existing.resolvers.push({ resolve, reject });
+      existing.timer = setTimeout(() => void executePendingWrite(projectPath), DEBOUNCE_MS);
     } else {
       const pending: PendingWrite = {
         timer: setTimeout(() => void executePendingWrite(projectPath), DEBOUNCE_MS),
