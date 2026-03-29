@@ -242,7 +242,7 @@
 - [x] T114 [US5] Implement runtime config reload (on PUT /config or file change, re-merge config, apply to next node activation only) in packages/core/src/config.ts
 - [x] T115 [US5] Implement CLI `loomflo config set <key> <value>` and `loomflo config get <key>` commands in packages/cli/src/commands/config.ts
 - [x] T116 [US5] Implement Config page (form-based config editing with zod validation, show current merged config with source indicators) in packages/dashboard/src/pages/Config.tsx
-- [ ] T117 [P] [US5] Write unit tests for config merge (3-level override, per-node override, mid-execution change semantics) in packages/core/tests/unit/config-merge.test.ts
+- [x] T117 [P] [US5] Write unit tests for config merge (3-level override, per-node override, mid-execution change semantics) in packages/core/tests/unit/config-merge.test.ts
 
 **Checkpoint**: Configuration works at all levels. Mid-execution changes apply to next node.
 
