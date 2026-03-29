@@ -9,6 +9,7 @@ import type { EventQueryFilters } from '../../persistence/events.js';
 import { saveWorkflowState } from '../../persistence/state.js';
 import type { LLMProvider } from '../../providers/base.js';
 import type { Event, Workflow } from '../../types.js';
+import { WorkflowManager, type ResumeInfo } from '../../workflow/workflow.js';
 
 // ============================================================================
 // Types
@@ -59,6 +60,17 @@ interface InitResponse {
 /** Shape of the POST /workflow/start JSON response. */
 interface StartResponse {
   status: string;
+}
+
+/** Shape of the POST /workflow/pause JSON response. */
+interface PauseResponse {
+  status: string;
+}
+
+/** Shape of the POST /workflow/resume JSON response. */
+interface ResumeResponse {
+  status: string;
+  resumeInfo: ResumeInfo;
 }
 
 /** Shape of the GET /workflow JSON response. */
@@ -207,6 +219,83 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       await saveWorkflowState(updated.projectPath, updated);
 
       await reply.code(200).send({ status: 'running' } satisfies StartResponse);
+    });
+
+    /**
+     * POST /workflow/pause
+     *
+     * Pause a running workflow. In-progress nodes continue until their current
+     * agent calls complete, but no new nodes are dispatched.
+     */
+    fastify.post('/workflow/pause', async (_request, reply): Promise<void> => {
+      const workflow = getWorkflow();
+
+      if (workflow === null) {
+        await reply.code(404).send({ error: 'No active workflow' });
+        return;
+      }
+
+      if (workflow.status !== 'running') {
+        await reply.code(400).send({
+          error: `Cannot pause workflow in "${workflow.status}" state. Only running workflows can be paused.`,
+        });
+        return;
+      }
+
+      const updated: Workflow = {
+        ...workflow,
+        status: 'paused',
+        updatedAt: new Date().toISOString(),
+      };
+
+      setWorkflow(updated);
+      await saveWorkflowState(updated.projectPath, updated);
+
+      await reply.code(200).send({ status: 'paused' } satisfies PauseResponse);
+    });
+
+    /**
+     * POST /workflow/resume
+     *
+     * Resume a paused or interrupted workflow. Loads state from disk,
+     * identifies completed nodes (skipped), resets interrupted nodes
+     * to pending, recalculates scheduler delays, and transitions the
+     * workflow back to running.
+     */
+    fastify.post('/workflow/resume', async (_request, reply): Promise<void> => {
+      const workflow = getWorkflow();
+
+      if (workflow === null) {
+        await reply.code(404).send({ error: 'No workflow to resume' });
+        return;
+      }
+
+      if (workflow.status !== 'paused' && workflow.status !== 'running') {
+        await reply.code(400).send({
+          error: `Cannot resume workflow in "${workflow.status}" state. Only paused or running workflows can be resumed.`,
+        });
+        return;
+      }
+
+      try {
+        const result = await WorkflowManager.resume(workflow.projectPath);
+
+        if (result === null) {
+          await reply.code(404).send({ error: 'No persisted workflow state found' });
+          return;
+        }
+
+        const resumedWorkflow = result.manager.toJSON();
+        setWorkflow(resumedWorkflow);
+
+        await reply.code(200).send({
+          status: resumedWorkflow.status,
+          resumeInfo: result.info,
+        } satisfies ResumeResponse);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        await reply.code(400).send({ error: `Resume failed: ${message}` });
+      }
     });
   };
 
