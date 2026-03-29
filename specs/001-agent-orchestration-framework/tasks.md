@@ -261,7 +261,7 @@
 - [x] T120 [US6] Implement graceful shutdown (stop dispatching new agent calls, wait for active calls, mark node interrupted, flush events.jsonl, save workflow.json) in packages/core/src/daemon.ts
 - [x] T121 [US6] Implement POST /workflow/pause and POST /workflow/resume routes in packages/core/src/api/routes/workflow.ts
 - [x] T122 [US6] Implement CLI `loomflo resume` command (call POST /workflow/resume, show resume status) in packages/cli/src/commands/resume.ts
-- [ ] T123 [P] [US6] Write integration test for resume (simulate crash, verify state recovery, verify completed nodes skipped) in packages/core/tests/integration/resume.test.ts
+- [x] T123 [P] [US6] Write integration test for resume (simulate crash, verify state recovery, verify completed nodes skipped) in packages/core/tests/integration/resume.test.ts
 
 **Checkpoint**: Workflows survive interruptions and resume correctly.
 
