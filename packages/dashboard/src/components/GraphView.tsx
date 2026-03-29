@@ -5,7 +5,7 @@
 // node rendering, status-based styling, auto-layout, and real-time updates.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent, ReactElement } from 'react';
 import {
   ReactFlow,
@@ -99,12 +99,38 @@ const EDGE_COLOR_PENDING = '#4b5563';
 // Types
 // ============================================================================
 
+/** Duration of the node enter animation in milliseconds. */
+const NODE_ENTER_DURATION_MS = 400;
+
+/** Duration of the new-edge animated state in milliseconds. */
+const EDGE_ENTER_DURATION_MS = 500;
+
+/** CSS keyframe animation for newly added nodes. */
+const ENTER_ANIMATION_STYLES = `
+@keyframes loomflo-node-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-node-enter {
+  animation: loomflo-node-enter ${String(NODE_ENTER_DURATION_MS)}ms ease-out both;
+}
+`;
+
 /** Data payload for the custom workflow node in React Flow. */
 interface WorkflowNodeData {
   /** Human-readable node title. */
   title: string;
   /** Current node execution status. */
   status: NodeStatus;
+  /** Whether this node was just added and should play the enter animation. */
+  isNew?: boolean;
   [key: string]: unknown;
 }
 
@@ -119,6 +145,8 @@ export interface GraphViewProps {
   edges: Edge[];
   /** Callback invoked when a node is clicked. */
   onNodeClick?: (nodeId: string) => void;
+  /** When true, newly added nodes and edges play an enter animation. Defaults to false. */
+  animate?: boolean;
 }
 
 // ============================================================================
@@ -208,11 +236,12 @@ function computeLayout(
 const WorkflowNodeComponent = memo(function WorkflowNodeComponent({
   data,
 }: NodeProps<WorkflowFlowNode>): ReactElement {
-  const { title, status } = data;
+  const { title, status, isNew } = data;
   const style = STATUS_STYLES[status];
+  const enterClass = isNew ? ' animate-node-enter' : '';
 
   return (
-    <div className="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 shadow-lg">
+    <div className={`min-w-[200px] rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 shadow-lg${enterClass}`}>
       <Handle
         type="target"
         position={Position.Top}
@@ -342,7 +371,11 @@ export function GraphView({
   nodes,
   edges,
   onNodeClick,
+  animate = false,
 }: GraphViewProps): ReactElement {
+  const prevNodeIdsRef = useRef(new Set<string>());
+  const prevEdgeIdsRef = useRef(new Set<string>());
+
   const nodeStatusMap = useMemo((): Map<string, NodeStatus> => {
     const map = new Map<string, NodeStatus>();
     for (const node of nodes) {
@@ -366,13 +399,85 @@ export function GraphView({
   const [rfEdges, setRfEdges, onEdgesChange] =
     useEdgesState(initialFlowEdges);
 
-  useEffect((): void => {
-    setRfNodes(toFlowNodes(nodes, edges));
-  }, [nodes, edges, setRfNodes]);
+  useEffect(() => {
+    const prevNodeIds = prevNodeIdsRef.current;
+    const flowNodes = toFlowNodes(nodes, edges);
 
-  useEffect((): void => {
-    setRfEdges(toFlowEdges(edges, nodeStatusMap));
-  }, [edges, nodeStatusMap, setRfEdges]);
+    if (animate) {
+      const newNodeIds: string[] = [];
+      for (const fn of flowNodes) {
+        if (!prevNodeIds.has(fn.id)) {
+          fn.data = { ...fn.data, isNew: true };
+          newNodeIds.push(fn.id);
+        }
+      }
+
+      setRfNodes(flowNodes);
+
+      if (newNodeIds.length > 0) {
+        const timer = setTimeout((): void => {
+          setRfNodes((current) =>
+            current.map((n) =>
+              newNodeIds.includes(n.id)
+                ? { ...n, data: { ...n.data, isNew: false } }
+                : n,
+            ),
+          );
+        }, NODE_ENTER_DURATION_MS);
+
+        prevNodeIdsRef.current = new Set(nodes.map((n) => n.id));
+
+        return (): void => {
+          clearTimeout(timer);
+        };
+      }
+    } else {
+      setRfNodes(flowNodes);
+    }
+
+    prevNodeIdsRef.current = new Set(nodes.map((n) => n.id));
+  }, [nodes, edges, setRfNodes, animate]);
+
+  useEffect(() => {
+    const prevEdgeIds = prevEdgeIdsRef.current;
+    const flowEdges = toFlowEdges(edges, nodeStatusMap);
+
+    if (animate) {
+      const newEdgeIds: string[] = [];
+      for (const fe of flowEdges) {
+        if (!prevEdgeIds.has(fe.id)) {
+          fe.animated = true;
+          newEdgeIds.push(fe.id);
+        }
+      }
+
+      setRfEdges(flowEdges);
+
+      if (newEdgeIds.length > 0) {
+        const timer = setTimeout((): void => {
+          setRfEdges((current) =>
+            current.map((e) => {
+              if (!newEdgeIds.includes(e.id)) return e;
+              const sourceStatus = nodeStatusMap.get(e.source);
+              return { ...e, animated: sourceStatus === 'running' };
+            }),
+          );
+        }, EDGE_ENTER_DURATION_MS);
+
+        prevEdgeIdsRef.current = new Set(
+          flowEdges.map((e) => e.id),
+        );
+
+        return (): void => {
+          clearTimeout(timer);
+        };
+      }
+    } else {
+      setRfEdges(flowEdges);
+    }
+
+    prevEdgeIdsRef.current = new Set(flowEdges.map((e) => e.id));
+  }, [edges, nodeStatusMap, setRfEdges, animate]);
 
   const handleNodeClick = useCallback(
     (_event: MouseEvent, node: RFNode): void => {
@@ -383,6 +488,7 @@ export function GraphView({
 
   return (
     <div className="h-full w-full bg-gray-950">
+      {animate && <style>{ENTER_ANIMATION_STYLES}</style>}
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
