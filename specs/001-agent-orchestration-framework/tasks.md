@@ -312,7 +312,7 @@
 - [x] T136 [P] Create SDK public exports (index.ts) in packages/sdk/src/index.ts
 - [x] T137 [P] Create core public exports (index.ts with all types and key classes) in packages/core/src/index.ts
 - [x] T138 Implement CLI `loomflo dashboard` command (open browser at daemon URL) in packages/cli/src/commands/dashboard.ts
-- [ ] T139 Implement CLI `loomflo logs [node-id]` command (fetch and display agent logs) in packages/cli/src/commands/logs.ts
+- [x] T139 Implement CLI `loomflo logs [node-id]` command (fetch and display agent logs) in packages/cli/src/commands/logs.ts
 - [ ] T140 [P] Create Dockerfile (multi-stage build: build all packages, serve daemon + dashboard) in Dockerfile
 - [ ] T141 [P] Create docker-compose.yml (daemon service with env vars and port mapping) in docker-compose.yml
 - [ ] T142 Write end-to-end test (init → spec generation → confirm → execute 3-node linear graph → complete, using mock LLM provider) in packages/core/tests/integration/e2e.test.ts
