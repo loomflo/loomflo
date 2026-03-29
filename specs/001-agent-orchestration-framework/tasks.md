@@ -307,7 +307,7 @@
 
 **Purpose**: SDK, remaining CLI commands, Docker, documentation, end-to-end validation
 
-- [ ] T134 [P] Implement SDK LoomfloClient class (connect, init, chat, status, onEvent, disconnect) in packages/sdk/src/client.ts
+- [x] T134 [P] Implement SDK LoomfloClient class (connect, init, chat, status, onEvent, disconnect) in packages/sdk/src/client.ts
 - [ ] T135 [P] Define and export all public SDK types in packages/sdk/src/types.ts
 - [ ] T136 [P] Create SDK public exports (index.ts) in packages/sdk/src/index.ts
 - [ ] T137 [P] Create core public exports (index.ts with all types and key classes) in packages/core/src/index.ts
