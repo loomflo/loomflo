@@ -7,6 +7,7 @@ import { createConfigCommand } from './commands/config.js';
 import { createInitCommand } from './commands/init.js';
 import { createResumeCommand } from './commands/resume.js';
 import { createStartCommand } from './commands/start.js';
+import { createStatusCommand } from './commands/status.js';
 import { createStopCommand } from './commands/stop.js';
 
 /**
@@ -32,13 +33,7 @@ function createProgram(): Command {
   program.addCommand(createChatCommand());
   program.addCommand(createConfigCommand());
   program.addCommand(createResumeCommand());
-
-  program
-    .command('status')
-    .description('Show workflow status and costs')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
+  program.addCommand(createStatusCommand());
 
   program
     .command('logs')
