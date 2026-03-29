@@ -4,6 +4,7 @@ import { Command } from 'commander';
 
 import { createChatCommand } from './commands/chat.js';
 import { createConfigCommand } from './commands/config.js';
+import { createDashboardCommand } from './commands/dashboard.js';
 import { createInitCommand } from './commands/init.js';
 import { createResumeCommand } from './commands/resume.js';
 import { createStartCommand } from './commands/start.js';
@@ -42,12 +43,7 @@ function createProgram(): Command {
       console.log('Not yet implemented');
     });
 
-  program
-    .command('dashboard')
-    .description('Open the web dashboard')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
+  program.addCommand(createDashboardCommand());
 
   return program;
 }
