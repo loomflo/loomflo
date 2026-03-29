@@ -259,7 +259,7 @@
 - [x] T118 [US6] Implement resume logic (load workflow.json, identify completed/interrupted nodes, restart interrupted node from scratch, recalculate scheduler delays) in packages/core/src/workflow/workflow.ts
 - [x] T119 [US6] Implement state recovery verification (cross-check workflow.json against events.jsonl for consistency, detect corruption) in packages/core/src/persistence/state.ts
 - [x] T120 [US6] Implement graceful shutdown (stop dispatching new agent calls, wait for active calls, mark node interrupted, flush events.jsonl, save workflow.json) in packages/core/src/daemon.ts
-- [ ] T121 [US6] Implement POST /workflow/pause and POST /workflow/resume routes in packages/core/src/api/routes/workflow.ts
+- [x] T121 [US6] Implement POST /workflow/pause and POST /workflow/resume routes in packages/core/src/api/routes/workflow.ts
 - [ ] T122 [US6] Implement CLI `loomflo resume` command (call POST /workflow/resume, show resume status) in packages/cli/src/commands/resume.ts
 - [ ] T123 [P] [US6] Write integration test for resume (simulate crash, verify state recovery, verify completed nodes skipped) in packages/core/tests/integration/resume.test.ts
 
