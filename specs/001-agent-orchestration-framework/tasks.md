@@ -222,7 +222,7 @@
 - [x] T107 [US4] Implement GET /chat/history route (return persisted conversation history) in packages/core/src/api/routes/chat.ts
 - [x] T108 [US4] Implement chat_response WebSocket event (broadcast Loom responses to dashboard) in packages/core/src/api/websocket.ts
 - [x] T109 [US4] Implement CLI `loomflo chat "message"` command (call POST /chat, display response, show action if taken) in packages/cli/src/commands/chat.ts
-- [ ] T110 [US4] Implement ChatInterface component (message list, text input, typing/streaming indicator) in packages/dashboard/src/components/ChatInterface.tsx
+- [x] T110 [US4] Implement ChatInterface component (message list, text input, typing/streaming indicator) in packages/dashboard/src/components/ChatInterface.tsx
 - [ ] T111 [US4] Implement useChat hook (send messages via REST, receive responses via WS, manage conversation state) in packages/dashboard/src/hooks/useChat.ts
 - [ ] T112 [US4] Implement Chat page (full chat UI with Loom, display action confirmations) in packages/dashboard/src/pages/Chat.tsx
 
