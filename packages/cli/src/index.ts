@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import { createChatCommand } from './commands/chat.js';
 import { createConfigCommand } from './commands/config.js';
 import { createInitCommand } from './commands/init.js';
+import { createResumeCommand } from './commands/resume.js';
 import { createStartCommand } from './commands/start.js';
 import { createStopCommand } from './commands/stop.js';
 
@@ -30,17 +31,11 @@ function createProgram(): Command {
   program.addCommand(createStopCommand());
   program.addCommand(createChatCommand());
   program.addCommand(createConfigCommand());
+  program.addCommand(createResumeCommand());
 
   program
     .command('status')
     .description('Show workflow status and costs')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
-
-  program
-    .command('resume')
-    .description('Resume a paused or interrupted workflow')
     .action((): void => {
       console.log('Not yet implemented');
     });
