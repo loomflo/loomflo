@@ -318,7 +318,7 @@
 - [x] T142 Write end-to-end test (init → spec generation → confirm → execute 3-node linear graph → complete, using mock LLM provider) in packages/core/tests/integration/e2e.test.ts
 - [x] T143 Write README.md (architecture diagram in Mermaid, 3-command quickstart, real usage example, configuration reference, agent hierarchy diagram) in README.md
 - [x] T144 [P] Create LICENSE file (MIT) in LICENSE
-- [ ] T145 Run quickstart.md validation (verify install → start → init works as documented) as manual verification
+- [x] T145 Run quickstart.md validation (verify install → start → init works as documented) as manual verification
 
 **Checkpoint**: All packages complete, tests pass, documentation ready. Tag v0.1.0.
 
