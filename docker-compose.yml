@@ -1,0 +1,41 @@
+# ==============================================================================
+# Loomflo — Docker Compose
+# ==============================================================================
+# Quick start:
+#   cp .env.example .env  (add your ANTHROPIC_API_KEY)
+#   docker compose up --build
+#
+# The daemon + dashboard will be available at http://localhost:3000
+# ==============================================================================
+
+services:
+  daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loomflo-daemon
+    ports:
+      - "${LOOMFLO_PORT:-3000}:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LOOMFLO_HOST=0.0.0.0
+      - LOOMFLO_PORT=3000
+      - LOOMFLO_PROJECT_PATH=/workspace
+      - NODE_ENV=production
+    volumes:
+      # Mount the project directory to work on
+      - ${PROJECT_PATH:-.}:/workspace
+      # Persist daemon state across restarts
+      - loomflo-state:/home/loomflo/.loomflo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  loomflo-state:
+    driver: local
