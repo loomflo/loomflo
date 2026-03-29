@@ -256,7 +256,7 @@
 
 ### Implementation for User Story 6
 
-- [ ] T118 [US6] Implement resume logic (load workflow.json, identify completed/interrupted nodes, restart interrupted node from scratch, recalculate scheduler delays) in packages/core/src/workflow/workflow.ts
+- [x] T118 [US6] Implement resume logic (load workflow.json, identify completed/interrupted nodes, restart interrupted node from scratch, recalculate scheduler delays) in packages/core/src/workflow/workflow.ts
 - [ ] T119 [US6] Implement state recovery verification (cross-check workflow.json against events.jsonl for consistency, detect corruption) in packages/core/src/persistence/state.ts
 - [ ] T120 [US6] Implement graceful shutdown (stop dispatching new agent calls, wait for active calls, mark node interrupted, flush events.jsonl, save workflow.json) in packages/core/src/daemon.ts
 - [ ] T121 [US6] Implement POST /workflow/pause and POST /workflow/resume routes in packages/core/src/api/routes/workflow.ts
