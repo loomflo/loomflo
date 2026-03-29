@@ -12,7 +12,9 @@ export type WsEventType =
   | 'review_verdict'
   | 'graph_modified'
   | 'cost_update'
-  | 'chat_response';
+  | 'chat_response'
+  | 'spec_artifact_ready'
+  | 'memory_updated';
 
 /** Base shape shared by all WebSocket events. */
 export interface WsEventBase {
@@ -116,6 +118,26 @@ export interface WsChatResponseEvent extends WsEventBase {
   action: WsChatAction | null;
 }
 
+/** Payload broadcast when a spec artifact is generated during Phase 1. */
+export interface WsSpecArtifactReadyEvent extends WsEventBase {
+  type: 'spec_artifact_ready';
+  /** File name of the generated artifact (e.g. "spec.md"). */
+  name: string;
+  /** Relative path to the artifact (e.g. ".loomflo/specs/spec.md"). */
+  path: string;
+}
+
+/** Payload broadcast when a shared memory file is updated. */
+export interface WsMemoryUpdatedEvent extends WsEventBase {
+  type: 'memory_updated';
+  /** Name of the memory file that was updated. */
+  file: string;
+  /** Description of what was updated. */
+  summary: string;
+  /** ID of the agent that triggered the update, if applicable. */
+  agentId?: string;
+}
+
 /** Union of all WebSocket event payloads. */
 export type WsEvent =
   | WsNodeStatusEvent
@@ -124,7 +146,9 @@ export type WsEvent =
   | WsReviewVerdictEvent
   | WsGraphModifiedEvent
   | WsCostUpdateEvent
-  | WsChatResponseEvent;
+  | WsChatResponseEvent
+  | WsSpecArtifactReadyEvent
+  | WsMemoryUpdatedEvent;
 
 /** Broadcast function signature matching the one returned by {@link createServer}. */
 export type BroadcastFn = (event: Record<string, unknown>) => void;
@@ -301,6 +325,40 @@ export class WebSocketBroadcaster {
       response,
       category,
       action,
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast that a spec artifact has been generated during Phase 1.
+   *
+   * @param name - File name of the generated artifact (e.g. "spec.md").
+   * @param path - Relative path to the artifact (e.g. ".loomflo/specs/spec.md").
+   */
+  emitSpecArtifactReady(name: string, path: string): void {
+    const event: WsSpecArtifactReadyEvent = {
+      type: 'spec_artifact_ready',
+      timestamp: new Date().toISOString(),
+      name,
+      path,
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast that a shared memory file has been updated.
+   *
+   * @param file - Name of the memory file that was updated.
+   * @param summary - Description of what was updated.
+   * @param agentId - ID of the agent that triggered the update, if applicable.
+   */
+  emitMemoryUpdated(file: string, summary: string, agentId?: string): void {
+    const event: WsMemoryUpdatedEvent = {
+      type: 'memory_updated',
+      timestamp: new Date().toISOString(),
+      file,
+      summary,
+      ...(agentId !== undefined && { agentId }),
     };
     this.emit(event);
   }
