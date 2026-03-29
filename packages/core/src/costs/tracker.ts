@@ -63,6 +63,22 @@ export interface CostSummary {
 }
 
 /**
+ * Callback invoked after every {@link CostTracker.recordCall} with the
+ * recorded entry and current aggregated cost state.
+ *
+ * @param entry - The cost entry that was just recorded.
+ * @param nodeCost - Accumulated cost in USD for the entry's node after this call.
+ * @param totalCost - Total accumulated cost in USD across all nodes after this call.
+ * @param budgetRemaining - Remaining budget in USD, or null if no limit is set.
+ */
+export type OnRecordCallback = (
+  entry: CostEntry,
+  nodeCost: number,
+  totalCost: number,
+  budgetRemaining: number | null,
+) => void;
+
+/**
  * Tracks token usage and estimated cost for every LLM call in a workflow.
  *
  * Maintains per-node and per-agent cost aggregation, uses a configurable
@@ -75,6 +91,7 @@ export class CostTracker {
   private readonly perAgent: Map<string, number> = new Map();
   private totalCost = 0;
   private budgetLimit: number | null;
+  private onRecordCallback: OnRecordCallback | null = null;
 
   /**
    * Creates a new CostTracker instance.
@@ -127,6 +144,15 @@ export class CostTracker {
     this.totalCost += cost;
     this.perNode.set(nodeId, (this.perNode.get(nodeId) ?? 0) + cost);
     this.perAgent.set(agentId, (this.perAgent.get(agentId) ?? 0) + cost);
+
+    if (this.onRecordCallback) {
+      const nodeCost = this.perNode.get(nodeId)!;
+      const budgetRemaining =
+        this.budgetLimit !== null
+          ? Math.max(0, this.budgetLimit - this.totalCost)
+          : null;
+      this.onRecordCallback(entry, nodeCost, this.totalCost, budgetRemaining);
+    }
 
     return entry;
   }
@@ -198,6 +224,18 @@ export class CostTracker {
    */
   setBudgetLimit(limit: number | null): void {
     this.budgetLimit = limit;
+  }
+
+  /**
+   * Registers a callback that fires after every {@link recordCall}.
+   *
+   * The daemon uses this to wire cost updates to the WebSocket broadcaster.
+   * Pass `null` to remove a previously registered callback.
+   *
+   * @param callback - Function to invoke after each recorded call, or null to unregister.
+   */
+  setOnRecordCallback(callback: OnRecordCallback | null): void {
+    this.onRecordCallback = callback;
   }
 
   /**
