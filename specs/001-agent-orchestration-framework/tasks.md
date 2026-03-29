@@ -280,7 +280,7 @@
 - [x] T126 [US7] Implement CostTracker component (progress bar toward budget, per-node cost breakdown table) in packages/dashboard/src/components/CostTracker.tsx
 - [x] T127 [US7] Implement useCosts hook (fetch costs via REST, update on WS cost_update events) in packages/dashboard/src/hooks/useCosts.ts
 - [x] T128 [US7] Implement Costs page (tokens per agent, cost per node including retries, total, budget gauge) in packages/dashboard/src/pages/Costs.tsx
-- [ ] T129 [US7] Implement CLI `loomflo status` command (workflow state, active node, per-node costs, total cost, budget remaining) in packages/cli/src/commands/status.ts
+- [x] T129 [US7] Implement CLI `loomflo status` command (workflow state, active node, per-node costs, total cost, budget remaining) in packages/cli/src/commands/status.ts
 
 **Checkpoint**: Costs visible in real time. Budget enforcement pauses workflow.
 
