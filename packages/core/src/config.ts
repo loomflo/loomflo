@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
+import { watch, type FSWatcher } from 'node:fs';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -318,4 +320,332 @@ export async function loadConfig(
   merged = deepMerge(merged, overrides as Partial<Config>);
 
   return ConfigSchema.parse(merged);
+}
+
+// ============================================================================
+// Config Resolution (from pre-loaded layers)
+// ============================================================================
+
+/**
+ * Resolve a full configuration from pre-loaded config layers.
+ *
+ * Merges in order: DEFAULT_CONFIG → level preset → global → project → overrides.
+ * The effective level is determined from the highest-priority source that sets it.
+ *
+ * @param globalConfig - Global-level partial configuration (~/.loomflo/config.json).
+ * @param projectConfig - Project-level partial configuration (.loomflo/config.json).
+ * @param overrides - CLI or programmatic overrides applied with highest precedence.
+ * @returns The fully resolved and validated configuration.
+ */
+export function resolveConfig(
+  globalConfig: PartialConfig,
+  projectConfig: PartialConfig,
+  overrides: PartialConfig,
+): Config {
+  const resolvedLevel: Level =
+    overrides.level ?? projectConfig.level ?? globalConfig.level ?? DEFAULT_CONFIG.level;
+  const levelPreset = getLevelPreset(resolvedLevel);
+  let merged: Config = deepMerge(DEFAULT_CONFIG, levelPreset as Partial<Config>);
+  merged = deepMerge(merged, globalConfig as Partial<Config>);
+  merged = deepMerge(merged, projectConfig as Partial<Config>);
+  merged = deepMerge(merged, overrides as Partial<Config>);
+  return ConfigSchema.parse(merged);
+}
+
+// ============================================================================
+// Config Manager
+// ============================================================================
+
+/** Options for creating a {@link ConfigManager} instance. */
+export interface ConfigManagerOptions {
+  /** Path to the project root (for project-level config and file watching). */
+  projectPath?: string;
+  /** CLI or programmatic overrides applied with highest precedence. */
+  overrides?: PartialConfig;
+}
+
+/**
+ * Typed event overloads for {@link ConfigManager}.
+ *
+ * The `'configChanged'` event fires with the new {@link Config} whenever
+ * the resolved configuration changes.
+ */
+export interface ConfigManager {
+  /** Register a listener for the `'configChanged'` event. */
+  on(event: 'configChanged', listener: (config: Config) => void): this;
+  /** Emit the `'configChanged'` event with the updated config. */
+  emit(event: 'configChanged', config: Config): boolean;
+}
+
+/**
+ * Runtime configuration manager with live reload support.
+ *
+ * Holds the current resolved config in memory, supports partial updates via
+ * {@link updateConfig}, and watches the project config file for external
+ * changes. Emits a `'configChanged'` event (with the new {@link Config} as
+ * the argument) whenever the resolved configuration changes.
+ *
+ * **Design contract**: configuration changes apply to the **next node
+ * activation only** — they do not retroactively affect nodes that are already
+ * executing. This contract is enforced by the execution engine, not by
+ * ConfigManager itself.
+ *
+ * Use the static {@link ConfigManager.create} factory to construct an instance.
+ *
+ * @example
+ * ```ts
+ * const manager = await ConfigManager.create({ projectPath: '/my/project' });
+ * manager.on('configChanged', (config) => console.log('Config updated'));
+ * manager.updateConfig({ apiRateLimit: 120 });
+ * manager.destroy();
+ * ```
+ */
+export class ConfigManager extends EventEmitter {
+  /** Current fully-resolved configuration. */
+  private config: Config;
+
+  /** Cached global-level partial config from the last load/reload. */
+  private globalConfig: PartialConfig;
+
+  /** Current project-level partial config (updated by updateConfig and reload). */
+  private projectFileConfig: PartialConfig;
+
+  /** Path to the project root, or undefined if no project context. */
+  private readonly projectPath: string | undefined;
+
+  /** CLI/programmatic overrides (immutable after construction). */
+  private readonly overrides: PartialConfig;
+
+  /** Active file system watcher, or null if not watching. */
+  private watcher: FSWatcher | null = null;
+
+  /** Debounce timer for file watch events. */
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Flag to skip the next watcher-triggered reload after our own persist. */
+  private skipNextReload = false;
+
+  /** Debounce delay in milliseconds for file watch events. */
+  private static readonly DEBOUNCE_MS = 75;
+
+  /**
+   * Private constructor — use {@link ConfigManager.create} instead.
+   *
+   * @param config - Initial fully-resolved configuration.
+   * @param globalConfig - Initial global-level partial config.
+   * @param projectFileConfig - Initial project-level partial config.
+   * @param projectPath - Project root path.
+   * @param overrides - CLI/programmatic overrides.
+   */
+  private constructor(
+    config: Config,
+    globalConfig: PartialConfig,
+    projectFileConfig: PartialConfig,
+    projectPath: string | undefined,
+    overrides: PartialConfig,
+  ) {
+    super();
+    this.config = config;
+    this.globalConfig = globalConfig;
+    this.projectFileConfig = projectFileConfig;
+    this.projectPath = projectPath;
+    this.overrides = overrides;
+  }
+
+  /**
+   * Create and initialize a new ConfigManager.
+   *
+   * Loads configuration from all three levels (global, project, CLI overrides),
+   * resolves the merged config, and starts watching the project config directory
+   * for external changes to `config.json`.
+   *
+   * @param options - Configuration manager options.
+   * @returns A fully initialized ConfigManager instance.
+   */
+  static async create(options: ConfigManagerOptions = {}): Promise<ConfigManager> {
+    const { projectPath, overrides = {} } = options;
+
+    const globalPath = join(homedir(), '.loomflo', 'config.json');
+    const globalConfig = await loadConfigFile(globalPath);
+
+    let projectFileConfig: PartialConfig = {};
+    if (projectPath) {
+      projectFileConfig = await loadConfigFile(
+        join(projectPath, '.loomflo', 'config.json'),
+      );
+    }
+
+    const config = resolveConfig(globalConfig, projectFileConfig, overrides);
+    const manager = new ConfigManager(
+      config,
+      globalConfig,
+      projectFileConfig,
+      projectPath,
+      overrides,
+    );
+    manager.startWatching();
+
+    return manager;
+  }
+
+  /**
+   * Return the current fully-resolved configuration.
+   *
+   * @returns The current merged configuration object.
+   */
+  getConfig(): Config {
+    return this.config;
+  }
+
+  /**
+   * Apply a partial configuration update.
+   *
+   * Deep-merges the partial update into the project-level configuration,
+   * re-resolves the full merged config, validates it against {@link ConfigSchema},
+   * persists changes to the project config file (`.loomflo/config.json`)
+   * asynchronously, and emits a `'configChanged'` event if the resolved
+   * config actually changed.
+   *
+   * @param partial - Partial configuration values to merge into project config.
+   * @returns The new fully-resolved configuration.
+   * @throws If the merged configuration fails zod schema validation.
+   */
+  updateConfig(partial: Partial<Config>): Config {
+    this.projectFileConfig = deepMerge(
+      this.projectFileConfig as Config,
+      partial,
+    ) as PartialConfig;
+
+    const previous = this.config;
+    this.config = resolveConfig(this.globalConfig, this.projectFileConfig, this.overrides);
+
+    if (JSON.stringify(previous) !== JSON.stringify(this.config)) {
+      this.emit('configChanged', this.config);
+    }
+
+    this.persistProjectConfig();
+
+    return this.config;
+  }
+
+  /**
+   * Reload configuration from all three levels (global, project, CLI overrides).
+   *
+   * Re-reads config files from disk, re-merges them, and emits `'configChanged'`
+   * if the resolved config changed.
+   *
+   * @returns The newly resolved configuration.
+   */
+  async reload(): Promise<Config> {
+    const globalPath = join(homedir(), '.loomflo', 'config.json');
+    this.globalConfig = await loadConfigFile(globalPath);
+
+    if (this.projectPath) {
+      this.projectFileConfig = await loadConfigFile(
+        join(this.projectPath, '.loomflo', 'config.json'),
+      );
+    }
+
+    const previous = this.config;
+    this.config = resolveConfig(this.globalConfig, this.projectFileConfig, this.overrides);
+
+    if (JSON.stringify(previous) !== JSON.stringify(this.config)) {
+      this.emit('configChanged', this.config);
+    }
+
+    return this.config;
+  }
+
+  /**
+   * Stop watching for file changes and clean up all resources.
+   *
+   * Call this method when the ConfigManager is no longer needed to prevent
+   * resource leaks from the file watcher and timers.
+   */
+  destroy(): void {
+    this.stopWatching();
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.removeAllListeners();
+  }
+
+  /**
+   * Start watching the project config directory for file changes.
+   * Handles missing directories gracefully (no-op if directory does not exist).
+   */
+  private startWatching(): void {
+    if (!this.projectPath) return;
+
+    const configDir = join(this.projectPath, '.loomflo');
+
+    try {
+      this.watcher = watch(
+        configDir,
+        (_eventType: string, filename: string | null): void => {
+          if (filename === 'config.json') {
+            this.handleFileChange();
+          }
+        },
+      );
+
+      this.watcher.on('error', (): void => {
+        this.stopWatching();
+      });
+    } catch {
+      // Directory doesn't exist yet; file watching is not available.
+    }
+  }
+
+  /** Stop the file system watcher if active. */
+  private stopWatching(): void {
+    if (this.watcher) {
+      this.watcher.close();
+      this.watcher = null;
+    }
+  }
+
+  /**
+   * Handle a file change event from the watcher.
+   * Debounces rapid events and triggers a config reload.
+   */
+  private handleFileChange(): void {
+    if (this.skipNextReload) {
+      this.skipNextReload = false;
+      return;
+    }
+
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    this.debounceTimer = setTimeout((): void => {
+      this.debounceTimer = null;
+      void this.reload().catch((): void => {
+        // Reload failure from file watching is non-fatal.
+      });
+    }, ConfigManager.DEBOUNCE_MS);
+  }
+
+  /**
+   * Persist the current project-level config to the project config file.
+   * Runs asynchronously in the background; errors are silently ignored
+   * since the in-memory config is already up-to-date.
+   */
+  private persistProjectConfig(): void {
+    if (!this.projectPath) return;
+
+    this.skipNextReload = true;
+
+    const configDir = join(this.projectPath, '.loomflo');
+    const configPath = join(configDir, 'config.json');
+    const content = JSON.stringify(this.projectFileConfig, null, 2) + '\n';
+
+    void mkdir(configDir, { recursive: true })
+      .then(() => writeFile(configPath, content, 'utf-8'))
+      .catch((): void => {
+        // Persist failure is non-fatal; in-memory config is already updated.
+      });
+  }
 }

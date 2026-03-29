@@ -13,6 +13,7 @@ import { eventsRoutes, type EventsRoutesOptions } from './routes/events.js';
 import { nodesRoutes, type NodesRoutesOptions } from './routes/nodes.js';
 import { workflowRoutes, type WorkflowRoutesOptions } from './routes/workflow.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
+import { configRoutes, type ConfigRoutesOptions } from './routes/config.js';
 
 // ============================================================================
 // Constants
@@ -44,6 +45,7 @@ const API_ROUTE_PREFIXES = [
   '/events',
   '/specs',
   '/chat',
+  '/config',
 ];
 
 // ============================================================================
@@ -87,6 +89,8 @@ export interface ServerOptions {
   events?: EventsRoutesOptions;
   /** Callbacks for the chat routes. When omitted, chat routes are not registered. */
   chat?: ChatRoutesOptions;
+  /** Callbacks for the config routes. When omitted, config routes are not registered. */
+  config?: ConfigRoutesOptions;
 }
 
 /** Return value of {@link createServer}. */
@@ -229,6 +233,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   if (options.chat) {
     await server.register(chatRoutes(options.chat));
+  }
+
+  if (options.config) {
+    await server.register(configRoutes(options.config));
   }
 
   // ---------------------------------------------------------------------------
