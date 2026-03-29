@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Config, EventType, Graph, Node, Workflow, WorkflowStatus } from '../types.js';
-import { saveWorkflowState } from '../persistence/state.js';
+import { loadWorkflowState, saveWorkflowState } from '../persistence/state.js';
 import { appendEvent, createEvent } from '../persistence/events.js';
 import { WorkflowGraph } from './graph.js';
 import { WorkflowNode } from './node.js';
@@ -39,6 +39,21 @@ const TRANSITION_EVENTS: Readonly<Partial<Record<WorkflowStatus, EventType>>> = 
   paused: 'workflow_paused',
   done: 'workflow_completed',
 } as const;
+
+/**
+ * Information about a resumed workflow, describing which nodes
+ * were completed, reset, or rescheduled during the resume process.
+ */
+export interface ResumeInfo {
+  /** ID of the first interrupted node that triggered the resume, or null if none were interrupted. */
+  resumedFrom: string | null;
+  /** IDs of nodes that were already completed and will be skipped. */
+  completedNodeIds: string[];
+  /** IDs of nodes that were interrupted (running/review) and have been reset to pending. */
+  resetNodeIds: string[];
+  /** IDs of nodes in waiting state whose scheduler delays have been recalculated. */
+  rescheduledNodeIds: string[];
+}
 
 /**
  * Manages the full lifecycle of a Loomflo workflow.
@@ -154,6 +169,87 @@ export class WorkflowManager {
   }
 
   /**
+   * Resumes an interrupted or paused workflow from disk.
+   *
+   * Loads the persisted workflow state, identifies completed nodes (skipped),
+   * resets interrupted nodes (running/review) back to pending, and recalculates
+   * scheduler delays for waiting nodes. Logs a `workflow_resumed` event.
+   *
+   * @param projectPath - Absolute path to the project workspace.
+   * @returns A WorkflowManager and {@link ResumeInfo} describing the resume,
+   *   or `null` if no persisted state exists.
+   * @throws Error if the workflow status does not support resuming.
+   */
+  static async resume(
+    projectPath: string,
+  ): Promise<{ manager: WorkflowManager; info: ResumeInfo } | null> {
+    const state = await loadWorkflowState(projectPath);
+    if (!state) {
+      return null;
+    }
+
+    if (state.status !== 'running' && state.status !== 'paused') {
+      throw new Error(
+        `Cannot resume workflow in "${state.status}" status. ` +
+          'Only "running" or "paused" workflows can be resumed.',
+      );
+    }
+
+    const completedNodeIds: string[] = [];
+    const resetNodeIds: string[] = [];
+    const rescheduledNodeIds: string[] = [];
+    let resumedFrom: string | null = null;
+
+    for (const node of Object.values(state.graph.nodes)) {
+      if (node.status === 'done') {
+        completedNodeIds.push(node.id);
+      } else if (node.status === 'running' || node.status === 'review') {
+        if (resumedFrom === null) {
+          resumedFrom = node.id;
+        }
+        resetNodeIds.push(node.id);
+        node.status = 'pending';
+        node.agents = [];
+        node.retryCount = 0;
+        node.reviewReport = null;
+        node.cost = 0;
+        node.startedAt = null;
+        node.completedAt = null;
+        node.resumeAt = null;
+      } else if (node.status === 'waiting') {
+        if (node.resumeAt !== null) {
+          rescheduledNodeIds.push(node.id);
+        } else {
+          // Waiting node with no resumeAt is inconsistent — reset to pending
+          // so the engine re-evaluates it on the next scheduling pass.
+          resetNodeIds.push(node.id);
+          node.status = 'pending';
+        }
+      }
+    }
+
+    if (state.status === 'paused') {
+      state.status = 'running';
+    }
+    state.updatedAt = new Date().toISOString();
+
+    const manager = new WorkflowManager(state);
+    await saveWorkflowState(projectPath, manager.toJSON());
+
+    const event = createEvent({
+      type: 'workflow_resumed',
+      workflowId: state.id,
+      details: { resumedFrom, completedNodeIds, resetNodeIds, rescheduledNodeIds },
+    });
+    await appendEvent(projectPath, event);
+
+    return {
+      manager,
+      info: { resumedFrom, completedNodeIds, resetNodeIds, rescheduledNodeIds },
+    };
+  }
+
+  /**
    * Checks whether a transition to the given status is valid.
    *
    * @param to - The target workflow status to check.
@@ -197,6 +293,18 @@ export class WorkflowManager {
       });
       await appendEvent(this.data.projectPath, event);
     }
+  }
+
+  /**
+   * Pauses a running workflow.
+   *
+   * Transitions the workflow status from `running` to `paused`,
+   * persists the new state, and logs a `workflow_paused` event.
+   *
+   * @throws Error if the workflow is not in `running` status.
+   */
+  async pause(): Promise<void> {
+    await this.transition('paused');
   }
 
   /**
