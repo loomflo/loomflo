@@ -5,6 +5,7 @@ import type { ModelPricing } from '../costs/tracker.js';
 import { DEFAULT_PRICING } from '../costs/tracker.js';
 import type { LLMProvider } from '../providers/base.js';
 import type { Graph, LLMResponse, Node, Edge, TopologyType } from '../types.js';
+import type { WebSocketBroadcaster } from '../api/websocket.js';
 import { SPEC_PROMPTS } from './prompts.js';
 
 // ============================================================================
@@ -38,6 +39,11 @@ export interface SpecEngineConfig {
    * the LLM's best-guess defaults.
    */
   clarificationCallback?: ClarificationCallback;
+  /**
+   * Optional WebSocket broadcaster for emitting real-time events during
+   * spec generation (graph_modified, spec_artifact_ready).
+   */
+  broadcaster?: WebSocketBroadcaster;
 }
 
 /**
@@ -703,6 +709,7 @@ function createNodeFromDefinition(def: GraphNodeDefinition): Node {
 export class SpecEngine {
   private readonly config: SpecEngineConfig;
   private readonly specsDir: string;
+  private readonly broadcaster: WebSocketBroadcaster | undefined;
 
   /**
    * Create a new SpecEngine instance.
@@ -712,6 +719,7 @@ export class SpecEngine {
   constructor(config: SpecEngineConfig) {
     this.config = config;
     this.specsDir = join(config.projectPath, '.loomflo', 'specs');
+    this.broadcaster = config.broadcaster;
   }
 
   /**
@@ -756,6 +764,7 @@ export class SpecEngine {
     );
     const constitutionArtifact = await this.writeArtifact('constitution.md', constitution);
     artifacts.push(constitutionArtifact);
+    this.broadcaster?.emitSpecArtifactReady('constitution.md', '.loomflo/specs/constitution.md');
     this.notifyStepCompleted(0, 'constitution', constitutionArtifact.path, onProgress);
 
     // Step 1: Generate spec (with clarification support)
@@ -773,6 +782,7 @@ export class SpecEngine {
     );
     const specArtifact = await this.writeArtifact('spec.md', spec);
     artifacts.push(specArtifact);
+    this.broadcaster?.emitSpecArtifactReady('spec.md', '.loomflo/specs/spec.md');
     this.notifyStepCompleted(1, 'spec', specArtifact.path, onProgress);
 
     // Step 2: Generate plan
@@ -783,6 +793,7 @@ export class SpecEngine {
     );
     const planArtifact = await this.writeArtifact('plan.md', plan);
     artifacts.push(planArtifact);
+    this.broadcaster?.emitSpecArtifactReady('plan.md', '.loomflo/specs/plan.md');
     this.notifyStepCompleted(2, 'plan', planArtifact.path, onProgress);
 
     // Step 3: Generate tasks
@@ -793,6 +804,7 @@ export class SpecEngine {
     );
     const tasksArtifact = await this.writeArtifact('tasks.md', tasks);
     artifacts.push(tasksArtifact);
+    this.broadcaster?.emitSpecArtifactReady('tasks.md', '.loomflo/specs/tasks.md');
     this.notifyStepCompleted(3, 'tasks', tasksArtifact.path, onProgress);
 
     // Step 4: Generate analysis
@@ -803,6 +815,7 @@ export class SpecEngine {
     );
     const analysisArtifact = await this.writeArtifact('analysis-report.md', analysis);
     artifacts.push(analysisArtifact);
+    this.broadcaster?.emitSpecArtifactReady('analysis-report.md', '.loomflo/specs/analysis-report.md');
     this.notifyStepCompleted(4, 'analysis', analysisArtifact.path, onProgress);
 
     // Step 5: Build graph
@@ -1273,6 +1286,10 @@ export class SpecEngine {
     const nodes: Record<string, Node> = {};
     for (const def of graphDef.nodes) {
       nodes[def.id] = createNodeFromDefinition(def);
+      this.broadcaster?.emitGraphModified('node_added', def.id, {
+        title: def.title,
+        instructionsSummary: def.instructions.slice(0, 120),
+      });
     }
 
     // Build edges from dependency declarations
@@ -1287,6 +1304,10 @@ export class SpecEngine {
           );
         }
         edges.push({ from: depId, to: def.id });
+        this.broadcaster?.emitGraphModified('edge_added', def.id, {
+          from: depId,
+          to: def.id,
+        });
       }
     }
 
