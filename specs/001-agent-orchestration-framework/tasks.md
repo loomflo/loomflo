@@ -311,7 +311,7 @@
 - [x] T135 [P] Define and export all public SDK types in packages/sdk/src/types.ts
 - [x] T136 [P] Create SDK public exports (index.ts) in packages/sdk/src/index.ts
 - [x] T137 [P] Create core public exports (index.ts with all types and key classes) in packages/core/src/index.ts
-- [ ] T138 Implement CLI `loomflo dashboard` command (open browser at daemon URL) in packages/cli/src/commands/dashboard.ts
+- [x] T138 Implement CLI `loomflo dashboard` command (open browser at daemon URL) in packages/cli/src/commands/dashboard.ts
 - [ ] T139 Implement CLI `loomflo logs [node-id]` command (fetch and display agent logs) in packages/cli/src/commands/logs.ts
 - [ ] T140 [P] Create Dockerfile (multi-stage build: build all packages, serve daemon + dashboard) in Dockerfile
 - [ ] T141 [P] Create docker-compose.yml (daemon service with env vars and port mapping) in docker-compose.yml
