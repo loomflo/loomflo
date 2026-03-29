@@ -9,6 +9,8 @@
  *
  * Environment variables:
  * - LOOMFLO_PORT — TCP port to listen on (default: 3000).
+ * - LOOMFLO_HOST — Host address to bind to (default: 127.0.0.1).
+ *   Set to 0.0.0.0 inside Docker containers.
  * - LOOMFLO_PROJECT_PATH — Absolute path to the project workspace.
  */
 
@@ -29,13 +31,14 @@ const port = process.env['LOOMFLO_PORT']
   ? Number(process.env['LOOMFLO_PORT'])
   : DEFAULT_PORT;
 
+const host = process.env['LOOMFLO_HOST'] ?? '127.0.0.1';
 const projectPath = process.env['LOOMFLO_PROJECT_PATH'] ?? process.cwd();
 
 // ============================================================================
 // Startup
 // ============================================================================
 
-const daemon = new Daemon({ port, projectPath });
+const daemon = new Daemon({ port, host, projectPath });
 
 /**
  * Gracefully shut down the daemon on process signals.

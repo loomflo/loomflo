@@ -109,10 +109,12 @@ export class Daemon {
     this.host = config.host ?? DEFAULT_HOST;
     this.projectPath = config.projectPath;
 
-    if (this.host !== '127.0.0.1' && this.host !== 'localhost') {
+    const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0']);
+
+    if (!ALLOWED_HOSTS.has(this.host)) {
       throw new Error(
-        `Daemon must listen on 127.0.0.1 only, got '${this.host}'. ` +
-          'Binding to external interfaces is prohibited for security.',
+        `Daemon host must be one of ${[...ALLOWED_HOSTS].join(', ')}, got '${this.host}'. ` +
+          'Use 0.0.0.0 only inside containers where network isolation is provided by the runtime.',
       );
     }
   }
