@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 
 import { createChatCommand } from './commands/chat.js';
+import { createConfigCommand } from './commands/config.js';
 import { createInitCommand } from './commands/init.js';
 import { createStartCommand } from './commands/start.js';
 import { createStopCommand } from './commands/stop.js';
@@ -12,8 +13,8 @@ import { createStopCommand } from './commands/stop.js';
  *
  * Registers all subcommands (both implemented and placeholder stubs)
  * and configures global program metadata. Implemented commands include
- * init, start, stop, and chat; remaining commands are stubs that will
- * be wired up in later tasks.
+ * init, start, stop, chat, and config; remaining commands are stubs
+ * that will be wired up in later tasks.
  *
  * @returns The configured commander Program instance.
  */
@@ -28,6 +29,7 @@ function createProgram(): Command {
   program.addCommand(createStartCommand());
   program.addCommand(createStopCommand());
   program.addCommand(createChatCommand());
+  program.addCommand(createConfigCommand());
 
   program
     .command('status')
@@ -39,13 +41,6 @@ function createProgram(): Command {
   program
     .command('resume')
     .description('Resume a paused or interrupted workflow')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
-
-  program
-    .command('config')
-    .description('Get or set configuration')
     .action((): void => {
       console.log('Not yet implemented');
     });
