@@ -6,6 +6,7 @@ import { createChatCommand } from './commands/chat.js';
 import { createConfigCommand } from './commands/config.js';
 import { createDashboardCommand } from './commands/dashboard.js';
 import { createInitCommand } from './commands/init.js';
+import { createLogsCommand } from './commands/logs.js';
 import { createResumeCommand } from './commands/resume.js';
 import { createStartCommand } from './commands/start.js';
 import { createStatusCommand } from './commands/status.js';
@@ -36,13 +37,7 @@ function createProgram(): Command {
   program.addCommand(createResumeCommand());
   program.addCommand(createStatusCommand());
 
-  program
-    .command('logs')
-    .description('View agent logs')
-    .action((): void => {
-      console.log('Not yet implemented');
-    });
-
+  program.addCommand(createLogsCommand());
   program.addCommand(createDashboardCommand());
 
   return program;
