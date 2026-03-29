@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Routes, Route, NavLink, Outlet } from "react-router-dom";
 
 import { ChatPage } from "./pages/Chat.js";
+import { ConfigPage } from "./pages/Config.js";
 import { HomePage } from "./pages/Home.js";
 import { MemoryPage } from "./pages/Memory.js";
 import { NodePage } from "./pages/Node.js";
@@ -65,11 +66,6 @@ function Costs(): ReactElement {
   return <h2 className="text-2xl font-semibold">Costs</h2>;
 }
 
-/** Placeholder page component. */
-function Config(): ReactElement {
-  return <h2 className="text-2xl font-semibold">Config</h2>;
-}
-
 /**
  * Root application component with React Router route definitions.
  *
@@ -86,7 +82,7 @@ export function App(): ReactElement {
         <Route path="memory" element={<MemoryPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="costs" element={<Costs />} />
-        <Route path="config" element={<Config />} />
+        <Route path="config" element={<ConfigPage />} />
       </Route>
     </Routes>
   );
