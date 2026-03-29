@@ -3,7 +3,9 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { flushPendingWrites } from './persistence/state.js';
+import { appendEvent, createEvent } from './persistence/events.js';
+import { flushPendingWrites, saveWorkflowStateImmediate } from './persistence/state.js';
+import type { Workflow } from './types.js';
 
 // ============================================================================
 // Interfaces
@@ -17,6 +19,33 @@ export interface DaemonConfig {
   host?: string;
   /** Absolute path to the project workspace. */
   projectPath?: string;
+}
+
+/**
+ * Callback interface for graceful shutdown coordination.
+ *
+ * The daemon does not own workflow state directly — the caller provides
+ * these hooks so the daemon can coordinate an orderly shutdown with
+ * the execution engine.
+ */
+export interface ShutdownHooks {
+  /** Stop dispatching new agent LLM calls. Called first during shutdown. */
+  stopDispatching: () => void;
+  /**
+   * Wait for all currently in-flight LLM calls to complete.
+   * Resolves when no more active calls remain.
+   */
+  waitForActiveCalls: () => Promise<void>;
+  /**
+   * Return the current in-memory workflow state for persistence,
+   * or `null` if no active workflow exists.
+   */
+  getWorkflow: () => Workflow | null;
+  /**
+   * Mark any currently running nodes as interrupted in the workflow.
+   * Returns the IDs of nodes that were marked.
+   */
+  markNodesInterrupted: () => string[];
 }
 
 /** Runtime information about a running daemon instance. */
@@ -54,15 +83,21 @@ const TOKEN_BYTES = 32;
 // Daemon Class
 // ============================================================================
 
+/** Default timeout for graceful shutdown in milliseconds. */
+const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 30_000;
+
 /**
  * Manages the Loomflo daemon lifecycle: Fastify server start/stop,
- * auth token generation, and daemon.json persistence.
+ * auth token generation, daemon.json persistence, and graceful shutdown.
  */
 export class Daemon {
   private readonly port: number;
   private readonly host: string;
+  private readonly projectPath: string | undefined;
   private server: FastifyInstance | null = null;
   private info: DaemonInfo | null = null;
+  private shutdownHooks: ShutdownHooks | null = null;
+  private shuttingDown = false;
 
   /**
    * Create a new Daemon instance.
@@ -72,6 +107,7 @@ export class Daemon {
   constructor(config: DaemonConfig) {
     this.port = config.port ?? DEFAULT_PORT;
     this.host = config.host ?? DEFAULT_HOST;
+    this.projectPath = config.projectPath;
 
     if (this.host !== '127.0.0.1' && this.host !== 'localhost') {
       throw new Error(
@@ -79,6 +115,28 @@ export class Daemon {
           'Binding to external interfaces is prohibited for security.',
       );
     }
+  }
+
+  /**
+   * Register shutdown hooks for graceful shutdown coordination.
+   *
+   * These hooks allow the daemon to coordinate with the execution engine
+   * during shutdown: stop dispatching new calls, wait for active calls,
+   * mark interrupted nodes, and persist final state.
+   *
+   * @param hooks - Callback interface for shutdown coordination.
+   */
+  setShutdownHooks(hooks: ShutdownHooks): void {
+    this.shutdownHooks = hooks;
+  }
+
+  /**
+   * Whether the daemon is currently in the process of shutting down.
+   *
+   * @returns True if graceful shutdown has been initiated.
+   */
+  get isShuttingDown(): boolean {
+    return this.shuttingDown;
   }
 
   /**
@@ -115,10 +173,11 @@ export class Daemon {
   }
 
   /**
-   * Gracefully stop the daemon.
+   * Stop the daemon immediately.
    *
    * Flushes any pending state writes, closes the Fastify server,
-   * and removes `~/.loomflo/daemon.json`.
+   * and removes `~/.loomflo/daemon.json`. Does NOT wait for active
+   * agent calls to finish. Use {@link gracefulShutdown} for orderly shutdown.
    */
   async stop(): Promise<void> {
     await flushPendingWrites();
@@ -130,6 +189,89 @@ export class Daemon {
 
     await removeDaemonFile();
     this.info = null;
+    this.shuttingDown = false;
+  }
+
+  /**
+   * Gracefully shut down the daemon with full state preservation.
+   *
+   * Performs the following steps in order:
+   * 1. Stops dispatching new agent LLM calls.
+   * 2. Waits for all currently in-flight LLM calls to complete
+   *    (or until the timeout is reached).
+   * 3. Marks any running nodes as interrupted in the workflow state.
+   * 4. Logs interruption events to events.jsonl.
+   * 5. Saves the final workflow.json state immediately (no debounce).
+   * 6. Flushes all pending writes.
+   * 7. Closes the Fastify server.
+   * 8. Removes daemon.json.
+   *
+   * If no shutdown hooks are registered, falls back to {@link stop}.
+   *
+   * @param timeoutMs - Maximum time to wait for active calls in milliseconds.
+   *   Defaults to 30 seconds.
+   */
+  async gracefulShutdown(timeoutMs: number = GRACEFUL_SHUTDOWN_TIMEOUT_MS): Promise<void> {
+    if (this.shuttingDown) {
+      return;
+    }
+    this.shuttingDown = true;
+
+    if (!this.shutdownHooks) {
+      await this.stop();
+      return;
+    }
+
+    const { stopDispatching, waitForActiveCalls, getWorkflow, markNodesInterrupted } =
+      this.shutdownHooks;
+
+    // Step 1: Stop dispatching new agent calls.
+    stopDispatching();
+
+    // Step 2: Wait for active calls with timeout.
+    try {
+      await Promise.race([
+        waitForActiveCalls(),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+      ]);
+    } catch {
+      // Timeout or error — proceed with shutdown regardless.
+    }
+
+    // Step 3: Mark running nodes as interrupted.
+    const interruptedNodeIds = markNodesInterrupted();
+
+    // Step 4 & 5: Persist final state if there's an active workflow.
+    const workflow = getWorkflow();
+    if (workflow !== null && this.projectPath) {
+      // Log interruption events for each interrupted node.
+      for (const nodeId of interruptedNodeIds) {
+        const event = createEvent({
+          type: 'node_failed',
+          workflowId: workflow.id,
+          nodeId,
+          details: { reason: 'daemon_shutdown', interrupted: true },
+        });
+        await appendEvent(this.projectPath, event);
+      }
+
+      // Save workflow state immediately (bypass debounce).
+      await saveWorkflowStateImmediate(this.projectPath, workflow);
+    }
+
+    // Step 6: Flush any remaining pending writes.
+    await flushPendingWrites();
+
+    // Step 7: Close the server.
+    if (this.server) {
+      await this.server.close();
+      this.server = null;
+    }
+
+    // Step 8: Remove daemon.json.
+    await removeDaemonFile();
+    this.info = null;
+    this.shuttingDown = false;
   }
 
   /**
