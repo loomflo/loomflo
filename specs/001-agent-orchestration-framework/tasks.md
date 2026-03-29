@@ -277,7 +277,7 @@
 
 - [x] T124 [US7] Implement GET /costs route (per-node costs, total, budget remaining, Loom overhead cost) in packages/core/src/api/routes/costs.ts
 - [x] T125 [US7] Implement cost_update WebSocket event (broadcast after every LLM call with call cost, node cost, total, budget remaining) in packages/core/src/api/websocket.ts
-- [ ] T126 [US7] Implement CostTracker component (progress bar toward budget, per-node cost breakdown table) in packages/dashboard/src/components/CostTracker.tsx
+- [x] T126 [US7] Implement CostTracker component (progress bar toward budget, per-node cost breakdown table) in packages/dashboard/src/components/CostTracker.tsx
 - [ ] T127 [US7] Implement useCosts hook (fetch costs via REST, update on WS cost_update events) in packages/dashboard/src/hooks/useCosts.ts
 - [ ] T128 [US7] Implement Costs page (tokens per agent, cost per node including retries, total, budget gauge) in packages/dashboard/src/pages/Costs.tsx
 - [ ] T129 [US7] Implement CLI `loomflo status` command (workflow state, active node, per-node costs, total cost, budget remaining) in packages/cli/src/commands/status.ts
