@@ -297,7 +297,7 @@
 - [x] T130 [US8] Implement spec_artifact_ready WebSocket event (broadcast as each spec artifact is generated during Phase 1) in packages/core/src/api/websocket.ts
 - [x] T131 [US8] Implement incremental graph building events (emit graph_modified for each node/edge added during graph construction in spec engine) in packages/core/src/spec/spec-engine.ts
 - [x] T132 [US8] Update GraphView component to handle incremental node/edge additions with animation in packages/dashboard/src/components/GraphView.tsx
-- [ ] T133 [US8] Update Graph page to show graph forming during Phase 1 with spec artifact status indicators in packages/dashboard/src/pages/Graph.tsx
+- [x] T133 [US8] Update Graph page to show graph forming during Phase 1 with spec artifact status indicators in packages/dashboard/src/pages/Graph.tsx
 
 **Checkpoint**: Dashboard shows graph building in real time during Phase 1.
 
