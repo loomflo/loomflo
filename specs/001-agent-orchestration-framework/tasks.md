@@ -332,7 +332,7 @@
 - [x] T147 [US-Quality] Write unit tests for packages/core/src/spec/ spec engine (SpecEngine class: plan generation, clarification flow, graph building from spec) using mock LLM provider in packages/core/tests/unit/spec-engine-extended.test.ts
 - [x] T148 [US-Quality] [P] Write unit tests for packages/core/src/memory/ (MemoryStore: store, retrieve, list, delete operations) in packages/core/tests/unit/memory-store.test.ts
 - [x] T149 [US-Quality] [P] Write unit tests for packages/core/src/providers/ (AnthropicProvider: complete(), error handling, token counting) using vi.mock for the Anthropic SDK in packages/core/tests/unit/anthropic-provider.test.ts
-- [ ] T150 [US-Quality] [P] Write unit tests for packages/core/src/config.ts (loadConfig, mergeConfig, validateConfig — edge cases: missing fields, invalid types, env var overrides) in packages/core/tests/unit/config-extended.test.ts
+- [x] T150 [US-Quality] [P] Write unit tests for packages/core/src/config.ts (loadConfig, mergeConfig, validateConfig — edge cases: missing fields, invalid types, env var overrides) in packages/core/tests/unit/config-extended.test.ts
 - [ ] T151 [US-Quality] Write unit tests for packages/core/src/workflow/ WorkflowEngine (execute, pause, resume, cancel — success and failure paths) using mock agents in packages/core/tests/unit/workflow-engine.test.ts
 - [ ] T152 [US-Quality] [P] Write unit tests for packages/core/src/costs/ CostTracker (track, summarize, per-model pricing) in packages/core/tests/unit/costs-extended.test.ts
 - [ ] T153 [US-Quality] After all test files added: run `pnpm test -- -- --coverage` and verify packages/core coverage lines >= 80%. Adjust or add tests if needed until threshold is met. Update vitest.config.ts threshold from 50 to 75.
