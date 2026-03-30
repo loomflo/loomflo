@@ -324,6 +324,23 @@
 
 ---
 
+## Phase 12: Test Coverage & Quality
+
+**Purpose**: Raise test coverage from ~55% to 80%+ across all packages. Add missing unit tests for API routes, spec engine, memory, providers, and config. Improve CI reliability.
+
+- [ ] T146 [US-Quality] Write unit tests for packages/core/src/api/ HTTP routes (health, nodes, events, workflows, chat endpoints) using fastify inject — target: all routes have at least one success + one error test in packages/core/tests/unit/api.test.ts
+- [ ] T147 [US-Quality] Write unit tests for packages/core/src/spec/ spec engine (SpecEngine class: plan generation, clarification flow, graph building from spec) using mock LLM provider in packages/core/tests/unit/spec-engine-extended.test.ts
+- [ ] T148 [US-Quality] [P] Write unit tests for packages/core/src/memory/ (MemoryStore: store, retrieve, list, delete operations) in packages/core/tests/unit/memory-store.test.ts
+- [ ] T149 [US-Quality] [P] Write unit tests for packages/core/src/providers/ (AnthropicProvider: complete(), error handling, token counting) using vi.mock for the Anthropic SDK in packages/core/tests/unit/anthropic-provider.test.ts
+- [ ] T150 [US-Quality] [P] Write unit tests for packages/core/src/config.ts (loadConfig, mergeConfig, validateConfig — edge cases: missing fields, invalid types, env var overrides) in packages/core/tests/unit/config-extended.test.ts
+- [ ] T151 [US-Quality] Write unit tests for packages/core/src/workflow/ WorkflowEngine (execute, pause, resume, cancel — success and failure paths) using mock agents in packages/core/tests/unit/workflow-engine.test.ts
+- [ ] T152 [US-Quality] [P] Write unit tests for packages/core/src/costs/ CostTracker (track, summarize, per-model pricing) in packages/core/tests/unit/costs-extended.test.ts
+- [ ] T153 [US-Quality] After all test files added: run `pnpm test -- -- --coverage` and verify packages/core coverage lines >= 80%. Adjust or add tests if needed until threshold is met. Update vitest.config.ts threshold from 50 to 75.
+
+**Checkpoint**: `pnpm test` passes with coverage >= 75% on packages/core. CI green on branch.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
