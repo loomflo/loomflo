@@ -328,7 +328,7 @@
 
 **Purpose**: Raise test coverage from ~55% to 80%+ across all packages. Add missing unit tests for API routes, spec engine, memory, providers, and config. Improve CI reliability.
 
-- [ ] T146 [US-Quality] Write unit tests for packages/core/src/api/ HTTP routes (health, nodes, events, workflows, chat endpoints) using fastify inject — target: all routes have at least one success + one error test in packages/core/tests/unit/api.test.ts
+- [x] T146 [US-Quality] Write unit tests for packages/core/src/api/ HTTP routes (health, nodes, events, workflows, chat endpoints) using fastify inject — target: all routes have at least one success + one error test in packages/core/tests/unit/api.test.ts
 - [ ] T147 [US-Quality] Write unit tests for packages/core/src/spec/ spec engine (SpecEngine class: plan generation, clarification flow, graph building from spec) using mock LLM provider in packages/core/tests/unit/spec-engine-extended.test.ts
 - [ ] T148 [US-Quality] [P] Write unit tests for packages/core/src/memory/ (MemoryStore: store, retrieve, list, delete operations) in packages/core/tests/unit/memory-store.test.ts
 - [ ] T149 [US-Quality] [P] Write unit tests for packages/core/src/providers/ (AnthropicProvider: complete(), error handling, token counting) using vi.mock for the Anthropic SDK in packages/core/tests/unit/anthropic-provider.test.ts
