@@ -171,7 +171,7 @@ export function createLogsCommand(): Command {
           ts: typeof wsEvent['timestamp'] === 'string'
             ? wsEvent['timestamp']
             : new Date().toISOString(),
-          type: String(wsEvent['type'] ?? 'unknown'),
+          type: typeof wsEvent['type'] === 'string' ? wsEvent['type'] : 'unknown',
           nodeId: typeof wsEvent['nodeId'] === 'string' ? wsEvent['nodeId'] : null,
           agentId: typeof wsEvent['agentId'] === 'string' ? wsEvent['agentId'] : null,
           details: {},

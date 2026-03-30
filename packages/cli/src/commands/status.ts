@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 
-import { type ApiResponse, DaemonClient, readDaemonConfig } from '../client.js';
+import { DaemonClient, readDaemonConfig } from '../client.js';
 
 // ============================================================================
 // Types
@@ -133,7 +133,7 @@ export function createStatusCommand(): Command {
         process.exit(1);
       }
 
-      const workflowRes = workflowResult.value as ApiResponse<WorkflowResponse | ErrorResponse>;
+      const workflowRes = workflowResult.value;
 
       if (!workflowRes.ok) {
         if (workflowRes.status === 404) {
@@ -163,7 +163,7 @@ export function createStatusCommand(): Command {
 
       let nodes: NodeEntry[] = [];
       if (nodesResult.status === 'fulfilled') {
-        const nodesRes = nodesResult.value as ApiResponse<NodeEntry[] | ErrorResponse>;
+        const nodesRes = nodesResult.value;
         if (nodesRes.ok) {
           nodes = nodesRes.data as NodeEntry[];
         }
@@ -231,7 +231,7 @@ export function createStatusCommand(): Command {
       /* ------------------------------------------------------------------ */
 
       if (costsResult.status === 'fulfilled') {
-        const costsRes = costsResult.value as ApiResponse<CostsResponse | ErrorResponse>;
+        const costsRes = costsResult.value;
         if (costsRes.ok) {
           const costs = costsRes.data as CostsResponse;
 

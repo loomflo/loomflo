@@ -91,11 +91,11 @@ function createSpinner(message: string): Spinner {
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let i = 0;
 
-  process.stdout.write(`${frames[0]!} ${message}`);
+  process.stdout.write(`${String(frames[0])} ${message}`);
 
   const interval = setInterval((): void => {
     i = (i + 1) % frames.length;
-    process.stdout.write(`\r${frames[i]!} ${message}`);
+    process.stdout.write(`\r${String(frames[i])} ${message}`);
   }, 80);
 
   return {
