@@ -330,7 +330,7 @@
 
 - [x] T146 [US-Quality] Write unit tests for packages/core/src/api/ HTTP routes (health, nodes, events, workflows, chat endpoints) using fastify inject — target: all routes have at least one success + one error test in packages/core/tests/unit/api.test.ts
 - [x] T147 [US-Quality] Write unit tests for packages/core/src/spec/ spec engine (SpecEngine class: plan generation, clarification flow, graph building from spec) using mock LLM provider in packages/core/tests/unit/spec-engine-extended.test.ts
-- [ ] T148 [US-Quality] [P] Write unit tests for packages/core/src/memory/ (MemoryStore: store, retrieve, list, delete operations) in packages/core/tests/unit/memory-store.test.ts
+- [x] T148 [US-Quality] [P] Write unit tests for packages/core/src/memory/ (MemoryStore: store, retrieve, list, delete operations) in packages/core/tests/unit/memory-store.test.ts
 - [ ] T149 [US-Quality] [P] Write unit tests for packages/core/src/providers/ (AnthropicProvider: complete(), error handling, token counting) using vi.mock for the Anthropic SDK in packages/core/tests/unit/anthropic-provider.test.ts
 - [ ] T150 [US-Quality] [P] Write unit tests for packages/core/src/config.ts (loadConfig, mergeConfig, validateConfig — edge cases: missing fields, invalid types, env var overrides) in packages/core/tests/unit/config-extended.test.ts
 - [ ] T151 [US-Quality] Write unit tests for packages/core/src/workflow/ WorkflowEngine (execute, pause, resume, cancel — success and failure paths) using mock agents in packages/core/tests/unit/workflow-engine.test.ts
