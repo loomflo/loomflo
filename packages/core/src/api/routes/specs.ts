@@ -1,7 +1,7 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { FastifyPluginAsync } from 'fastify';
-import type { Workflow } from '../../types.js';
+import { readdir, readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
+import type { FastifyPluginAsync } from "fastify";
+import type { Workflow } from "../../types.js";
 
 // ============================================================================
 // Types
@@ -34,7 +34,7 @@ export interface SpecsRoutesOptions {
 // ============================================================================
 
 /** Directory within the project workspace that holds spec artifacts. */
-const SPECS_DIR = '.loomflo/specs';
+const SPECS_DIR = ".loomflo/specs";
 
 // ============================================================================
 // Plugin Factory
@@ -59,11 +59,11 @@ export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
      * Lists all spec artifact files in the project's `.loomflo/specs/` directory.
      * Returns 404 if no workflow is active.
      */
-    fastify.get('/specs', async (_request, reply): Promise<void> => {
+    fastify.get("/specs", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
@@ -81,19 +81,19 @@ export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
      * Returns 404 if no workflow is active or the file does not exist.
      */
     fastify.get<{ Params: { name: string } }>(
-      '/specs/:name',
+      "/specs/:name",
       async (request, reply): Promise<void> => {
         const workflow = getWorkflow();
 
         if (workflow === null) {
-          await reply.code(404).send({ error: 'No active workflow' });
+          await reply.code(404).send({ error: "No active workflow" });
           return;
         }
 
         const { name } = request.params;
 
         if (!isValidArtifactName(name)) {
-          await reply.code(400).send({ error: 'Invalid artifact name' });
+          await reply.code(400).send({ error: "Invalid artifact name" });
           return;
         }
 
@@ -101,17 +101,17 @@ export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
 
         let content: string;
         try {
-          content = await readFile(filePath, 'utf-8');
+          content = await readFile(filePath, "utf-8");
         } catch (error: unknown) {
           const code = (error as { code?: string }).code;
-          if (code === 'ENOENT') {
-            await reply.code(404).send({ error: 'Artifact not found' });
+          if (code === "ENOENT") {
+            await reply.code(404).send({ error: "Artifact not found" });
             return;
           }
           throw error;
         }
 
-        await reply.type('text/markdown').code(200).send(content);
+        await reply.type("text/markdown").code(200).send(content);
       },
     );
     return Promise.resolve();
@@ -137,7 +137,7 @@ function isValidArtifactName(name: string): boolean {
     return false;
   }
 
-  if (name.includes('..') || name.includes('/') || name.includes('\\') || name.includes('\0')) {
+  if (name.includes("..") || name.includes("/") || name.includes("\\") || name.includes("\0")) {
     return false;
   }
 
@@ -158,7 +158,7 @@ async function listSpecArtifacts(specsPath: string): Promise<SpecArtifact[]> {
     entries = await readdir(specsPath);
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       return [];
     }
     throw error;

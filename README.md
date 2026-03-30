@@ -157,18 +157,18 @@ loomflo stop
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `loomflo start` | Start the daemon (detached) |
-| `loomflo stop` | Stop the daemon gracefully |
-| `loomflo init "description"` | Generate spec + execution graph from a description |
-| `loomflo chat "message"` | Chat with the Architect agent |
-| `loomflo status` | Show workflow state, active nodes, costs |
-| `loomflo resume` | Resume an interrupted workflow |
-| `loomflo dashboard` | Open the web dashboard in your browser |
-| `loomflo logs [node-id]` | View agent logs (optionally filtered by node) |
-| `loomflo config set <key> <value>` | Set a configuration value |
-| `loomflo config get <key>` | Get a configuration value |
+| Command                            | Description                                        |
+| ---------------------------------- | -------------------------------------------------- |
+| `loomflo start`                    | Start the daemon (detached)                        |
+| `loomflo stop`                     | Stop the daemon gracefully                         |
+| `loomflo init "description"`       | Generate spec + execution graph from a description |
+| `loomflo chat "message"`           | Chat with the Architect agent                      |
+| `loomflo status`                   | Show workflow state, active nodes, costs           |
+| `loomflo resume`                   | Resume an interrupted workflow                     |
+| `loomflo dashboard`                | Open the web dashboard in your browser             |
+| `loomflo logs [node-id]`           | View agent logs (optionally filtered by node)      |
+| `loomflo config set <key> <value>` | Set a configuration value                          |
+| `loomflo config get <key>`         | Get a configuration value                          |
 
 ## Dashboard
 
@@ -209,18 +209,18 @@ Loomflo uses a 3-level configuration system. Each level overrides the previous:
 
 ### Configuration Options
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `models.loom` | string | `claude-opus-4-6` | Model for the Architect agent |
-| `models.loomi` | string | `claude-sonnet-4-6` | Model for Orchestrator agents |
-| `models.looma` | string | `claude-sonnet-4-6` | Model for Worker agents |
-| `models.loomex` | string | `claude-sonnet-4-6` | Model for Reviewer agents |
-| `reviewerEnabled` | boolean | `true` | Enable/disable the review step |
-| `budgetLimit` | number \| null | `null` | Max spend in USD (pauses workflow when reached) |
-| `defaultDelay` | string | `"0"` | Delay between nodes (`"0"`, `"30m"`, `"1h"`, `"1d"`) |
-| `maxRetriesPerNode` | number | `3` | Max retry attempts per node |
-| `maxRetriesPerTask` | number | `2` | Max retry attempts per individual task |
-| `dashboardPort` | number | `3000` | Port for the daemon and dashboard |
+| Key                 | Type           | Default             | Description                                          |
+| ------------------- | -------------- | ------------------- | ---------------------------------------------------- |
+| `models.loom`       | string         | `claude-opus-4-6`   | Model for the Architect agent                        |
+| `models.loomi`      | string         | `claude-sonnet-4-6` | Model for Orchestrator agents                        |
+| `models.looma`      | string         | `claude-sonnet-4-6` | Model for Worker agents                              |
+| `models.loomex`     | string         | `claude-sonnet-4-6` | Model for Reviewer agents                            |
+| `reviewerEnabled`   | boolean        | `true`              | Enable/disable the review step                       |
+| `budgetLimit`       | number \| null | `null`              | Max spend in USD (pauses workflow when reached)      |
+| `defaultDelay`      | string         | `"0"`               | Delay between nodes (`"0"`, `"30m"`, `"1h"`, `"1d"`) |
+| `maxRetriesPerNode` | number         | `3`                 | Max retry attempts per node                          |
+| `maxRetriesPerTask` | number         | `2`                 | Max retry attempts per individual task               |
+| `dashboardPort`     | number         | `3000`              | Port for the daemon and dashboard                    |
 
 ### Example Configuration
 
@@ -245,14 +245,14 @@ Mid-execution configuration changes take effect at the next node activation — 
 
 When you run `loomflo init`, the Architect generates six artifacts:
 
-| Artifact | Purpose |
-|----------|---------|
-| `constitution.md` | Non-negotiable quality principles for the target project |
-| `spec.md` | Functional specification — user stories, features, constraints |
-| `plan.md` | Technical plan — stack, architecture, data model, file structure |
-| `tasks.md` | Ordered task list with file paths and parallelism flags |
-| `analysis-report.md` | Coherence analysis — coverage gaps, duplications, ambiguities |
-| `workflow.json` | Execution graph — nodes, edges, topology, per-node instructions |
+| Artifact             | Purpose                                                          |
+| -------------------- | ---------------------------------------------------------------- |
+| `constitution.md`    | Non-negotiable quality principles for the target project         |
+| `spec.md`            | Functional specification — user stories, features, constraints   |
+| `plan.md`            | Technical plan — stack, architecture, data model, file structure |
+| `tasks.md`           | Ordered task list with file paths and parallelism flags          |
+| `analysis-report.md` | Coherence analysis — coverage gaps, duplications, ambiguities    |
+| `workflow.json`      | Execution graph — nodes, edges, topology, per-node instructions  |
 
 ## Graph Topologies
 
@@ -268,19 +268,19 @@ Loomflo supports multiple graph structures from the same execution engine:
 
 Each agent has access to a sandboxed set of tools:
 
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read file content from the workspace |
-| `write_file` | Create or overwrite a file (scope-enforced) |
-| `edit_file` | String replacement in a file (scope-enforced) |
-| `search_files` | Regex/glob content search |
-| `list_files` | Glob pattern file listing |
-| `exec_command` | Sandboxed shell execution |
-| `read_memory` | Read shared memory files |
-| `write_memory` | Append to shared memory files |
-| `send_message` | Message another agent in the same node |
-| `report_complete` | Signal task completion |
-| `escalate` | Request graph modification from the Architect |
+| Tool              | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `read_file`       | Read file content from the workspace          |
+| `write_file`      | Create or overwrite a file (scope-enforced)   |
+| `edit_file`       | String replacement in a file (scope-enforced) |
+| `search_files`    | Regex/glob content search                     |
+| `list_files`      | Glob pattern file listing                     |
+| `exec_command`    | Sandboxed shell execution                     |
+| `read_memory`     | Read shared memory files                      |
+| `write_memory`    | Append to shared memory files                 |
+| `send_message`    | Message another agent in the same node        |
+| `report_complete` | Signal task completion                        |
+| `escalate`        | Request graph modification from the Architect |
 
 All tools enforce workspace isolation — agents cannot access files outside their project directory. Write operations are restricted to the agent's assigned file scope.
 
@@ -289,23 +289,23 @@ All tools enforce workspace isolation — agents cannot access files outside the
 The `loomflo-sdk` package provides programmatic access:
 
 ```typescript
-import { LoomfloClient } from 'loomflo-sdk';
+import { LoomfloClient } from "loomflo-sdk";
 
 const client = new LoomfloClient({
-  baseUrl: 'http://127.0.0.1:3000',
-  token: 'your-auth-token',
+  baseUrl: "http://127.0.0.1:3000",
+  token: "your-auth-token",
 });
 
 // Initialize a project
-const workflow = await client.init('Build a REST API with auth');
+const workflow = await client.init("Build a REST API with auth");
 
 // Listen to real-time events
-client.onEvent('node_status', (event) => {
+client.onEvent("node_status", (event) => {
   console.log(`Node ${event.nodeId}: ${event.status}`);
 });
 
 // Chat with the Architect
-const response = await client.chat('How is authentication being implemented?');
+const response = await client.chat("How is authentication being implemented?");
 
 // Check status
 const status = await client.status();
@@ -352,11 +352,11 @@ pnpm run typecheck
 
 ## Provider Support
 
-| Provider | Status | Notes |
-|----------|--------|-------|
+| Provider         | Status    | Notes                                                                             |
+| ---------------- | --------- | --------------------------------------------------------------------------------- |
 | Anthropic Claude | Supported | Default provider. claude-opus-4-6 for Architect, claude-sonnet-4-6 for all others |
-| OpenAI | Planned | Interface stub exists |
-| Ollama (local) | Planned | Interface stub exists |
+| OpenAI           | Planned   | Interface stub exists                                                             |
+| Ollama (local)   | Planned   | Interface stub exists                                                             |
 
 Swapping providers requires only a configuration change — zero code modifications.
 

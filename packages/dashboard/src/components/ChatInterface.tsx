@@ -8,8 +8,8 @@
 // with the rest of the dashboard.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import type { KeyboardEvent, ReactElement, SyntheticEvent } from "react";
 
 // ============================================================================
 // Types
@@ -18,7 +18,7 @@ import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
 /** A single chat message with optional action metadata. */
 export interface ChatMessage {
   /** Message author: user or Loom (assistant). */
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   /** Message text content. */
   content: string;
   /** ISO 8601 timestamp when the message was sent. */
@@ -59,8 +59,8 @@ const AUTO_SCROLL_THRESHOLD = 40;
  */
 function formatTime(iso: string): string {
   const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
 
@@ -71,7 +71,7 @@ function formatTime(iso: string): string {
  * @returns Formatted label with underscores replaced by spaces.
  */
 function formatActionType(type: string): string {
-  return type.replace(/_/g, ' ');
+  return type.replace(/_/g, " ");
 }
 
 // ============================================================================
@@ -92,33 +92,29 @@ interface MessageBubbleProps {
  * @returns Rendered message bubble element.
  */
 const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps): ReactElement {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
         className={`max-w-[75%] rounded-lg px-3 py-2 ${
-          isUser
-            ? 'bg-blue-900 text-blue-100'
-            : 'bg-gray-800 text-gray-200'
+          isUser ? "bg-blue-900 text-blue-100" : "bg-gray-800 text-gray-200"
         }`}
       >
         {/* Role indicator */}
         <div className="mb-1 flex items-center gap-2">
           <span
             className={`text-[10px] font-semibold uppercase tracking-wide ${
-              isUser ? 'text-blue-400' : 'text-purple-400'
+              isUser ? "text-blue-400" : "text-purple-400"
             }`}
           >
-            {isUser ? 'You' : 'Loom'}
+            {isUser ? "You" : "Loom"}
           </span>
           <span className="text-[10px] text-gray-500">{formatTime(message.timestamp)}</span>
         </div>
 
         {/* Content */}
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-          {message.content}
-        </p>
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</p>
 
         {/* Action badge */}
         {message.action != null && (
@@ -177,7 +173,7 @@ export const ChatInterface = memo(function ChatInterface({
   isLoading,
 }: ChatInterfaceProps): ReactElement {
   // ---- State ----
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
 
   // ---- Refs ----
@@ -206,11 +202,11 @@ export const ChatInterface = memo(function ChatInterface({
     (e: SyntheticEvent<HTMLFormElement>): void => {
       e.preventDefault();
       const trimmed = input.trim();
-      if (trimmed === '' || isLoading) {
+      if (trimmed === "" || isLoading) {
         return;
       }
       onSend(trimmed);
-      setInput('');
+      setInput("");
       setAutoScroll(true);
     },
     [input, isLoading, onSend],
@@ -218,14 +214,14 @@ export const ChatInterface = memo(function ChatInterface({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         const trimmed = input.trim();
-        if (trimmed === '' || isLoading) {
+        if (trimmed === "" || isLoading) {
           return;
         }
         onSend(trimmed);
-        setInput('');
+        setInput("");
         setAutoScroll(true);
       }
     },
@@ -239,7 +235,7 @@ export const ChatInterface = memo(function ChatInterface({
       <div className="flex items-center border-b border-gray-700 px-4 py-2">
         <span className="text-sm font-medium text-gray-200">Chat with Loom</span>
         <span className="ml-auto text-xs text-gray-500">
-          {messages.length} message{messages.length !== 1 ? 's' : ''}
+          {messages.length} message{messages.length !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -270,7 +266,9 @@ export const ChatInterface = memo(function ChatInterface({
         <textarea
           ref={inputRef}
           value={input}
-          onChange={(e) => { setInput(e.target.value); }}
+          onChange={(e) => {
+            setInput(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Message Loom..."
           disabled={isLoading}
@@ -279,7 +277,7 @@ export const ChatInterface = memo(function ChatInterface({
         />
         <button
           type="submit"
-          disabled={isLoading || input.trim() === ''}
+          disabled={isLoading || input.trim() === ""}
           className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Send

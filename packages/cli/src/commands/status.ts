@@ -1,6 +1,6 @@
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from '../client.js';
+import { DaemonClient, readDaemonConfig } from "../client.js";
 
 // ============================================================================
 // Types
@@ -97,8 +97,8 @@ function formatCost(value: number): string {
  * @returns A configured commander Command instance.
  */
 export function createStatusCommand(): Command {
-  const cmd = new Command('status')
-    .description('Show workflow status and costs')
+  const cmd = new Command("status")
+    .description("Show workflow status and costs")
     .action(async (): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Connect to daemon                                                  */
@@ -108,7 +108,7 @@ export function createStatusCommand(): Command {
       try {
         config = await readDaemonConfig();
       } catch {
-        console.error('Daemon is not running. Start with: loomflo start');
+        console.error("Daemon is not running. Start with: loomflo start");
         process.exit(1);
       }
 
@@ -119,17 +119,17 @@ export function createStatusCommand(): Command {
       /* ------------------------------------------------------------------ */
 
       const [workflowResult, costsResult, nodesResult] = await Promise.allSettled([
-        client.get<WorkflowResponse | ErrorResponse>('/workflow'),
-        client.get<CostsResponse | ErrorResponse>('/costs'),
-        client.get<NodeEntry[] | ErrorResponse>('/nodes'),
+        client.get<WorkflowResponse | ErrorResponse>("/workflow"),
+        client.get<CostsResponse | ErrorResponse>("/costs"),
+        client.get<NodeEntry[] | ErrorResponse>("/nodes"),
       ]);
 
       /* ------------------------------------------------------------------ */
       /* Handle no workflow (404)                                            */
       /* ------------------------------------------------------------------ */
 
-      if (workflowResult.status === 'rejected') {
-        console.error('Failed to connect to daemon.');
+      if (workflowResult.status === "rejected") {
+        console.error("Failed to connect to daemon.");
         process.exit(1);
       }
 
@@ -137,7 +137,7 @@ export function createStatusCommand(): Command {
 
       if (!workflowRes.ok) {
         if (workflowRes.status === 404) {
-          console.log('No active workflow. Start one with: loomflo start');
+          console.log("No active workflow. Start one with: loomflo start");
           return;
         }
         const errorData = workflowRes.data as ErrorResponse;
@@ -151,34 +151,32 @@ export function createStatusCommand(): Command {
       /* Workflow summary                                                    */
       /* ------------------------------------------------------------------ */
 
-      console.log('Workflow');
+      console.log("Workflow");
       console.log(`  ID:          ${workflow.id}`);
       console.log(`  Status:      ${workflow.status}`);
       console.log(`  Description: ${workflow.description}`);
-      console.log('');
+      console.log("");
 
       /* ------------------------------------------------------------------ */
       /* Active nodes                                                        */
       /* ------------------------------------------------------------------ */
 
       let nodes: NodeEntry[] = [];
-      if (nodesResult.status === 'fulfilled') {
+      if (nodesResult.status === "fulfilled") {
         const nodesRes = nodesResult.value;
         if (nodesRes.ok) {
           nodes = nodesRes.data as NodeEntry[];
         }
       }
 
-      const activeNodes = nodes.filter(
-        (n) => n.status === 'running' || n.status === 'review',
-      );
+      const activeNodes = nodes.filter((n) => n.status === "running" || n.status === "review");
 
       if (activeNodes.length > 0) {
-        console.log('Active Nodes');
+        console.log("Active Nodes");
         for (const node of activeNodes) {
           console.log(`  - ${node.title} [${node.status}] (${String(node.agentCount)} agents)`);
         }
-        console.log('');
+        console.log("");
       }
 
       /* ------------------------------------------------------------------ */
@@ -186,59 +184,57 @@ export function createStatusCommand(): Command {
       /* ------------------------------------------------------------------ */
 
       if (nodes.length > 0) {
-        console.log('Node Costs');
+        console.log("Node Costs");
 
-        const titleWidth = Math.max(
-          'Node'.length,
-          ...nodes.map((n) => n.title.length),
-        );
-        const statusWidth = Math.max(
-          'Status'.length,
-          ...nodes.map((n) => n.status.length),
-        );
+        const titleWidth = Math.max("Node".length, ...nodes.map((n) => n.title.length));
+        const statusWidth = Math.max("Status".length, ...nodes.map((n) => n.status.length));
 
         const header =
-          '  ' +
-          'Node'.padEnd(titleWidth) +
-          '  ' +
-          'Status'.padEnd(statusWidth) +
-          '  ' +
-          'Cost'.padStart(10) +
-          '  ' +
-          'Retries';
-        const separator = '  ' + '-'.repeat(header.length - 2);
+          "  " +
+          "Node".padEnd(titleWidth) +
+          "  " +
+          "Status".padEnd(statusWidth) +
+          "  " +
+          "Cost".padStart(10) +
+          "  " +
+          "Retries";
+        const separator = "  " + "-".repeat(header.length - 2);
 
         console.log(header);
         console.log(separator);
 
         for (const node of nodes) {
           const line =
-            '  ' +
+            "  " +
             node.title.padEnd(titleWidth) +
-            '  ' +
+            "  " +
             node.status.padEnd(statusWidth) +
-            '  ' +
+            "  " +
             formatCost(node.cost).padStart(10) +
-            '  ' +
+            "  " +
             String(node.retryCount);
           console.log(line);
         }
-        console.log('');
+        console.log("");
       }
 
       /* ------------------------------------------------------------------ */
       /* Cost summary                                                        */
       /* ------------------------------------------------------------------ */
 
-      if (costsResult.status === 'fulfilled') {
+      if (costsResult.status === "fulfilled") {
         const costsRes = costsResult.value;
         if (costsRes.ok) {
           const costs = costsRes.data as CostsResponse;
 
-          console.log('Cost Summary');
+          console.log("Cost Summary");
           console.log(`  Total Cost:       ${formatCost(costs.total)}`);
-          console.log(`  Budget Limit:     ${costs.budgetLimit !== null ? formatCost(costs.budgetLimit) : 'None'}`);
-          console.log(`  Budget Remaining: ${costs.budgetRemaining !== null ? formatCost(costs.budgetRemaining) : 'N/A'}`);
+          console.log(
+            `  Budget Limit:     ${costs.budgetLimit !== null ? formatCost(costs.budgetLimit) : "None"}`,
+          );
+          console.log(
+            `  Budget Remaining: ${costs.budgetRemaining !== null ? formatCost(costs.budgetRemaining) : "N/A"}`,
+          );
           console.log(`  Loom Overhead:    ${formatCost(costs.loomCost)}`);
         }
       }

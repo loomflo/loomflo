@@ -1,17 +1,17 @@
-import { appendFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { appendFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 /** Directory within the workspace where shared memory files are stored. */
-const SHARED_MEMORY_DIR = '.loomflo/shared-memory';
+const SHARED_MEMORY_DIR = ".loomflo/shared-memory";
 
 /** Zod schema for write_memory tool input. */
 const WriteMemoryInputSchema = z.object({
   /** Name of the shared memory file to write to (e.g. "DECISIONS.md"). */
   name: z.string().describe('Name of the shared memory file (e.g. "DECISIONS.md")'),
   /** Text content to append to the memory file. */
-  content: z.string().describe('Text content to append to the shared memory file'),
+  content: z.string().describe("Text content to append to the shared memory file"),
 });
 
 /**
@@ -39,13 +39,13 @@ function buildEntryHeader(agentId: string): string {
  * shared-memory manager (T042). This tool performs only the file I/O.
  */
 export const memoryWriteTool: Tool = {
-  name: 'write_memory',
+  name: "write_memory",
   description:
-    'Append content to a shared memory file in the workspace. ' +
+    "Append content to a shared memory file in the workspace. " +
     'Provide the file name (e.g. "DECISIONS.md", "PROGRESS.md") and the ' +
-    'text content to append. The content is appended with a timestamp and ' +
-    'agent ID header for traceability. Returns a success confirmation or ' +
-    'an error message.',
+    "text content to append. The content is appended with a timestamp and " +
+    "agent ID header for traceability. Returns a success confirmation or " +
+    "an error message.",
   inputSchema: WriteMemoryInputSchema,
 
   async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -53,7 +53,7 @@ export const memoryWriteTool: Tool = {
       const { name, content } = WriteMemoryInputSchema.parse(input);
 
       // Reject path traversal: name must not contain slashes or ".." segments.
-      if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+      if (name.includes("/") || name.includes("\\") || name.includes("..")) {
         return `Error: invalid memory file name "${name}" — must not contain path separators or ".."`;
       }
 
@@ -68,10 +68,10 @@ export const memoryWriteTool: Tool = {
       }
 
       // Build entry with timestamp header and append to file.
-      const entry = buildEntryHeader(context.agentId) + content + '\n';
+      const entry = buildEntryHeader(context.agentId) + content + "\n";
 
       try {
-        await appendFile(filePath, entry, 'utf-8');
+        await appendFile(filePath, entry, "utf-8");
       } catch {
         return `Error: failed to write to shared memory file — ${name}`;
       }

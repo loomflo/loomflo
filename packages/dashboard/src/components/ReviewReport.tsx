@@ -6,14 +6,14 @@
 // Designed for the dark-themed dashboard.
 // ============================================================================
 
-import { memo } from 'react';
-import type { ReactElement } from 'react';
+import { memo } from "react";
+import type { ReactElement } from "react";
 
 import type {
   ReviewReport as ReviewReportData,
   ReviewVerdict,
   TaskVerificationStatus,
-} from '../lib/types.js';
+} from "../lib/types.js";
 
 // ============================================================================
 // Types
@@ -31,16 +31,16 @@ export interface ReviewReportProps {
 
 /** Verdict-to-Tailwind class mapping for the large verdict badge. */
 const VERDICT_STYLES: Record<ReviewVerdict, { bg: string; text: string; border: string }> = {
-  PASS: { bg: 'bg-green-900', text: 'text-green-300', border: 'border-green-700' },
-  FAIL: { bg: 'bg-red-900', text: 'text-red-300', border: 'border-red-700' },
-  BLOCKED: { bg: 'bg-orange-900', text: 'text-orange-300', border: 'border-orange-700' },
+  PASS: { bg: "bg-green-900", text: "text-green-300", border: "border-green-700" },
+  FAIL: { bg: "bg-red-900", text: "text-red-300", border: "border-red-700" },
+  BLOCKED: { bg: "bg-orange-900", text: "text-orange-300", border: "border-orange-700" },
 };
 
 /** Task verification status to icon and color mapping. */
 const TASK_STATUS_DISPLAY: Record<TaskVerificationStatus, { icon: string; color: string }> = {
-  pass: { icon: '\u2713', color: 'text-green-400' },
-  fail: { icon: '\u2717', color: 'text-red-400' },
-  blocked: { icon: '\u2298', color: 'text-orange-400' },
+  pass: { icon: "\u2713", color: "text-green-400" },
+  fail: { icon: "\u2717", color: "text-red-400" },
+  blocked: { icon: "\u2298", color: "text-orange-400" },
 };
 
 // ============================================================================
@@ -55,12 +55,12 @@ const TASK_STATUS_DISPLAY: Record<TaskVerificationStatus, { icon: string; color:
  */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -101,9 +101,7 @@ export const ReviewReport = memo(function ReviewReport({
         >
           {report.verdict}
         </span>
-        <span className="ml-3 text-xs text-gray-500">
-          {formatTimestamp(report.createdAt)}
-        </span>
+        <span className="ml-3 text-xs text-gray-500">{formatTimestamp(report.createdAt)}</span>
       </div>
 
       {/* Task checklist */}
@@ -122,9 +120,7 @@ export const ReviewReport = memo(function ReviewReport({
                   </span>
                   <div className="min-w-0 flex-1">
                     <span className="font-medium text-gray-200">{task.taskId}</span>
-                    {task.details && (
-                      <p className="mt-0.5 text-xs text-gray-400">{task.details}</p>
-                    )}
+                    {task.details && <p className="mt-0.5 text-xs text-gray-400">{task.details}</p>}
                   </div>
                 </li>
               );

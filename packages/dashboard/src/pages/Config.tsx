@@ -6,11 +6,11 @@
 // logically into collapsible sections with inline success / error feedback.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
 
-import type { Config, Level, ModelsConfig, RetryStrategy } from '../lib/types.js';
-import { apiClient } from '../lib/api.js';
+import type { Config, Level, ModelsConfig, RetryStrategy } from "../lib/types.js";
+import { apiClient } from "../lib/api.js";
 
 // ============================================================================
 // Constants
@@ -18,16 +18,16 @@ import { apiClient } from '../lib/api.js';
 
 /** Level preset options for the select dropdown. */
 const LEVEL_OPTIONS: readonly { value: Level; label: string }[] = [
-  { value: 1, label: '1 – Minimal' },
-  { value: 2, label: '2 – Standard' },
-  { value: 3, label: '3 – Full' },
-  { value: 'custom', label: 'Custom' },
+  { value: 1, label: "1 – Minimal" },
+  { value: 2, label: "2 – Standard" },
+  { value: 3, label: "3 – Full" },
+  { value: "custom", label: "Custom" },
 ] as const;
 
 /** Retry strategy options for the select dropdown. */
 const RETRY_STRATEGY_OPTIONS: readonly { value: RetryStrategy; label: string }[] = [
-  { value: 'adaptive', label: 'Adaptive' },
-  { value: 'same', label: 'Same' },
+  { value: "adaptive", label: "Adaptive" },
+  { value: "same", label: "Same" },
 ] as const;
 
 /** Timeout for clearing inline feedback messages (ms). */
@@ -40,7 +40,7 @@ const FEEDBACK_TIMEOUT_MS = 3000;
 /** Inline feedback state for a single config field. */
 interface FieldFeedback {
   /** Whether the update succeeded or failed. */
-  type: 'success' | 'error';
+  type: "success" | "error";
   /** Human-readable feedback message. */
   message: string;
 }
@@ -81,9 +81,7 @@ const Section = memo(function Section({
     <div className="rounded-lg border border-gray-700 bg-gray-900 p-5">
       <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gray-400">
         {title}
-        <span className="text-xs font-normal normal-case text-gray-600">
-          (merged config)
-        </span>
+        <span className="text-xs font-normal normal-case text-gray-600">(merged config)</span>
       </h3>
       <div className="flex flex-col gap-4">{children}</div>
     </div>
@@ -102,7 +100,7 @@ const Feedback = memo(function Feedback({
   feedback: FieldFeedback | undefined;
 }): ReactElement | null {
   if (!feedback) return null;
-  const color = feedback.type === 'success' ? 'text-green-400' : 'text-red-400';
+  const color = feedback.type === "success" ? "text-green-400" : "text-red-400";
   return <span className={`ml-2 text-xs ${color}`}>{feedback.message}</span>;
 });
 
@@ -144,14 +142,16 @@ const ToggleField = memo(function ToggleField({
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => { onChange(!checked); }}
+        onClick={() => {
+          onChange(!checked);
+        }}
         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-          checked ? 'bg-blue-500' : 'bg-gray-600'
+          checked ? "bg-blue-500" : "bg-gray-600"
         }`}
       >
         <span
           className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-0'
+            checked ? "translate-x-5" : "translate-x-0"
           }`}
         />
       </button>
@@ -243,7 +243,9 @@ const TextField = memo(function TextField({
         id={field}
         type="text"
         value={value}
-        onChange={(e) => { onChange(e.target.value); }}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
         className="w-48 rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
       />
     </div>
@@ -350,7 +352,9 @@ const NullableNumberField = memo(function NullableNumberField({
           id={`${field}-check`}
           type="checkbox"
           checked={enabled}
-          onChange={(e) => { onChange(e.target.checked ? fallback : null); }}
+          onChange={(e) => {
+            onChange(e.target.checked ? fallback : null);
+          }}
           className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
         />
         {enabled && (
@@ -366,9 +370,7 @@ const NullableNumberField = memo(function NullableNumberField({
             className="w-28 rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
           />
         )}
-        {!enabled && (
-          <span className="text-xs text-gray-500">Unlimited</span>
-        )}
+        {!enabled && <span className="text-xs text-gray-500">Unlimited</span>}
       </div>
     </div>
   );
@@ -439,10 +441,10 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
       try {
         const updated = await applyUpdate(patch);
         setConfig(updated);
-        showFeedback(field, { type: 'success', message: 'Saved' });
+        showFeedback(field, { type: "success", message: "Saved" });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Update failed';
-        showFeedback(field, { type: 'error', message: msg });
+        const msg = err instanceof Error ? err.message : "Update failed";
+        showFeedback(field, { type: "error", message: msg });
       }
     },
     [showFeedback],
@@ -458,7 +460,7 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
         const data = await apiClient.getConfig();
         setConfig(data);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to load config';
+        const msg = err instanceof Error ? err.message : "Failed to load config";
         setError(msg);
       } finally {
         setLoading(false);
@@ -501,7 +503,7 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
   if (error || !config) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-red-400">{error ?? 'Failed to load config'}</p>
+        <p className="text-sm text-red-400">{error ?? "Failed to load config"}</p>
       </div>
     );
   }
@@ -521,22 +523,28 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           field="level"
           value={config.level}
           options={LEVEL_OPTIONS}
-          onChange={(v) => { void handleUpdate('level', { level: v }); }}
-          feedback={feedback['level']}
+          onChange={(v) => {
+            void handleUpdate("level", { level: v });
+          }}
+          feedback={feedback["level"]}
         />
         <TextField
           label="Default Delay"
           field="defaultDelay"
           value={config.defaultDelay}
-          onChange={(v) => { void handleUpdate('defaultDelay', { defaultDelay: v }); }}
-          feedback={feedback['defaultDelay']}
+          onChange={(v) => {
+            void handleUpdate("defaultDelay", { defaultDelay: v });
+          }}
+          feedback={feedback["defaultDelay"]}
         />
         <TextField
           label="Provider"
           field="provider"
           value={config.provider}
-          onChange={(v) => { void handleUpdate('provider', { provider: v }); }}
-          feedback={feedback['provider']}
+          onChange={(v) => {
+            void handleUpdate("provider", { provider: v });
+          }}
+          feedback={feedback["provider"]}
         />
       </Section>
 
@@ -548,9 +556,9 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           value={config.models.loom}
           onChange={(v) => {
             const models: ModelsConfig = { ...config.models, loom: v };
-            void handleUpdate('models.loom', { models });
+            void handleUpdate("models.loom", { models });
           }}
-          feedback={feedback['models.loom']}
+          feedback={feedback["models.loom"]}
         />
         <TextField
           label="Loomi Model (Orchestrator)"
@@ -558,9 +566,9 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           value={config.models.loomi}
           onChange={(v) => {
             const models: ModelsConfig = { ...config.models, loomi: v };
-            void handleUpdate('models.loomi', { models });
+            void handleUpdate("models.loomi", { models });
           }}
-          feedback={feedback['models.loomi']}
+          feedback={feedback["models.loomi"]}
         />
         <TextField
           label="Looma Model (Worker)"
@@ -568,9 +576,9 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           value={config.models.looma}
           onChange={(v) => {
             const models: ModelsConfig = { ...config.models, looma: v };
-            void handleUpdate('models.looma', { models });
+            void handleUpdate("models.looma", { models });
           }}
-          feedback={feedback['models.looma']}
+          feedback={feedback["models.looma"]}
         />
         <TextField
           label="Loomex Model (Reviewer)"
@@ -578,17 +586,19 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           value={config.models.loomex}
           onChange={(v) => {
             const models: ModelsConfig = { ...config.models, loomex: v };
-            void handleUpdate('models.loomex', { models });
+            void handleUpdate("models.loomex", { models });
           }}
-          feedback={feedback['models.loomex']}
+          feedback={feedback["models.loomex"]}
         />
         <NullableNumberField
           label="Max Loomas per Loomi"
           field="maxLoomasPerLoomi"
           value={config.maxLoomasPerLoomi}
           fallback={5}
-          onChange={(v) => { void handleUpdate('maxLoomasPerLoomi', { maxLoomasPerLoomi: v }); }}
-          feedback={feedback['maxLoomasPerLoomi']}
+          onChange={(v) => {
+            void handleUpdate("maxLoomasPerLoomi", { maxLoomasPerLoomi: v });
+          }}
+          feedback={feedback["maxLoomasPerLoomi"]}
           min={1}
         />
       </Section>
@@ -599,31 +609,39 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           label="Reviewer Enabled"
           field="reviewerEnabled"
           checked={config.reviewerEnabled}
-          onChange={(v) => { void handleUpdate('reviewerEnabled', { reviewerEnabled: v }); }}
-          feedback={feedback['reviewerEnabled']}
+          onChange={(v) => {
+            void handleUpdate("reviewerEnabled", { reviewerEnabled: v });
+          }}
+          feedback={feedback["reviewerEnabled"]}
         />
         <SelectField<RetryStrategy>
           label="Retry Strategy"
           field="retryStrategy"
           value={config.retryStrategy}
           options={RETRY_STRATEGY_OPTIONS}
-          onChange={(v) => { void handleUpdate('retryStrategy', { retryStrategy: v }); }}
-          feedback={feedback['retryStrategy']}
+          onChange={(v) => {
+            void handleUpdate("retryStrategy", { retryStrategy: v });
+          }}
+          feedback={feedback["retryStrategy"]}
         />
         <NumberField
           label="Max Retries per Node"
           field="maxRetriesPerNode"
           value={config.maxRetriesPerNode}
-          onChange={(v) => { void handleUpdate('maxRetriesPerNode', { maxRetriesPerNode: v }); }}
-          feedback={feedback['maxRetriesPerNode']}
+          onChange={(v) => {
+            void handleUpdate("maxRetriesPerNode", { maxRetriesPerNode: v });
+          }}
+          feedback={feedback["maxRetriesPerNode"]}
           min={0}
         />
         <NumberField
           label="Max Retries per Task"
           field="maxRetriesPerTask"
           value={config.maxRetriesPerTask}
-          onChange={(v) => { void handleUpdate('maxRetriesPerTask', { maxRetriesPerTask: v }); }}
-          feedback={feedback['maxRetriesPerTask']}
+          onChange={(v) => {
+            void handleUpdate("maxRetriesPerTask", { maxRetriesPerTask: v });
+          }}
+          feedback={feedback["maxRetriesPerTask"]}
           min={0}
         />
       </Section>
@@ -635,16 +653,20 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           field="budgetLimit"
           value={config.budgetLimit}
           fallback={100}
-          onChange={(v) => { void handleUpdate('budgetLimit', { budgetLimit: v }); }}
-          feedback={feedback['budgetLimit']}
+          onChange={(v) => {
+            void handleUpdate("budgetLimit", { budgetLimit: v });
+          }}
+          feedback={feedback["budgetLimit"]}
           min={0}
         />
         <ToggleField
           label="Pause on Budget Reached"
           field="pauseOnBudgetReached"
           checked={config.pauseOnBudgetReached}
-          onChange={(v) => { void handleUpdate('pauseOnBudgetReached', { pauseOnBudgetReached: v }); }}
-          feedback={feedback['pauseOnBudgetReached']}
+          onChange={(v) => {
+            void handleUpdate("pauseOnBudgetReached", { pauseOnBudgetReached: v });
+          }}
+          feedback={feedback["pauseOnBudgetReached"]}
         />
       </Section>
 
@@ -654,15 +676,19 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           label="Sandbox Commands"
           field="sandboxCommands"
           checked={config.sandboxCommands}
-          onChange={(v) => { void handleUpdate('sandboxCommands', { sandboxCommands: v }); }}
-          feedback={feedback['sandboxCommands']}
+          onChange={(v) => {
+            void handleUpdate("sandboxCommands", { sandboxCommands: v });
+          }}
+          feedback={feedback["sandboxCommands"]}
         />
         <ToggleField
           label="Allow Network"
           field="allowNetwork"
           checked={config.allowNetwork}
-          onChange={(v) => { void handleUpdate('allowNetwork', { allowNetwork: v }); }}
-          feedback={feedback['allowNetwork']}
+          onChange={(v) => {
+            void handleUpdate("allowNetwork", { allowNetwork: v });
+          }}
+          feedback={feedback["allowNetwork"]}
         />
       </Section>
 
@@ -672,16 +698,20 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           label="Dashboard Port"
           field="dashboardPort"
           value={config.dashboardPort}
-          onChange={(v) => { void handleUpdate('dashboardPort', { dashboardPort: v }); }}
-          feedback={feedback['dashboardPort']}
+          onChange={(v) => {
+            void handleUpdate("dashboardPort", { dashboardPort: v });
+          }}
+          feedback={feedback["dashboardPort"]}
           min={1}
         />
         <ToggleField
           label="Auto-open Dashboard"
           field="dashboardAutoOpen"
           checked={config.dashboardAutoOpen}
-          onChange={(v) => { void handleUpdate('dashboardAutoOpen', { dashboardAutoOpen: v }); }}
-          feedback={feedback['dashboardAutoOpen']}
+          onChange={(v) => {
+            void handleUpdate("dashboardAutoOpen", { dashboardAutoOpen: v });
+          }}
+          feedback={feedback["dashboardAutoOpen"]}
         />
       </Section>
 
@@ -691,8 +721,10 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           label="Agent Timeout (ms)"
           field="agentTimeout"
           value={config.agentTimeout}
-          onChange={(v) => { void handleUpdate('agentTimeout', { agentTimeout: v }); }}
-          feedback={feedback['agentTimeout']}
+          onChange={(v) => {
+            void handleUpdate("agentTimeout", { agentTimeout: v });
+          }}
+          feedback={feedback["agentTimeout"]}
           min={1000}
           step={1000}
         />
@@ -700,16 +732,20 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
           label="Agent Token Limit"
           field="agentTokenLimit"
           value={config.agentTokenLimit}
-          onChange={(v) => { void handleUpdate('agentTokenLimit', { agentTokenLimit: v }); }}
-          feedback={feedback['agentTokenLimit']}
+          onChange={(v) => {
+            void handleUpdate("agentTokenLimit", { agentTokenLimit: v });
+          }}
+          feedback={feedback["agentTokenLimit"]}
           min={1}
         />
         <NumberField
           label="API Rate Limit (calls/min)"
           field="apiRateLimit"
           value={config.apiRateLimit}
-          onChange={(v) => { void handleUpdate('apiRateLimit', { apiRateLimit: v }); }}
-          feedback={feedback['apiRateLimit']}
+          onChange={(v) => {
+            void handleUpdate("apiRateLimit", { apiRateLimit: v });
+          }}
+          feedback={feedback["apiRateLimit"]}
           min={1}
         />
       </Section>

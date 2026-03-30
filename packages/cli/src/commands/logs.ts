@@ -1,6 +1,6 @@
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from '../client.js';
+import { DaemonClient, readDaemonConfig } from "../client.js";
 
 // ============================================================================
 // Types
@@ -45,7 +45,7 @@ interface LogsOptions {
  */
 function formatTimestamp(ts: string): string {
   const date = new Date(ts);
-  return date.toLocaleTimeString('en-US', { hour12: false });
+  return date.toLocaleTimeString("en-US", { hour12: false });
 }
 
 /**
@@ -56,13 +56,11 @@ function formatTimestamp(ts: string): string {
  */
 function formatEvent(event: Event): string {
   const time = formatTimestamp(event.ts);
-  const node = event.nodeId !== null ? ` [${event.nodeId}]` : '';
-  const agent = event.agentId !== null ? ` agent=${event.agentId}` : '';
+  const node = event.nodeId !== null ? ` [${event.nodeId}]` : "";
+  const agent = event.agentId !== null ? ` agent=${event.agentId}` : "";
 
   const detailKeys = Object.keys(event.details);
-  const detail = detailKeys.length > 0
-    ? ' ' + JSON.stringify(event.details)
-    : '';
+  const detail = detailKeys.length > 0 ? " " + JSON.stringify(event.details) : "";
 
   return `${time}${node} ${event.type}${agent}${detail}`;
 }
@@ -84,12 +82,12 @@ function formatEvent(event: Event): string {
  * @returns A configured commander Command instance.
  */
 export function createLogsCommand(): Command {
-  const cmd = new Command('logs')
-    .description('Fetch and display agent logs')
-    .argument('[node-id]', 'Filter events by node ID')
-    .option('--type <type>', 'Filter by event type')
-    .option('--limit <n>', 'Maximum number of events to fetch', '50')
-    .option('-f, --follow', 'Stream new events in real time via WebSocket', false)
+  const cmd = new Command("logs")
+    .description("Fetch and display agent logs")
+    .argument("[node-id]", "Filter events by node ID")
+    .option("--type <type>", "Filter by event type")
+    .option("--limit <n>", "Maximum number of events to fetch", "50")
+    .option("-f, --follow", "Stream new events in real time via WebSocket", false)
     .action(async (nodeId: string | undefined, opts: LogsOptions): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Connect to daemon                                                  */
@@ -99,7 +97,7 @@ export function createLogsCommand(): Command {
       try {
         config = await readDaemonConfig();
       } catch {
-        console.error('Daemon is not running. Start with: loomflo start');
+        console.error("Daemon is not running. Start with: loomflo start");
         process.exit(1);
       }
 
@@ -112,17 +110,17 @@ export function createLogsCommand(): Command {
       const params = new URLSearchParams();
 
       if (nodeId !== undefined) {
-        params.set('nodeId', nodeId);
+        params.set("nodeId", nodeId);
       }
       if (opts.type !== undefined) {
-        params.set('type', opts.type);
+        params.set("type", opts.type);
       }
 
       const limit = parseInt(opts.limit, 10);
-      params.set('limit', String(Number.isFinite(limit) && limit > 0 ? limit : 50));
+      params.set("limit", String(Number.isFinite(limit) && limit > 0 ? limit : 50));
 
       const queryString = params.toString();
-      const path = queryString.length > 0 ? `/events?${queryString}` : '/events';
+      const path = queryString.length > 0 ? `/events?${queryString}` : "/events";
 
       /* ------------------------------------------------------------------ */
       /* Fetch historical events                                            */
@@ -139,7 +137,7 @@ export function createLogsCommand(): Command {
       const { events, total } = result.data as EventsResponse;
 
       if (events.length === 0 && !opts.follow) {
-        console.log('No events found.');
+        console.log("No events found.");
         return;
       }
 
@@ -150,7 +148,9 @@ export function createLogsCommand(): Command {
       }
 
       if (events.length < total) {
-        console.log(`\nShowing ${String(events.length)} of ${String(total)} events. Use --limit to see more.`);
+        console.log(
+          `\nShowing ${String(events.length)} of ${String(total)} events. Use --limit to see more.`,
+        );
       }
 
       /* ------------------------------------------------------------------ */
@@ -161,19 +161,20 @@ export function createLogsCommand(): Command {
         return;
       }
 
-      console.log('\n--- streaming live events (Ctrl+C to stop) ---\n');
+      console.log("\n--- streaming live events (Ctrl+C to stop) ---\n");
 
       client.connectWebSocket();
 
       /** Handle an incoming WebSocket event and print it if it matches filters. */
       const handleWsEvent = (wsEvent: Record<string, unknown>): void => {
         const event: Event = {
-          ts: typeof wsEvent['timestamp'] === 'string'
-            ? wsEvent['timestamp']
-            : new Date().toISOString(),
-          type: typeof wsEvent['type'] === 'string' ? wsEvent['type'] : 'unknown',
-          nodeId: typeof wsEvent['nodeId'] === 'string' ? wsEvent['nodeId'] : null,
-          agentId: typeof wsEvent['agentId'] === 'string' ? wsEvent['agentId'] : null,
+          ts:
+            typeof wsEvent["timestamp"] === "string"
+              ? wsEvent["timestamp"]
+              : new Date().toISOString(),
+          type: typeof wsEvent["type"] === "string" ? wsEvent["type"] : "unknown",
+          nodeId: typeof wsEvent["nodeId"] === "string" ? wsEvent["nodeId"] : null,
+          agentId: typeof wsEvent["agentId"] === "string" ? wsEvent["agentId"] : null,
           details: {},
         };
 
@@ -191,14 +192,14 @@ export function createLogsCommand(): Command {
       /* Subscribe to all relevant event types via a catch-all approach:
          the DaemonClient dispatches by `type` field, so we listen on common types. */
       const eventTypes = [
-        'node_status',
-        'agent_status',
-        'agent_message',
-        'review_verdict',
-        'graph_modified',
-        'cost_update',
-        'memory_updated',
-        'workflow_status',
+        "node_status",
+        "agent_status",
+        "agent_message",
+        "review_verdict",
+        "graph_modified",
+        "cost_update",
+        "memory_updated",
+        "workflow_status",
       ] as const;
 
       const removers: Array<() => void> = [];
@@ -218,8 +219,8 @@ export function createLogsCommand(): Command {
         process.exit(0);
       };
 
-      process.on('SIGINT', cleanup);
-      process.on('SIGTERM', cleanup);
+      process.on("SIGINT", cleanup);
+      process.on("SIGTERM", cleanup);
 
       /* Prevent Node from exiting while streaming. */
       await new Promise<never>(() => {

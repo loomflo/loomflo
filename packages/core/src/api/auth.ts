@@ -1,8 +1,8 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { preHandlerAsyncHookHandler } from 'fastify/types/hooks.js';
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { preHandlerAsyncHookHandler } from "fastify/types/hooks.js";
 
 /** Expected prefix for the Authorization header value. */
-const BEARER_PREFIX = 'Bearer ';
+const BEARER_PREFIX = "Bearer ";
 
 /**
  * Create a Fastify preHandler hook that validates Bearer token authentication.
@@ -23,14 +23,14 @@ export function createAuthMiddleware(token: string): preHandlerAsyncHookHandler 
     const header = request.headers.authorization;
 
     if (!header || !header.startsWith(BEARER_PREFIX)) {
-      await reply.code(401).send({ error: 'Unauthorized' });
+      await reply.code(401).send({ error: "Unauthorized" });
       return;
     }
 
     const provided = header.slice(BEARER_PREFIX.length);
 
     if (provided !== token) {
-      await reply.code(401).send({ error: 'Unauthorized' });
+      await reply.code(401).send({ error: "Unauthorized" });
       return;
     }
   };

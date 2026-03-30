@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { createChatCommand } from './commands/chat.js';
-import { createConfigCommand } from './commands/config.js';
-import { createDashboardCommand } from './commands/dashboard.js';
-import { createInitCommand } from './commands/init.js';
-import { createLogsCommand } from './commands/logs.js';
-import { createResumeCommand } from './commands/resume.js';
-import { createStartCommand } from './commands/start.js';
-import { createStatusCommand } from './commands/status.js';
-import { createStopCommand } from './commands/stop.js';
+import { createChatCommand } from "./commands/chat.js";
+import { createConfigCommand } from "./commands/config.js";
+import { createDashboardCommand } from "./commands/dashboard.js";
+import { createInitCommand } from "./commands/init.js";
+import { createLogsCommand } from "./commands/logs.js";
+import { createResumeCommand } from "./commands/resume.js";
+import { createStartCommand } from "./commands/start.js";
+import { createStatusCommand } from "./commands/status.js";
+import { createStopCommand } from "./commands/stop.js";
 
 /**
  * Create and configure the loomflo CLI program.
@@ -24,9 +24,9 @@ import { createStopCommand } from './commands/stop.js';
  */
 function createProgram(): Command {
   const program = new Command()
-    .name('loomflo')
-    .description('AI Agent Orchestration Framework')
-    .version('0.1.0');
+    .name("loomflo")
+    .description("AI Agent Orchestration Framework")
+    .version("0.1.0");
 
   // Implemented commands
   program.addCommand(createInitCommand());

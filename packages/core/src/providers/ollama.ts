@@ -5,7 +5,7 @@
 // Currently throws on any completion attempt.
 // ============================================================================
 
-import type { LLMProvider } from './base.js';
+import type { LLMProvider } from "./base.js";
 
 /**
  * Stub Ollama provider.
@@ -20,8 +20,6 @@ export class OllamaProvider implements LLMProvider {
    * @throws {Error} Always, indicating the provider is not yet supported.
    */
   complete(): never {
-    throw new Error(
-      'Ollama provider is not yet supported. Planned for a future release.',
-    );
+    throw new Error("Ollama provider is not yet supported. Planned for a future release.");
   }
 }

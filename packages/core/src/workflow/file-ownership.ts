@@ -7,8 +7,8 @@
  * a MessageBus-based lock request/grant protocol.
  */
 
-import { randomUUID } from 'node:crypto';
-import picomatch from 'picomatch';
+import { randomUUID } from "node:crypto";
+import picomatch from "picomatch";
 
 // ============================================================================
 // Temporary Lock
@@ -65,9 +65,9 @@ export interface FileOwnershipState {
  */
 export interface LockRequestMessage {
   /** Protocol discriminator — always `'file_lock'`. */
-  readonly protocol: 'file_lock';
+  readonly protocol: "file_lock";
   /** Action discriminator. */
-  readonly action: 'lock_request';
+  readonly action: "lock_request";
   /** File path or glob pattern the agent needs write access to. */
   readonly targetPattern: string;
   /** Human-readable reason the agent needs this access. */
@@ -81,9 +81,9 @@ export interface LockRequestMessage {
  */
 export interface LockGrantMessage {
   /** Protocol discriminator — always `'file_lock'`. */
-  readonly protocol: 'file_lock';
+  readonly protocol: "file_lock";
   /** Action discriminator. */
-  readonly action: 'lock_grant';
+  readonly action: "lock_grant";
   /** ID of the granted lock (matches {@link TemporaryLock.id}). */
   readonly lockId: string;
   /** Glob patterns the lock covers. */
@@ -99,9 +99,9 @@ export interface LockGrantMessage {
  */
 export interface LockDeniedMessage {
   /** Protocol discriminator — always `'file_lock'`. */
-  readonly protocol: 'file_lock';
+  readonly protocol: "file_lock";
   /** Action discriminator. */
-  readonly action: 'lock_denied';
+  readonly action: "lock_denied";
   /** The pattern that was denied. */
   readonly targetPattern: string;
   /** Reason the lock was denied. */
@@ -115,9 +115,9 @@ export interface LockDeniedMessage {
  */
 export interface LockReleaseMessage {
   /** Protocol discriminator — always `'file_lock'`. */
-  readonly protocol: 'file_lock';
+  readonly protocol: "file_lock";
   /** Action discriminator. */
-  readonly action: 'lock_release';
+  readonly action: "lock_release";
   /** ID of the released lock. */
   readonly lockId: string;
 }
@@ -142,7 +142,7 @@ export type LockProtocolMessage =
 export function isLockProtocolMessage(content: string): boolean {
   try {
     const parsed = JSON.parse(content) as Record<string, unknown>;
-    return parsed['protocol'] === 'file_lock';
+    return parsed["protocol"] === "file_lock";
   } catch {
     return false;
   }
@@ -158,14 +158,14 @@ export function isLockProtocolMessage(content: string): boolean {
 export function parseLockProtocolMessage(content: string): LockProtocolMessage | null {
   try {
     const parsed = JSON.parse(content) as Record<string, unknown>;
-    if (parsed['protocol'] !== 'file_lock') return null;
+    if (parsed["protocol"] !== "file_lock") return null;
 
-    const action = parsed['action'];
+    const action = parsed["action"];
     if (
-      action !== 'lock_request' &&
-      action !== 'lock_grant' &&
-      action !== 'lock_denied' &&
-      action !== 'lock_release'
+      action !== "lock_request" &&
+      action !== "lock_grant" &&
+      action !== "lock_denied" &&
+      action !== "lock_release"
     ) {
       return null;
     }
@@ -185,8 +185,8 @@ export function parseLockProtocolMessage(content: string): LockProtocolMessage |
  */
 export function createLockRequest(targetPattern: string, reason: string): string {
   const msg: LockRequestMessage = {
-    protocol: 'file_lock',
-    action: 'lock_request',
+    protocol: "file_lock",
+    action: "lock_request",
     targetPattern,
     reason,
   };
@@ -201,8 +201,8 @@ export function createLockRequest(targetPattern: string, reason: string): string
  */
 export function createLockGrant(lock: TemporaryLock): string {
   const msg: LockGrantMessage = {
-    protocol: 'file_lock',
-    action: 'lock_grant',
+    protocol: "file_lock",
+    action: "lock_grant",
     lockId: lock.id,
     patterns: [...lock.patterns],
     expiresAt: lock.expiresAt,
@@ -219,8 +219,8 @@ export function createLockGrant(lock: TemporaryLock): string {
  */
 export function createLockDenied(targetPattern: string, reason: string): string {
   const msg: LockDeniedMessage = {
-    protocol: 'file_lock',
-    action: 'lock_denied',
+    protocol: "file_lock",
+    action: "lock_denied",
     targetPattern,
     reason,
   };
@@ -235,8 +235,8 @@ export function createLockDenied(targetPattern: string, reason: string): string 
  */
 export function createLockRelease(lockId: string): string {
   const msg: LockReleaseMessage = {
-    protocol: 'file_lock',
-    action: 'lock_release',
+    protocol: "file_lock",
+    action: "lock_release",
     lockId,
   };
   return JSON.stringify(msg);
@@ -291,9 +291,7 @@ export class FileOwnershipManager {
    * @param scopes - Initial scope map (agent ID → glob patterns). Defaults to empty.
    */
   constructor(scopes: Record<string, string[]> = {}) {
-    this.scopes = new Map(
-      Object.entries(scopes).map(([k, v]) => [k, [...v]]),
-    );
+    this.scopes = new Map(Object.entries(scopes).map(([k, v]) => [k, [...v]]));
     this.locks = new Map();
   }
 
@@ -383,9 +381,7 @@ export class FileOwnershipManager {
 
         for (const testPath of testPaths) {
           if (matcherA(testPath) && matcherB(testPath)) {
-            overlaps.push(
-              `Agents "${idA}" and "${idB}" both match "${testPath}"`,
-            );
+            overlaps.push(`Agents "${idA}" and "${idB}" both match "${testPath}"`);
             break;
           }
         }
@@ -539,10 +535,7 @@ export class FileOwnershipManager {
 
     const now = Date.now();
     for (const lock of this.locks.values()) {
-      if (
-        lock.agentId === agentId &&
-        new Date(lock.expiresAt).getTime() > now
-      ) {
+      if (lock.agentId === agentId && new Date(lock.expiresAt).getTime() > now) {
         patterns.push(...lock.patterns);
       }
     }
@@ -608,16 +601,16 @@ export function generateTestPaths(patterns: string[]): string[] {
 
   for (const pattern of patterns) {
     // Replace ** with a representative deep path segment
-    let path = pattern.replace(/\*\*/g, 'a/b');
+    let path = pattern.replace(/\*\*/g, "a/b");
     // Replace remaining * with a representative filename
-    path = path.replace(/\*/g, 'test.file');
+    path = path.replace(/\*/g, "test.file");
     // Replace brace expansions with first alternative
     path = path.replace(/\{([^}]+)\}/g, (_match, group: string) => {
-      const first = group.split(',')[0];
-      return first ?? 'x';
+      const first = group.split(",")[0];
+      return first ?? "x";
     });
     // Replace ? with a single character
-    path = path.replace(/\?/g, 'x');
+    path = path.replace(/\?/g, "x");
     paths.add(path);
   }
 

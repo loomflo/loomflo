@@ -1,7 +1,7 @@
-import { mkdir, appendFile, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { EventSchema } from '../types.js';
-import type { Event, EventType } from '../types.js';
+import { mkdir, appendFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { EventSchema } from "../types.js";
+import type { Event, EventType } from "../types.js";
 
 // ============================================================================
 // Types
@@ -41,8 +41,8 @@ export interface CreateEventParams {
 // Constants
 // ============================================================================
 
-const LOOMFLO_DIR = '.loomflo';
-const EVENTS_FILE = 'events.jsonl';
+const LOOMFLO_DIR = ".loomflo";
+const EVENTS_FILE = "events.jsonl";
 
 // ============================================================================
 // Public API
@@ -79,8 +79,8 @@ export async function appendEvent(projectPath: string, event: Event): Promise<vo
   await mkdir(dir, { recursive: true });
 
   const filePath = join(dir, EVENTS_FILE);
-  const line = JSON.stringify(event) + '\n';
-  await appendFile(filePath, line, { encoding: 'utf-8' });
+  const line = JSON.stringify(event) + "\n";
+  await appendFile(filePath, line, { encoding: "utf-8" });
 }
 
 /**
@@ -101,18 +101,18 @@ export async function queryEvents(
 
   let raw: string;
   try {
-    raw = await readFile(filePath, { encoding: 'utf-8' });
+    raw = await readFile(filePath, { encoding: "utf-8" });
   } catch {
     // File does not exist yet — no events to return.
     return [];
   }
 
-  const lines = raw.split('\n');
+  const lines = raw.split("\n");
   let events: Event[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = (lines[i] ?? '').trim();
-    if (line === '') continue;
+    const line = (lines[i] ?? "").trim();
+    if (line === "") continue;
 
     let parsed: unknown;
     try {

@@ -1,14 +1,14 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import type { Event, EventType, NodeStatus, Workflow } from '../types.js';
-import { WorkflowSchema } from '../types.js';
-import { queryEvents } from './events.js';
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import type { Event, EventType, NodeStatus, Workflow } from "../types.js";
+import { WorkflowSchema } from "../types.js";
+import { queryEvents } from "./events.js";
 
 /** Directory name for Loomflo project-level state. */
-const LOOMFLO_DIR = '.loomflo';
+const LOOMFLO_DIR = ".loomflo";
 
 /** Workflow state filename. */
-const WORKFLOW_FILE = 'workflow.json';
+const WORKFLOW_FILE = "workflow.json";
 
 /** Debounce delay in milliseconds. */
 const DEBOUNCE_MS = 300;
@@ -49,7 +49,7 @@ async function atomicWrite(filePath: string, workflow: Workflow): Promise<void> 
 
   const tmpPath = `${filePath}.tmp`;
   const content = JSON.stringify(workflow, null, 2);
-  await writeFile(tmpPath, content, 'utf-8');
+  await writeFile(tmpPath, content, "utf-8");
   await rename(tmpPath, filePath);
 }
 
@@ -69,9 +69,9 @@ export async function loadWorkflowState(projectPath: string): Promise<Workflow |
 
   let content: string;
   try {
-    content = await readFile(filePath, 'utf-8');
+    content = await readFile(filePath, "utf-8");
   } catch (error: unknown) {
-    if ((error as { code?: string }).code === 'ENOENT') {
+    if ((error as { code?: string }).code === "ENOENT") {
       return null;
     }
     throw new Error(
@@ -88,9 +88,7 @@ export async function loadWorkflowState(projectPath: string): Promise<Workflow |
 
   const result = WorkflowSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(
-      `Invalid workflow state in ${filePath}: ${result.error.message}`,
-    );
+    throw new Error(`Invalid workflow state in ${filePath}: ${result.error.message}`);
   }
 
   return result.data;
@@ -225,18 +223,18 @@ export async function flushPendingWrites(): Promise<void> {
  * Only events that represent a final state transition for a node are included.
  */
 const EVENT_TO_NODE_STATUS: ReadonlyMap<EventType, NodeStatus> = new Map<EventType, NodeStatus>([
-  ['node_started', 'running'],
-  ['node_completed', 'done'],
-  ['node_failed', 'failed'],
-  ['node_blocked', 'blocked'],
+  ["node_started", "running"],
+  ["node_completed", "done"],
+  ["node_failed", "failed"],
+  ["node_blocked", "blocked"],
 ]);
 
 /** Node-level event types used for cross-checking node status. */
 const NODE_EVENT_TYPES: EventType[] = [
-  'node_started',
-  'node_completed',
-  'node_failed',
-  'node_blocked',
+  "node_started",
+  "node_completed",
+  "node_failed",
+  "node_blocked",
 ];
 
 /**
@@ -293,7 +291,7 @@ export async function verifyStateConsistency(projectPath: string): Promise<Verif
   if (workflow === null) {
     const hasEvents = events.length > 0;
     if (hasEvents) {
-      issues.push('workflow.json is missing but events.jsonl contains events');
+      issues.push("workflow.json is missing but events.jsonl contains events");
       recoverable = false;
     }
     return { valid: !hasEvents, issues, recoverable };
@@ -302,9 +300,7 @@ export async function verifyStateConsistency(projectPath: string): Promise<Verif
   // Check: events.jsonl exists and references this workflow.
   const workflowEvents = events.filter((e) => e.workflowId === workflow.id);
   if (events.length > 0 && workflowEvents.length === 0) {
-    issues.push(
-      `events.jsonl contains events but none reference workflow ${workflow.id}`,
-    );
+    issues.push(`events.jsonl contains events but none reference workflow ${workflow.id}`);
     // Not auto-fixable — event log may belong to a different workflow.
     recoverable = false;
   }
@@ -318,7 +314,7 @@ export async function verifyStateConsistency(projectPath: string): Promise<Verif
 
     if (lastEvent === undefined) {
       // Node has no events — only valid for nodes in initial states.
-      if (node.status !== 'pending' && node.status !== 'waiting') {
+      if (node.status !== "pending" && node.status !== "waiting") {
         issues.push(
           `Node "${nodeId}" has status "${node.status}" but no events were logged for it`,
         );
@@ -334,14 +330,12 @@ export async function verifyStateConsistency(projectPath: string): Promise<Verif
     }
 
     // Check: node is 'done' but missing a node_completed event.
-    if (node.status === 'done') {
+    if (node.status === "done") {
       const hasCompletionEvent = workflowEvents.some(
-        (e) => e.nodeId === nodeId && e.type === 'node_completed',
+        (e) => e.nodeId === nodeId && e.type === "node_completed",
       );
       if (!hasCompletionEvent) {
-        issues.push(
-          `Node "${nodeId}" is marked as done but has no node_completed event`,
-        );
+        issues.push(`Node "${nodeId}" is marked as done but has no node_completed event`);
       }
     }
   }

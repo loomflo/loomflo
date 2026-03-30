@@ -6,13 +6,13 @@
 // Subscribes to WebSocket events for real-time cost updates.
 // ============================================================================
 
-import { memo } from 'react';
-import type { ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { memo } from "react";
+import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import { CostTracker } from '../components/CostTracker.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
-import { useCosts } from '../hooks/useCosts.js';
+import { CostTracker } from "../components/CostTracker.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
+import { useCosts } from "../hooks/useCosts.js";
 
 // ============================================================================
 // CostsPage Component
@@ -31,7 +31,7 @@ import { useCosts } from '../hooks/useCosts.js';
  */
 export const CostsPage = memo(function CostsPage(): ReactElement {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
 
   const { subscribe } = useWebSocket(token);
   const { total, budgetLimit, budgetRemaining, nodes, loomCost, loading, error } =
@@ -72,9 +72,7 @@ export const CostsPage = memo(function CostsPage(): ReactElement {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-300">
-            No active workflow
-          </p>
+          <p className="text-lg font-medium text-gray-300">No active workflow</p>
           <p className="mt-2 text-sm text-gray-500">
             Cost data will appear here once a workflow is running.
           </p>

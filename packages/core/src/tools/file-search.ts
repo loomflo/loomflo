@@ -1,11 +1,11 @@
-import { readFile, readdir, realpath } from 'node:fs/promises';
-import { join, normalize, relative, resolve } from 'node:path';
-import picomatch from 'picomatch';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { readFile, readdir, realpath } from "node:fs/promises";
+import { join, normalize, relative, resolve } from "node:path";
+import picomatch from "picomatch";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 /** Directories to always skip during recursive traversal. */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist"]);
 
 /**
  * Byte-range heuristic for detecting binary files.
@@ -16,19 +16,19 @@ const BINARY_CHECK_BYTES = 8192;
 /** Zod schema for search_files tool input. */
 const SearchFilesInputSchema = z.object({
   /** Regex pattern to search for in file contents. */
-  pattern: z.string().describe('Regex pattern to search for in file contents'),
+  pattern: z.string().describe("Regex pattern to search for in file contents"),
   /** Glob pattern to filter which files to search. Defaults to all files. */
   glob: z
     .string()
     .optional()
-    .describe('Glob pattern to filter which files to search (default: **/*)'),
+    .describe("Glob pattern to filter which files to search (default: **/*)"),
   /** Maximum number of matches to return. Defaults to 50. */
   maxResults: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe('Maximum number of matching lines to return (default: 50)'),
+    .describe("Maximum number of matching lines to return (default: 50)"),
 });
 
 /**
@@ -39,7 +39,7 @@ const SearchFilesInputSchema = z.object({
  */
 function compileRegex(pattern: string): RegExp | string {
   try {
-    return new RegExp(pattern, 'g');
+    return new RegExp(pattern, "g");
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return `Error: invalid regex pattern — ${message}`;
@@ -98,24 +98,24 @@ async function walkDirectory(dir: string): Promise<string[]> {
  * strings — this tool never throws.
  */
 export const searchFilesTool: Tool = {
-  name: 'search_files',
+  name: "search_files",
   description:
-    'Search file contents within the workspace using a regex pattern. ' +
-    'Optionally filter files with a glob pattern. ' +
+    "Search file contents within the workspace using a regex pattern. " +
+    "Optionally filter files with a glob pattern. " +
     'Returns matching lines in "file:lineNumber:content" format, ' +
-    'or an error message on failure.',
+    "or an error message on failure.",
   inputSchema: SearchFilesInputSchema,
 
   async execute(input: unknown, context: ToolContext): Promise<string> {
     try {
       const {
         pattern,
-        glob: globPattern = '**/*',
+        glob: globPattern = "**/*",
         maxResults = 50,
       } = SearchFilesInputSchema.parse(input);
 
       const regex = compileRegex(pattern);
-      if (typeof regex === 'string') {
+      if (typeof regex === "string") {
         return regex;
       }
 
@@ -139,7 +139,7 @@ export const searchFilesTool: Tool = {
 
         // Validate the file is still inside workspace (guards against symlinks).
         const realFile = await realpath(absolutePath);
-        if (!realFile.startsWith(realWorkspace + '/') && realFile !== realWorkspace) {
+        if (!realFile.startsWith(realWorkspace + "/") && realFile !== realWorkspace) {
           continue;
         }
 
@@ -154,13 +154,13 @@ export const searchFilesTool: Tool = {
           continue;
         }
 
-        const content = buffer.toString('utf-8');
-        const lines = content.split('\n');
+        const content = buffer.toString("utf-8");
+        const lines = content.split("\n");
 
         for (let i = 0; i < lines.length; i++) {
           // Reset regex state for each line (global flag carries lastIndex).
           regex.lastIndex = 0;
-          const currentLine = lines[i] ?? '';
+          const currentLine = lines[i] ?? "";
           if (regex.test(currentLine)) {
             results.push(`${rel}:${String(i + 1)}:${currentLine}`);
             if (results.length >= maxResults) {
@@ -171,10 +171,10 @@ export const searchFilesTool: Tool = {
       }
 
       if (results.length === 0) {
-        return 'No matches found';
+        return "No matches found";
       }
 
-      return results.join('\n');
+      return results.join("\n");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return `Error: ${message}`;

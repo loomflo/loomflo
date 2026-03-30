@@ -1,0 +1,50 @@
+{
+  "files": {
+    "packages/core/dist/index.d.ts": {
+      "size": 323980,
+      "mtime_nanos": 1774863320495041503,
+      "mode": 436,
+      "is_dir": false
+    },
+    "packages/core/dist/chunk-7M4TNMD3.js": {
+      "size": 38964,
+      "mtime_nanos": 1774863312763944264,
+      "mode": 436,
+      "is_dir": false
+    },
+    "packages/core/dist/index.js": {
+      "size": 301590,
+      "mtime_nanos": 1774863312763944264,
+      "mode": 436,
+      "is_dir": false
+    },
+    "packages/core/.turbo/turbo-build.log": {
+      "size": 560,
+      "mtime_nanos": 1774863320587042660,
+      "mode": 436,
+      "is_dir": false
+    },
+    "packages/core/dist": { "size": 0, "mtime_nanos": 0, "mode": 0, "is_dir": true },
+    "packages/core/dist/daemon-entry.d.ts": {
+      "size": 20,
+      "mtime_nanos": 1774863320495041503,
+      "mode": 436,
+      "is_dir": false
+    },
+    "packages/core/dist/daemon-entry.js": {
+      "size": 926,
+      "mtime_nanos": 1774863312763944264,
+      "mode": 493,
+      "is_dir": false
+    }
+  },
+  "order": [
+    "packages/core/.turbo/turbo-build.log",
+    "packages/core/dist",
+    "packages/core/dist/chunk-7M4TNMD3.js",
+    "packages/core/dist/daemon-entry.d.ts",
+    "packages/core/dist/daemon-entry.js",
+    "packages/core/dist/index.d.ts",
+    "packages/core/dist/index.js"
+  ]
+}

@@ -141,9 +141,7 @@ type WsEventMap = {
 };
 
 /** Typed callback for a specific event type. */
-export type WsEventCallback<T extends WsEventType> = (
-  event: WsEventMap[T],
-) => void;
+export type WsEventCallback<T extends WsEventType> = (event: WsEventMap[T]) => void;
 
 // ============================================================================
 // Hook Options & Return Type
@@ -168,10 +166,7 @@ export interface UseWebSocketReturn {
    * @param callback - Handler invoked when an event of that type arrives.
    * @returns An unsubscribe function that removes the subscription.
    */
-  subscribe: <T extends WsEventType>(
-    type: T,
-    callback: WsEventCallback<T>,
-  ) => () => void;
+  subscribe: <T extends WsEventType>(type: T, callback: WsEventCallback<T>) => () => void;
   /** Manually disconnect the WebSocket. Disables automatic reconnection. */
   disconnect: () => void;
   /** Manually trigger a reconnection attempt. Resets the backoff counter. */
@@ -209,9 +204,7 @@ export function useWebSocket(
   const [connected, setConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const subscribersRef = useRef(
-    new Map<WsEventType, Set<WsEventCallback<WsEventType>>>(),
-  );
+  const subscribersRef = useRef(new Map<WsEventType, Set<WsEventCallback<WsEventType>>>());
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intentionalCloseRef = useRef(false);
@@ -235,14 +228,11 @@ export function useWebSocket(
   }, []);
 
   /** Build the WebSocket URL from the current page location and token. */
-  const buildUrl = useCallback(
-    (tkn: string): string => {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host = window.location.host;
-      return `${protocol}//${host}/ws?token=${encodeURIComponent(tkn)}`;
-    },
-    [],
-  );
+  const buildUrl = useCallback((tkn: string): string => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host;
+    return `${protocol}//${host}/ws?token=${encodeURIComponent(tkn)}`;
+  }, []);
 
   /** Open a new WebSocket connection. */
   const connect = useCallback((): void => {
@@ -262,11 +252,7 @@ export function useWebSocket(
     ws.onmessage = (event: MessageEvent): void => {
       try {
         const data: unknown = JSON.parse(event.data as string);
-        if (
-          typeof data === "object" &&
-          data !== null &&
-          "type" in data
-        ) {
+        if (typeof data === "object" && data !== null && "type" in data) {
           const typed = data as { type: string };
           if (typed.type === "connected") {
             return;
@@ -285,10 +271,7 @@ export function useWebSocket(
       if (intentionalCloseRef.current) return;
       if (retryCountRef.current >= reconnectMaxRetries) return;
 
-      const delay = Math.min(
-        BASE_DELAY_MS * 2 ** retryCountRef.current,
-        MAX_DELAY_MS,
-      );
+      const delay = Math.min(BASE_DELAY_MS * 2 ** retryCountRef.current, MAX_DELAY_MS);
       retryCountRef.current += 1;
       retryTimerRef.current = setTimeout(connect, delay);
     };
@@ -302,10 +285,7 @@ export function useWebSocket(
 
   /** Subscribe to a specific event type with a typed callback. */
   const subscribe = useCallback(
-    <T extends WsEventType>(
-      type: T,
-      callback: WsEventCallback<T>,
-    ): (() => void) => {
+    <T extends WsEventType>(type: T, callback: WsEventCallback<T>): (() => void) => {
       const subs = subscribersRef.current;
       if (!subs.has(type)) {
         subs.set(type, new Set());

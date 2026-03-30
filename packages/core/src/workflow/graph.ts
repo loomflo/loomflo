@@ -5,7 +5,7 @@
  * topology classification, and topological sort for execution ordering.
  */
 
-import type { Edge, Graph, Node, TopologyType } from '../types.js';
+import type { Edge, Graph, Node, TopologyType } from "../types.js";
 
 /** Result of DAG validation containing validity status and any errors found. */
 export interface ValidationResult {
@@ -32,10 +32,7 @@ export class WorkflowGraph {
    * @param nodes - Initial nodes as a Map or plain record, or omit for an empty graph.
    * @param edges - Initial directed edges, or omit for an empty edge list.
    */
-  constructor(
-    nodes?: Map<string, Node> | Record<string, Node>,
-    edges?: Edge[],
-  ) {
+  constructor(nodes?: Map<string, Node> | Record<string, Node>, edges?: Edge[]) {
     if (nodes instanceof Map) {
       this.nodes = new Map(nodes);
     } else if (nodes) {
@@ -131,22 +128,16 @@ export class WorkflowGraph {
       throw new Error(`Target node "${edge.to}" not found`);
     }
     if (edge.from === edge.to) {
-      throw new Error(
-        `Self-loop detected: "${edge.from}" cannot connect to itself`,
-      );
+      throw new Error(`Self-loop detected: "${edge.from}" cannot connect to itself`);
     }
-    const duplicate = this.edgeList.some(
-      (e) => e.from === edge.from && e.to === edge.to,
-    );
+    const duplicate = this.edgeList.some((e) => e.from === edge.from && e.to === edge.to);
     if (duplicate) {
       throw new Error(`Edge "${edge.from}" → "${edge.to}" already exists`);
     }
     this.edgeList.push(edge);
     if (this.detectCycles()) {
       this.edgeList.pop();
-      throw new Error(
-        `Adding edge "${edge.from}" → "${edge.to}" would create a cycle`,
-      );
+      throw new Error(`Adding edge "${edge.from}" → "${edge.to}" would create a cycle`);
     }
   }
 
@@ -158,9 +149,7 @@ export class WorkflowGraph {
    * @throws Error if the edge does not exist.
    */
   removeEdge(from: string, to: string): void {
-    const index = this.edgeList.findIndex(
-      (e) => e.from === from && e.to === to,
-    );
+    const index = this.edgeList.findIndex((e) => e.from === from && e.to === to);
     if (index === -1) {
       throw new Error(`Edge "${from}" → "${to}" not found`);
     }
@@ -252,7 +241,7 @@ export class WorkflowGraph {
     }
 
     if (this.detectCycles()) {
-      errors.push('Graph contains one or more cycles');
+      errors.push("Graph contains one or more cycles");
     }
 
     const sourceNodes: string[] = [];
@@ -261,14 +250,8 @@ export class WorkflowGraph {
       const predecessors = this.getPredecessors(nodeId);
       const successors = this.getSuccessors(nodeId);
 
-      if (
-        predecessors.length === 0 &&
-        successors.length === 0 &&
-        this.nodes.size > 1
-      ) {
-        errors.push(
-          `Node "${nodeId}" is an orphan (no incoming or outgoing edges)`,
-        );
+      if (predecessors.length === 0 && successors.length === 0 && this.nodes.size > 1) {
+        errors.push(`Node "${nodeId}" is an orphan (no incoming or outgoing edges)`);
       }
 
       if (predecessors.length === 0) {
@@ -278,7 +261,7 @@ export class WorkflowGraph {
 
     if (sourceNodes.length > 1) {
       errors.push(
-        `Multiple source nodes found: ${sourceNodes.join(', ')}. Only one entry point is allowed`,
+        `Multiple source nodes found: ${sourceNodes.join(", ")}. Only one entry point is allowed`,
       );
     }
 
@@ -307,13 +290,13 @@ export class WorkflowGraph {
         hasConvergent = true;
       }
       if (hasDivergent && hasConvergent) {
-        return 'mixed';
+        return "mixed";
       }
     }
 
-    if (hasDivergent) return 'tree';
-    if (hasConvergent) return 'convergent';
-    return 'linear';
+    if (hasDivergent) return "tree";
+    if (hasConvergent) return "convergent";
+    return "linear";
   }
 
   /**
@@ -356,9 +339,7 @@ export class WorkflowGraph {
     }
 
     if (order.length !== this.nodes.size) {
-      throw new Error(
-        'Cannot determine execution order: graph contains a cycle',
-      );
+      throw new Error("Cannot determine execution order: graph contains a cycle");
     }
 
     return order;

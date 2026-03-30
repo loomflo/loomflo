@@ -8,12 +8,12 @@
  * 4. Logging the change to shared memory (ARCHITECTURE_CHANGES.md) and events.jsonl
  */
 
-import type { CostTracker } from '../costs/tracker.js';
-import type { SharedMemoryManager } from '../memory/shared-memory.js';
-import { createEvent, appendEvent } from '../persistence/events.js';
-import type { LLMProvider } from '../providers/base.js';
-import type { EscalationHandlerLike, EscalationRequest } from '../tools/escalate.js';
-import type { EventType } from '../types.js';
+import type { CostTracker } from "../costs/tracker.js";
+import type { SharedMemoryManager } from "../memory/shared-memory.js";
+import { createEvent, appendEvent } from "../persistence/events.js";
+import type { LLMProvider } from "../providers/base.js";
+import type { EscalationHandlerLike, EscalationRequest } from "../tools/escalate.js";
+import type { EventType } from "../types.js";
 
 // ============================================================================
 // GraphModification
@@ -24,7 +24,7 @@ import type { EventType } from '../types.js';
  */
 export interface GraphModification {
   /** The action to take on the graph. */
-  action: 'add_node' | 'modify_node' | 'remove_node' | 'skip_node' | 'no_action';
+  action: "add_node" | "modify_node" | "remove_node" | "skip_node" | "no_action";
   /** Target node ID (for modify, remove, skip). */
   nodeId?: string;
   /** New node details (for add_node). */
@@ -93,7 +93,7 @@ export interface EscalationManagerConfig {
 // ============================================================================
 
 /** Agent ID used for escalation event logging. */
-const ESCALATION_AGENT_ID = 'loom-escalation';
+const ESCALATION_AGENT_ID = "loom-escalation";
 
 // ============================================================================
 // Prompts
@@ -106,21 +106,21 @@ const ESCALATION_AGENT_ID = 'loom-escalation';
  */
 function buildEscalationSystemPrompt(): string {
   return [
-    'You are Loom, the Architect agent in the Loomflo framework.',
-    'An Orchestrator (Loomi) has submitted an escalation to you. A node in the workflow has failed or is blocked.',
-    '',
-    'Your task is to decide how to modify the workflow graph to work around the issue.',
-    'The workflow must NEVER deadlock — you must always choose an action that allows forward progress.',
-    '',
-    'Available actions:',
-    '- add_node: Insert a new node to handle the work differently. Specify title, instructions, and where to insert.',
-    '- modify_node: Change the instructions of the failed node so a retry has a better chance. Specify the nodeId and new instructions.',
-    '- remove_node: Remove the failed node if its work is not critical. Specify the nodeId.',
-    '- skip_node: Mark the node as done (skipped) and move on. Use when the node\'s work can be deferred or is optional. Specify the nodeId.',
-    '- no_action: No graph change needed — the issue will resolve on its own or is informational only.',
-    '',
-    'Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):',
-    '{',
+    "You are Loom, the Architect agent in the Loomflo framework.",
+    "An Orchestrator (Loomi) has submitted an escalation to you. A node in the workflow has failed or is blocked.",
+    "",
+    "Your task is to decide how to modify the workflow graph to work around the issue.",
+    "The workflow must NEVER deadlock — you must always choose an action that allows forward progress.",
+    "",
+    "Available actions:",
+    "- add_node: Insert a new node to handle the work differently. Specify title, instructions, and where to insert.",
+    "- modify_node: Change the instructions of the failed node so a retry has a better chance. Specify the nodeId and new instructions.",
+    "- remove_node: Remove the failed node if its work is not critical. Specify the nodeId.",
+    "- skip_node: Mark the node as done (skipped) and move on. Use when the node's work can be deferred or is optional. Specify the nodeId.",
+    "- no_action: No graph change needed — the issue will resolve on its own or is informational only.",
+    "",
+    "Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):",
+    "{",
     '  "action": "add_node|modify_node|remove_node|skip_node|no_action",',
     '  "nodeId": "target-node-id (for modify/remove/skip, omit for add/no_action)",',
     '  "newNode": {',
@@ -128,11 +128,11 @@ function buildEscalationSystemPrompt(): string {
     '    "instructions": "Markdown instructions (for add_node only)",',
     '    "insertAfter": "node-id (optional)",',
     '    "insertBefore": "node-id (optional)"',
-    '  },',
+    "  },",
     '  "modifiedInstructions": "New instructions (for modify_node only)",',
     '  "reason": "Brief explanation of why you chose this action"',
-    '}',
-  ].join('\n');
+    "}",
+  ].join("\n");
 }
 
 /**
@@ -143,8 +143,8 @@ function buildEscalationSystemPrompt(): string {
  */
 function buildEscalationUserMessage(request: EscalationRequest): string {
   const parts = [
-    '## Escalation Report',
-    '',
+    "## Escalation Report",
+    "",
     `**Node:** ${request.nodeId}`,
     `**Agent:** ${request.agentId}`,
     `**Reason:** ${request.reason}`,
@@ -155,10 +155,10 @@ function buildEscalationUserMessage(request: EscalationRequest): string {
   }
 
   if (request.details !== undefined && request.details.length > 0) {
-    parts.push('', '**Details:**', request.details);
+    parts.push("", "**Details:**", request.details);
   }
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 // ============================================================================
@@ -186,13 +186,13 @@ function extractJson(text: string): unknown {
     return JSON.parse(fenceMatch[1].trim());
   }
 
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
   }
 
-  throw new Error('Failed to extract JSON from LLM response');
+  throw new Error("Failed to extract JSON from LLM response");
 }
 
 /**
@@ -207,12 +207,18 @@ function extractJson(text: string): unknown {
 function parseModification(text: string, nodeId: string): GraphModification {
   try {
     const json = extractJson(text) as Record<string, unknown>;
-    const action = json['action'] as GraphModification['action'] | undefined;
-    const validActions = new Set(['add_node', 'modify_node', 'remove_node', 'skip_node', 'no_action']);
+    const action = json["action"] as GraphModification["action"] | undefined;
+    const validActions = new Set([
+      "add_node",
+      "modify_node",
+      "remove_node",
+      "skip_node",
+      "no_action",
+    ]);
 
     if (action === undefined || !validActions.has(action)) {
       return {
-        action: 'skip_node',
+        action: "skip_node",
         nodeId,
         reason: `LLM returned invalid action "${String(action)}" — defaulting to skip_node for forward progress`,
       };
@@ -220,37 +226,38 @@ function parseModification(text: string, nodeId: string): GraphModification {
 
     const modification: GraphModification = {
       action,
-      reason: typeof json['reason'] === 'string' ? json['reason'] : 'No reason provided',
+      reason: typeof json["reason"] === "string" ? json["reason"] : "No reason provided",
     };
 
-    if (typeof json['nodeId'] === 'string') {
-      modification.nodeId = json['nodeId'];
+    if (typeof json["nodeId"] === "string") {
+      modification.nodeId = json["nodeId"];
     }
 
-    if (action === 'add_node' && typeof json['newNode'] === 'object' && json['newNode'] !== null) {
-      const newNode = json['newNode'] as Record<string, unknown>;
+    if (action === "add_node" && typeof json["newNode"] === "object" && json["newNode"] !== null) {
+      const newNode = json["newNode"] as Record<string, unknown>;
       modification.newNode = {
-        title: typeof newNode['title'] === 'string' ? newNode['title'] : 'Recovery Node',
-        instructions: typeof newNode['instructions'] === 'string' ? newNode['instructions'] : '',
+        title: typeof newNode["title"] === "string" ? newNode["title"] : "Recovery Node",
+        instructions: typeof newNode["instructions"] === "string" ? newNode["instructions"] : "",
       };
-      if (typeof newNode['insertAfter'] === 'string') {
-        modification.newNode.insertAfter = newNode['insertAfter'];
+      if (typeof newNode["insertAfter"] === "string") {
+        modification.newNode.insertAfter = newNode["insertAfter"];
       }
-      if (typeof newNode['insertBefore'] === 'string') {
-        modification.newNode.insertBefore = newNode['insertBefore'];
+      if (typeof newNode["insertBefore"] === "string") {
+        modification.newNode.insertBefore = newNode["insertBefore"];
       }
     }
 
-    if (action === 'modify_node' && typeof json['modifiedInstructions'] === 'string') {
-      modification.modifiedInstructions = json['modifiedInstructions'];
+    if (action === "modify_node" && typeof json["modifiedInstructions"] === "string") {
+      modification.modifiedInstructions = json["modifiedInstructions"];
     }
 
     return modification;
   } catch {
     return {
-      action: 'skip_node',
+      action: "skip_node",
       nodeId,
-      reason: 'Failed to parse LLM escalation response — defaulting to skip_node for forward progress',
+      reason:
+        "Failed to parse LLM escalation response — defaulting to skip_node for forward progress",
     };
   }
 }
@@ -295,7 +302,7 @@ export class EscalationManager implements EscalationHandlerLike {
    */
   async escalate(request: EscalationRequest): Promise<void> {
     // Log the escalation event
-    await this.logEvent('escalation_triggered', {
+    await this.logEvent("escalation_triggered", {
       nodeId: request.nodeId,
       agentId: request.agentId,
       reason: request.reason,
@@ -310,7 +317,7 @@ export class EscalationManager implements EscalationHandlerLike {
       const userMessage = buildEscalationUserMessage(request);
 
       const response = await this.config.provider.complete({
-        messages: [{ role: 'user', content: userMessage }],
+        messages: [{ role: "user", content: userMessage }],
         system: systemPrompt,
         model: this.config.model,
       });
@@ -326,47 +333,47 @@ export class EscalationManager implements EscalationHandlerLike {
 
       // Extract text response
       const textBlocks = response.content.filter(
-        (block): block is { type: 'text'; text: string } => block.type === 'text',
+        (block): block is { type: "text"; text: string } => block.type === "text",
       );
-      const responseText = textBlocks.map((b) => b.text).join('\n');
+      const responseText = textBlocks.map((b) => b.text).join("\n");
 
       modification = parseModification(responseText, request.nodeId);
     } catch {
       // LLM call failed — fall back to skip_node
       modification = {
-        action: 'skip_node',
+        action: "skip_node",
         nodeId: request.nodeId,
-        reason: 'Escalation LLM call failed — defaulting to skip_node for forward progress',
+        reason: "Escalation LLM call failed — defaulting to skip_node for forward progress",
       };
     }
 
     // Apply the modification (skip for no_action)
-    if (modification.action === 'no_action') {
+    if (modification.action === "no_action") {
       // Log but don't modify the graph
-      await this.logEvent('graph_modified', {
-        action: 'no_action',
+      await this.logEvent("graph_modified", {
+        action: "no_action",
         nodeId: modification.nodeId ?? request.nodeId,
         reason: modification.reason,
       });
     }
 
     try {
-      if (modification.action !== 'no_action') {
+      if (modification.action !== "no_action") {
         await this.config.graphModifier.applyModification(modification);
       }
     } catch {
       // Graph modification failed — log but don't re-throw
-      await this.logEvent('graph_modified', {
+      await this.logEvent("graph_modified", {
         action: modification.action,
         nodeId: modification.nodeId ?? request.nodeId,
         reason: modification.reason,
-        error: 'Graph modification application failed',
+        error: "Graph modification application failed",
       });
       return;
     }
 
     // Log the graph modification event
-    await this.logEvent('graph_modified', {
+    await this.logEvent("graph_modified", {
       action: modification.action,
       nodeId: modification.nodeId ?? request.nodeId,
       reason: modification.reason,
@@ -397,13 +404,13 @@ export class EscalationManager implements EscalationHandlerLike {
       changeParts.push(`**Modified Instructions:** ${modification.modifiedInstructions}`);
     }
 
-    changeParts.push(`**Timestamp:** ${new Date().toISOString()}`, '');
+    changeParts.push(`**Timestamp:** ${new Date().toISOString()}`, "");
 
-    const changeEntry = changeParts.join('\n');
+    const changeEntry = changeParts.join("\n");
 
     try {
       await this.config.sharedMemory.write(
-        'ARCHITECTURE_CHANGES.md',
+        "ARCHITECTURE_CHANGES.md",
         changeEntry,
         ESCALATION_AGENT_ID,
       );
@@ -418,10 +425,7 @@ export class EscalationManager implements EscalationHandlerLike {
    * @param type - Event type identifier.
    * @param details - Event-specific payload data.
    */
-  private async logEvent(
-    type: EventType,
-    details: Record<string, unknown>,
-  ): Promise<void> {
+  private async logEvent(type: EventType, details: Record<string, unknown>): Promise<void> {
     try {
       const event = createEvent({
         type,

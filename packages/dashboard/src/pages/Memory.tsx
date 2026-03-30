@@ -7,14 +7,14 @@
 // shared memory.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import type { MemoryFile } from '../lib/api.js';
-import { apiClient } from '../lib/api.js';
-import { MarkdownViewer } from '../components/MarkdownViewer.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
+import type { MemoryFile } from "../lib/api.js";
+import { apiClient } from "../lib/api.js";
+import { MarkdownViewer } from "../components/MarkdownViewer.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
 
 // ============================================================================
 // Helpers
@@ -29,10 +29,10 @@ import { useWebSocket } from '../hooks/useWebSocket.js';
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
   return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -57,7 +57,7 @@ function formatTimestamp(iso: string): string {
  */
 export const MemoryPage = memo(function MemoryPage(): ReactElement {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
   const { subscribe } = useWebSocket(token);
 
   const [files, setFiles] = useState<MemoryFile[]>([]);
@@ -88,7 +88,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
       setFiles(data.files);
       return data.files;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load memory files';
+      const msg = err instanceof Error ? err.message : "Failed to load memory files";
       setListError(msg);
       return null;
     } finally {
@@ -108,7 +108,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
       const md = await apiClient.getMemoryFile(name);
       setContent(md);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load file content';
+      const msg = err instanceof Error ? err.message : "Failed to load file content";
       setContentError(msg);
       setContent(null);
     } finally {
@@ -153,7 +153,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
   // --------------------------------------------------------------------------
 
   useEffect((): (() => void) => {
-    const unsub = subscribe('memory_updated', (event): void => {
+    const unsub = subscribe("memory_updated", (event): void => {
       void (async (): Promise<void> => {
         await fetchFiles();
         if (selectedNameRef.current === event.file) {
@@ -199,12 +199,10 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-300">
-            No shared memory files yet
-          </p>
+          <p className="text-lg font-medium text-gray-300">No shared memory files yet</p>
           <p className="mt-2 text-sm text-gray-500">
-            Memory files will appear here once agents begin writing to shared
-            memory during workflow execution.
+            Memory files will appear here once agents begin writing to shared memory during workflow
+            execution.
           </p>
         </div>
       </div>
@@ -227,11 +225,13 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
             <li key={file.name}>
               <button
                 type="button"
-                onClick={() => { handleSelect(file.name); }}
+                onClick={() => {
+                  handleSelect(file.name);
+                }}
                 className={`w-full px-4 py-3 text-left transition-colors ${
                   selectedName === file.name
-                    ? 'bg-gray-800 text-white'
-                    : 'text-gray-300 hover:bg-gray-800/50 hover:text-gray-100'
+                    ? "bg-gray-800 text-white"
+                    : "text-gray-300 hover:bg-gray-800/50 hover:text-gray-100"
                 }`}
               >
                 <p className="truncate text-sm font-medium">{file.name}</p>
@@ -267,9 +267,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
 
         {content === null && !contentLoading && !contentError && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-gray-500">
-              Select a file to view its content.
-            </p>
+            <p className="text-sm text-gray-500">Select a file to view its content.</p>
           </div>
         )}
       </div>

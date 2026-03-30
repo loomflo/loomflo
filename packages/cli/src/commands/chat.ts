@@ -1,7 +1,7 @@
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { DaemonClient } from '../client.js';
-import type { ApiError } from '../client.js';
+import { DaemonClient } from "../client.js";
+import type { ApiError } from "../client.js";
 
 // ============================================================================
 // Types
@@ -32,9 +32,9 @@ interface ChatResponse {
  * @returns A configured commander Command instance.
  */
 export function createChatCommand(): Command {
-  const cmd = new Command('chat')
-    .description('Chat with the Loom architect agent')
-    .argument('<message>', 'Message to send to Loom')
+  const cmd = new Command("chat")
+    .description("Chat with the Loom architect agent")
+    .argument("<message>", "Message to send to Loom")
     .action(async (message: string): Promise<void> => {
       let client: DaemonClient;
       try {
@@ -46,7 +46,7 @@ export function createChatCommand(): Command {
       }
 
       try {
-        const res = await client.post<ChatResponse>('/chat', { message });
+        const res = await client.post<ChatResponse>("/chat", { message });
 
         if (!res.ok) {
           const errData = res.data as unknown as ApiError;

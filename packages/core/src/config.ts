@@ -1,22 +1,22 @@
-import { EventEmitter } from 'node:events';
-import { watch, type FSWatcher } from 'node:fs';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { z } from 'zod';
+import { EventEmitter } from "node:events";
+import { watch, type FSWatcher } from "node:fs";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { z } from "zod";
 
 // ============================================================================
 // Sub-schemas
 // ============================================================================
 
 /** Zod schema for the level preset selector. */
-export const LevelSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal('custom')]);
+export const LevelSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal("custom")]);
 
 /** Level preset: 1 (Minimal), 2 (Standard), 3 (Full), or 'custom'. */
 export type Level = z.infer<typeof LevelSchema>;
 
 /** Zod schema for the retry strategy selector. */
-export const RetryStrategySchema = z.union([z.literal('adaptive'), z.literal('same')]);
+export const RetryStrategySchema = z.union([z.literal("adaptive"), z.literal("same")]);
 
 /** Retry strategy: 'adaptive' modifies the prompt on retry, 'same' retries with the original prompt. */
 export type RetryStrategy = z.infer<typeof RetryStrategySchema>;
@@ -24,13 +24,13 @@ export type RetryStrategy = z.infer<typeof RetryStrategySchema>;
 /** Zod schema for per-role model configuration. */
 export const ModelsConfigSchema = z.object({
   /** LLM model for the Loom (Architect) agent. */
-  loom: z.string().default('claude-opus-4-6'),
+  loom: z.string().default("claude-opus-4-6"),
   /** LLM model for the Loomi (Orchestrator) agent. */
-  loomi: z.string().default('claude-sonnet-4-6'),
+  loomi: z.string().default("claude-sonnet-4-6"),
   /** LLM model for the Looma (Worker) agent. */
-  looma: z.string().default('claude-sonnet-4-6'),
+  looma: z.string().default("claude-sonnet-4-6"),
   /** LLM model for the Loomex (Reviewer) agent. */
-  loomex: z.string().default('claude-sonnet-4-6'),
+  loomex: z.string().default("claude-sonnet-4-6"),
 });
 
 /** Per-role model configuration mapping agent roles to LLM model identifiers. */
@@ -51,7 +51,7 @@ export const ConfigSchema = z.object({
   /** Preset level controlling default agent topology and behavior. */
   level: LevelSchema.default(3),
   /** Default delay between node activations (e.g., "0", "30m", "1h", "1d"). */
-  defaultDelay: z.string().default('0'),
+  defaultDelay: z.string().default("0"),
   /** Whether the Loomex reviewer agent is enabled. */
   reviewerEnabled: z.boolean().default(true),
   /** Maximum retry cycles allowed per node before marking as failed. */
@@ -61,11 +61,11 @@ export const ConfigSchema = z.object({
   /** Maximum worker agents (Loomas) per orchestrator (Loomi). Null means unlimited. */
   maxLoomasPerLoomi: z.number().int().positive().nullable().default(null),
   /** Strategy for modifying prompts on retry: 'adaptive' adjusts the prompt, 'same' retries as-is. */
-  retryStrategy: RetryStrategySchema.default('adaptive'),
+  retryStrategy: RetryStrategySchema.default("adaptive"),
   /** Per-role LLM model assignments. */
   models: ModelsConfigSchema.default({}),
   /** LLM provider identifier (e.g., "anthropic", "openai"). */
-  provider: z.string().default('anthropic'),
+  provider: z.string().default("anthropic"),
   /** Maximum total cost in USD before pausing the workflow. Null means no limit. */
   budgetLimit: z.number().nonnegative().nullable().default(null),
   /** Whether to pause the workflow when the budget limit is reached. */
@@ -131,10 +131,10 @@ const LEVEL_PRESETS: Record<1 | 2 | 3, PartialConfig> = {
     maxRetriesPerNode: 0,
     maxLoomasPerLoomi: 1,
     models: {
-      loom: 'claude-sonnet-4-6',
-      loomi: 'claude-sonnet-4-6',
-      looma: 'claude-sonnet-4-6',
-      loomex: 'claude-sonnet-4-6',
+      loom: "claude-sonnet-4-6",
+      loomi: "claude-sonnet-4-6",
+      looma: "claude-sonnet-4-6",
+      loomex: "claude-sonnet-4-6",
     },
   },
   2: {
@@ -142,10 +142,10 @@ const LEVEL_PRESETS: Record<1 | 2 | 3, PartialConfig> = {
     maxRetriesPerNode: 1,
     maxLoomasPerLoomi: 2,
     models: {
-      loom: 'claude-opus-4-6',
-      loomi: 'claude-sonnet-4-6',
-      looma: 'claude-opus-4-6',
-      loomex: 'claude-sonnet-4-6',
+      loom: "claude-opus-4-6",
+      loomi: "claude-sonnet-4-6",
+      looma: "claude-opus-4-6",
+      loomex: "claude-sonnet-4-6",
     },
   },
   3: {
@@ -153,10 +153,10 @@ const LEVEL_PRESETS: Record<1 | 2 | 3, PartialConfig> = {
     maxRetriesPerNode: 2,
     maxLoomasPerLoomi: null,
     models: {
-      loom: 'claude-opus-4-6',
-      loomi: 'claude-opus-4-6',
-      looma: 'claude-opus-4-6',
-      loomex: 'claude-opus-4-6',
+      loom: "claude-opus-4-6",
+      loomi: "claude-opus-4-6",
+      looma: "claude-opus-4-6",
+      loomex: "claude-opus-4-6",
     },
   },
 };
@@ -172,7 +172,7 @@ const LEVEL_PRESETS: Record<1 | 2 | 3, PartialConfig> = {
  * @returns True if the value is a plain object.
  */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -184,10 +184,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * @param source - The object whose values take precedence.
  * @returns A new object with deeply merged values.
  */
-export function deepMerge<T extends Record<string, unknown>>(
-  target: T,
-  source: Partial<T>,
-): T {
+export function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
   const result = { ...target };
 
   for (const key of Object.keys(source)) {
@@ -229,9 +226,9 @@ export function deepMerge<T extends Record<string, unknown>>(
 export async function loadConfigFile(filePath: string): Promise<PartialConfig> {
   let content: string;
   try {
-    content = await readFile(filePath, 'utf-8');
+    content = await readFile(filePath, "utf-8");
   } catch (error: unknown) {
-    if ((error as { code?: string }).code === 'ENOENT') {
+    if ((error as { code?: string }).code === "ENOENT") {
       return {};
     }
     throw new Error(
@@ -270,7 +267,7 @@ export async function loadConfigFile(filePath: string): Promise<PartialConfig> {
  * @returns The partial config preset for the level.
  */
 function getLevelPreset(level: Level): PartialConfig {
-  if (level === 'custom') {
+  if (level === "custom") {
     return {};
   }
   return LEVEL_PRESETS[level];
@@ -296,13 +293,13 @@ export async function loadConfig(
   const { projectPath, overrides = {} } = options;
 
   // Load global config (~/.loomflo/config.json)
-  const globalPath = join(homedir(), '.loomflo', 'config.json');
+  const globalPath = join(homedir(), ".loomflo", "config.json");
   const globalConfig = await loadConfigFile(globalPath);
 
   // Load project config ({projectPath}/.loomflo/config.json)
   let projectConfig: PartialConfig = {};
   if (projectPath) {
-    projectConfig = await loadConfigFile(join(projectPath, '.loomflo', 'config.json'));
+    projectConfig = await loadConfigFile(join(projectPath, ".loomflo", "config.json"));
   }
 
   // Determine the effective level from the highest-priority source
@@ -452,14 +449,12 @@ export class ConfigManager extends EventEmitter {
   static async create(options: ConfigManagerOptions = {}): Promise<ConfigManager> {
     const { projectPath, overrides = {} } = options;
 
-    const globalPath = join(homedir(), '.loomflo', 'config.json');
+    const globalPath = join(homedir(), ".loomflo", "config.json");
     const globalConfig = await loadConfigFile(globalPath);
 
     let projectFileConfig: PartialConfig = {};
     if (projectPath) {
-      projectFileConfig = await loadConfigFile(
-        join(projectPath, '.loomflo', 'config.json'),
-      );
+      projectFileConfig = await loadConfigFile(join(projectPath, ".loomflo", "config.json"));
     }
 
     const config = resolveConfig(globalConfig, projectFileConfig, overrides);
@@ -498,16 +493,13 @@ export class ConfigManager extends EventEmitter {
    * @throws If the merged configuration fails zod schema validation.
    */
   updateConfig(partial: Partial<Config>): Config {
-    this.projectFileConfig = deepMerge(
-      this.projectFileConfig as Config,
-      partial,
-    ) as PartialConfig;
+    this.projectFileConfig = deepMerge(this.projectFileConfig as Config, partial) as PartialConfig;
 
     const previous = this.config;
     this.config = resolveConfig(this.globalConfig, this.projectFileConfig, this.overrides);
 
     if (JSON.stringify(previous) !== JSON.stringify(this.config)) {
-      this.emit('configChanged', this.config);
+      this.emit("configChanged", this.config);
     }
 
     this.persistProjectConfig();
@@ -524,12 +516,12 @@ export class ConfigManager extends EventEmitter {
    * @returns The newly resolved configuration.
    */
   async reload(): Promise<Config> {
-    const globalPath = join(homedir(), '.loomflo', 'config.json');
+    const globalPath = join(homedir(), ".loomflo", "config.json");
     this.globalConfig = await loadConfigFile(globalPath);
 
     if (this.projectPath) {
       this.projectFileConfig = await loadConfigFile(
-        join(this.projectPath, '.loomflo', 'config.json'),
+        join(this.projectPath, ".loomflo", "config.json"),
       );
     }
 
@@ -537,7 +529,7 @@ export class ConfigManager extends EventEmitter {
     this.config = resolveConfig(this.globalConfig, this.projectFileConfig, this.overrides);
 
     if (JSON.stringify(previous) !== JSON.stringify(this.config)) {
-      this.emit('configChanged', this.config);
+      this.emit("configChanged", this.config);
     }
 
     return this.config;
@@ -565,19 +557,16 @@ export class ConfigManager extends EventEmitter {
   private startWatching(): void {
     if (!this.projectPath) return;
 
-    const configDir = join(this.projectPath, '.loomflo');
+    const configDir = join(this.projectPath, ".loomflo");
 
     try {
-      this.watcher = watch(
-        configDir,
-        (_eventType: string, filename: string | null): void => {
-          if (filename === 'config.json') {
-            this.handleFileChange();
-          }
-        },
-      );
+      this.watcher = watch(configDir, (_eventType: string, filename: string | null): void => {
+        if (filename === "config.json") {
+          this.handleFileChange();
+        }
+      });
 
-      this.watcher.on('error', (): void => {
+      this.watcher.on("error", (): void => {
         this.stopWatching();
       });
     } catch {
@@ -625,12 +614,12 @@ export class ConfigManager extends EventEmitter {
 
     this.skipNextReload = true;
 
-    const configDir = join(this.projectPath, '.loomflo');
-    const configPath = join(configDir, 'config.json');
-    const content = JSON.stringify(this.projectFileConfig, null, 2) + '\n';
+    const configDir = join(this.projectPath, ".loomflo");
+    const configPath = join(configDir, "config.json");
+    const content = JSON.stringify(this.projectFileConfig, null, 2) + "\n";
 
     void mkdir(configDir, { recursive: true })
-      .then(() => writeFile(configPath, content, 'utf-8'))
+      .then(() => writeFile(configPath, content, "utf-8"))
       .catch((): void => {
         // Persist failure is non-fatal; in-memory config is already updated.
       });

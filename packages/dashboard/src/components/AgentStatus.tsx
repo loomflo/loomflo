@@ -6,10 +6,10 @@
 // metadata. Designed for the dark-themed dashboard.
 // ============================================================================
 
-import { memo } from 'react';
-import type { ReactElement } from 'react';
+import { memo } from "react";
+import type { ReactElement } from "react";
 
-import type { AgentRole, AgentStatus as AgentStatusType, TokenUsage } from '../lib/types.js';
+import type { AgentRole, AgentStatus as AgentStatusType, TokenUsage } from "../lib/types.js";
 
 // ============================================================================
 // Types
@@ -40,18 +40,18 @@ const TASK_DESCRIPTION_MAX_LENGTH = 120;
 
 /** Role-to-icon mapping for visual identification. */
 const ROLE_ICONS: Record<AgentRole, { icon: string; label: string }> = {
-  loom: { icon: '\u{1F3D7}\u{FE0F}', label: 'Architect' },
-  loomi: { icon: '\u{1F3AF}', label: 'Orchestrator' },
-  looma: { icon: '\u{2699}\u{FE0F}', label: 'Worker' },
-  loomex: { icon: '\u{1F50D}', label: 'Reviewer' },
+  loom: { icon: "\u{1F3D7}\u{FE0F}", label: "Architect" },
+  loomi: { icon: "\u{1F3AF}", label: "Orchestrator" },
+  looma: { icon: "\u{2699}\u{FE0F}", label: "Worker" },
+  loomex: { icon: "\u{1F50D}", label: "Reviewer" },
 };
 
 /** Status-to-Tailwind class mapping for the color-coded state indicator. */
 const STATUS_STYLES: Record<AgentStatusType, { bg: string; text: string; dot: string }> = {
-  created: { bg: 'bg-gray-700', text: 'text-gray-300', dot: 'bg-gray-400' },
-  running: { bg: 'bg-blue-900', text: 'text-blue-300', dot: 'bg-blue-400' },
-  completed: { bg: 'bg-green-900', text: 'text-green-300', dot: 'bg-green-400' },
-  failed: { bg: 'bg-red-900', text: 'text-red-300', dot: 'bg-red-400' },
+  created: { bg: "bg-gray-700", text: "text-gray-300", dot: "bg-gray-400" },
+  running: { bg: "bg-blue-900", text: "text-blue-300", dot: "bg-blue-400" },
+  completed: { bg: "bg-green-900", text: "text-green-300", dot: "bg-green-400" },
+  failed: { bg: "bg-red-900", text: "text-red-300", dot: "bg-red-400" },
 };
 
 // ============================================================================
@@ -141,7 +141,7 @@ export const AgentStatusCard = memo(function AgentStatusCard({
         >
           <span
             className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}${
-              status === 'running' ? ' animate-pulse' : ''
+              status === "running" ? " animate-pulse" : ""
             }`}
           />
           {status}

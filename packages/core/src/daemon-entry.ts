@@ -14,7 +14,7 @@
  * - LOOMFLO_PROJECT_PATH — Absolute path to the project workspace.
  */
 
-import { Daemon } from './daemon.js';
+import { Daemon } from "./daemon.js";
 
 // ============================================================================
 // Constants
@@ -27,12 +27,10 @@ const DEFAULT_PORT = 3000;
 // Configuration
 // ============================================================================
 
-const port = process.env['LOOMFLO_PORT']
-  ? Number(process.env['LOOMFLO_PORT'])
-  : DEFAULT_PORT;
+const port = process.env["LOOMFLO_PORT"] ? Number(process.env["LOOMFLO_PORT"]) : DEFAULT_PORT;
 
-const host = process.env['LOOMFLO_HOST'] ?? '127.0.0.1';
-const projectPath = process.env['LOOMFLO_PROJECT_PATH'] ?? process.cwd();
+const host = process.env["LOOMFLO_HOST"] ?? "127.0.0.1";
+const projectPath = process.env["LOOMFLO_PROJECT_PATH"] ?? process.cwd();
 
 // ============================================================================
 // Startup
@@ -55,11 +53,11 @@ async function shutdown(): Promise<void> {
   process.exit(0);
 }
 
-process.on('SIGTERM', (): void => {
+process.on("SIGTERM", (): void => {
   void shutdown();
 });
 
-process.on('SIGINT', (): void => {
+process.on("SIGINT", (): void => {
   void shutdown();
 });
 

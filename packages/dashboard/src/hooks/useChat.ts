@@ -6,18 +6,18 @@
 // the message history compatible with ChatInterface.
 // ============================================================================
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import type { ChatMessage } from '../components/ChatInterface.js';
-import { apiClient, ApiError } from '../lib/api.js';
-import type { UseWebSocketReturn } from './useWebSocket.js';
+import type { ChatMessage } from "../components/ChatInterface.js";
+import { apiClient, ApiError } from "../lib/api.js";
+import type { UseWebSocketReturn } from "./useWebSocket.js";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /** The subscribe function signature extracted from useWebSocket. */
-type Subscribe = UseWebSocketReturn['subscribe'];
+type Subscribe = UseWebSocketReturn["subscribe"];
 
 /** Return value of the useChat hook. */
 export interface UseChatReturn {
@@ -67,9 +67,7 @@ export function useChat(subscribe: Subscribe): UseChatReturn {
       if (err instanceof ApiError && err.status === 404) {
         setMessages([]);
       } else {
-        setError(
-          err instanceof Error ? err.message : 'Failed to fetch chat history',
-        );
+        setError(err instanceof Error ? err.message : "Failed to fetch chat history");
       }
     }
   }, []);
@@ -89,7 +87,7 @@ export function useChat(subscribe: Subscribe): UseChatReturn {
    */
   const sendMessage = useCallback((message: string): void => {
     const userMessage: ChatMessage = {
-      role: 'user',
+      role: "user",
       content: message,
       timestamp: new Date().toISOString(),
     };
@@ -102,16 +100,14 @@ export function useChat(subscribe: Subscribe): UseChatReturn {
       try {
         const response = await apiClient.chat(message);
         const assistantMessage: ChatMessage = {
-          role: 'assistant',
+          role: "assistant",
           content: response.response,
           timestamp: new Date().toISOString(),
           action: response.action,
         };
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to send message',
-        );
+        setError(err instanceof Error ? err.message : "Failed to send message");
       } finally {
         setIsLoading(false);
       }
@@ -120,15 +116,12 @@ export function useChat(subscribe: Subscribe): UseChatReturn {
 
   /** Subscribe to WebSocket chat_response events for real-time updates. */
   useEffect((): (() => void) => {
-    const unsub = subscribe('chat_response', (event): void => {
+    const unsub = subscribe("chat_response", (event): void => {
       const wsMessage: ChatMessage = {
-        role: 'assistant',
+        role: "assistant",
         content: event.message,
         timestamp: event.timestamp,
-        action:
-          event.action !== null
-            ? { type: event.action, details: {} }
-            : null,
+        action: event.action !== null ? { type: event.action, details: {} } : null,
       };
       setMessages((prev) => [...prev, wsMessage]);
       setIsLoading(false);

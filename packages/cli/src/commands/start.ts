@@ -1,15 +1,15 @@
-import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { Command } from 'commander';
+import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { Command } from "commander";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 /** Path to daemon.json in the user's home directory. */
-const DAEMON_JSON_PATH = join(homedir(), '.loomflo', 'daemon.json');
+const DAEMON_JSON_PATH = join(homedir(), ".loomflo", "daemon.json");
 
 /** Maximum time to wait for daemon.json to appear (in milliseconds). */
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -57,15 +57,15 @@ async function waitForDaemonFile(timeoutMs: number): Promise<DaemonInfo> {
 
   while (Date.now() < deadline) {
     try {
-      const raw = await readFile(DAEMON_JSON_PATH, 'utf-8');
+      const raw = await readFile(DAEMON_JSON_PATH, "utf-8");
       const parsed = JSON.parse(raw) as unknown;
 
       if (
-        typeof parsed === 'object' &&
+        typeof parsed === "object" &&
         parsed !== null &&
-        typeof (parsed as DaemonInfo).port === 'number' &&
-        typeof (parsed as DaemonInfo).token === 'string' &&
-        typeof (parsed as DaemonInfo).pid === 'number'
+        typeof (parsed as DaemonInfo).port === "number" &&
+        typeof (parsed as DaemonInfo).token === "string" &&
+        typeof (parsed as DaemonInfo).pid === "number"
       ) {
         return parsed as DaemonInfo;
       }
@@ -107,10 +107,10 @@ function isProcessAlive(pid: number): boolean {
  */
 async function getRunningDaemon(): Promise<DaemonInfo | null> {
   try {
-    const raw = await readFile(DAEMON_JSON_PATH, 'utf-8');
+    const raw = await readFile(DAEMON_JSON_PATH, "utf-8");
     const info = JSON.parse(raw) as DaemonInfo;
 
-    if (typeof info.pid === 'number' && isProcessAlive(info.pid)) {
+    if (typeof info.pid === "number" && isProcessAlive(info.pid)) {
       return info;
     }
   } catch {
@@ -134,10 +134,10 @@ function resolveDaemonScript(): string {
    *   ../../core/dist/daemon-entry.js (within the monorepo)
    *
    * We resolve from the CLI package root using import.meta for portability. */
-  const cliDir = new URL('..', import.meta.url).pathname;
+  const cliDir = new URL("..", import.meta.url).pathname;
 
   /* Try monorepo-relative path first: packages/cli -> packages/core */
-  const monorepoPath = resolve(cliDir, '..', 'core', 'dist', 'daemon-entry.js');
+  const monorepoPath = resolve(cliDir, "..", "core", "dist", "daemon-entry.js");
 
   return monorepoPath;
 }
@@ -161,10 +161,10 @@ function resolveDaemonScript(): string {
  * @returns A configured commander Command instance.
  */
 export function createStartCommand(): Command {
-  const cmd = new Command('start')
-    .description('Start the Loomflo daemon')
-    .option('--port <number>', 'TCP port to listen on', String(DEFAULT_PORT))
-    .option('--project-path <path>', 'Project directory path')
+  const cmd = new Command("start")
+    .description("Start the Loomflo daemon")
+    .option("--port <number>", "TCP port to listen on", String(DEFAULT_PORT))
+    .option("--project-path <path>", "Project directory path")
     .action(async (options: StartOptions): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Check for already-running daemon                                   */
@@ -184,13 +184,11 @@ export function createStartCommand(): Command {
 
       const port = options.port !== undefined ? Number(options.port) : DEFAULT_PORT;
       if (Number.isNaN(port) || port < 1 || port > 65_535) {
-        console.error('Error: --port must be a valid port number (1–65535)');
+        console.error("Error: --port must be a valid port number (1–65535)");
         process.exit(1);
       }
 
-      const projectPath = options.projectPath
-        ? resolve(options.projectPath)
-        : process.cwd();
+      const projectPath = options.projectPath ? resolve(options.projectPath) : process.cwd();
 
       /* ------------------------------------------------------------------ */
       /* Spawn daemon as detached child process                             */
@@ -199,14 +197,14 @@ export function createStartCommand(): Command {
       const daemonScript = resolveDaemonScript();
 
       const env: Record<string, string> = {
-        ...process.env as Record<string, string>,
+        ...(process.env as Record<string, string>),
         LOOMFLO_PORT: String(port),
         LOOMFLO_PROJECT_PATH: projectPath,
       };
 
-      const child = spawn('node', [daemonScript], {
+      const child = spawn("node", [daemonScript], {
         detached: true,
-        stdio: 'ignore',
+        stdio: "ignore",
         env,
       });
 
@@ -217,7 +215,7 @@ export function createStartCommand(): Command {
       /* Wait for daemon to write daemon.json                               */
       /* ------------------------------------------------------------------ */
 
-      console.log('Starting Loomflo daemon...');
+      console.log("Starting Loomflo daemon...");
 
       try {
         const info = await waitForDaemonFile(STARTUP_TIMEOUT_MS);

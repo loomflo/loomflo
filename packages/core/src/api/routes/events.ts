@@ -1,9 +1,9 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
-import { EventTypeSchema } from '../../types.js';
-import type { Event } from '../../types.js';
-import { queryEvents } from '../../persistence/events.js';
-import type { EventQueryFilters } from '../../persistence/events.js';
+import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
+import { EventTypeSchema } from "../../types.js";
+import type { Event } from "../../types.js";
+import { queryEvents } from "../../persistence/events.js";
+import type { EventQueryFilters } from "../../persistence/events.js";
 
 // ============================================================================
 // Types
@@ -58,12 +58,12 @@ export function eventsRoutes(options: EventsRoutesOptions): FastifyPluginAsync {
      * Supports offset-based pagination via `limit` and `offset` query params.
      * Returns 400 if query parameters fail validation.
      */
-    fastify.get('/events', async (request, reply): Promise<void> => {
+    fastify.get("/events", async (request, reply): Promise<void> => {
       const parseResult = EventsQuerySchema.safeParse(request.query);
 
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid query parameters',
+          error: "Invalid query parameters",
           details: parseResult.error.issues,
         });
         return;

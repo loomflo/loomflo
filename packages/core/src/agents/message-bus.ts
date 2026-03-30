@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import type { Message } from '../types.js';
-import type { MessageBusLike } from '../tools/send-message.js';
+import { randomUUID } from "node:crypto";
+import type { Message } from "../types.js";
+import type { MessageBusLike } from "../tools/send-message.js";
 
 // ============================================================================
 // MessageBus
@@ -89,20 +89,20 @@ export class MessageBus implements MessageBusLike {
   send(from: string, to: string, nodeId: string, content: string): Promise<void> {
     const nodeQueues = this.queues.get(nodeId);
     if (!nodeQueues) {
-      return Promise.reject(new Error(
-        `Cannot send message: no agents registered for node "${nodeId}"`,
-      ));
+      return Promise.reject(
+        new Error(`Cannot send message: no agents registered for node "${nodeId}"`),
+      );
     }
     if (!nodeQueues.has(from)) {
-      return Promise.reject(new Error(
-        `Cannot send message: sender "${from}" is not registered to node "${nodeId}"`,
-      ));
+      return Promise.reject(
+        new Error(`Cannot send message: sender "${from}" is not registered to node "${nodeId}"`),
+      );
     }
     const recipientQueue = nodeQueues.get(to);
     if (!recipientQueue) {
-      return Promise.reject(new Error(
-        `Cannot send message: recipient "${to}" is not registered to node "${nodeId}"`,
-      ));
+      return Promise.reject(
+        new Error(`Cannot send message: recipient "${to}" is not registered to node "${nodeId}"`),
+      );
     }
 
     const message: Message = {
@@ -133,14 +133,14 @@ export class MessageBus implements MessageBusLike {
   broadcast(from: string, nodeId: string, content: string): Promise<void> {
     const nodeQueues = this.queues.get(nodeId);
     if (!nodeQueues) {
-      return Promise.reject(new Error(
-        `Cannot broadcast: no agents registered for node "${nodeId}"`,
-      ));
+      return Promise.reject(
+        new Error(`Cannot broadcast: no agents registered for node "${nodeId}"`),
+      );
     }
     if (!nodeQueues.has(from)) {
-      return Promise.reject(new Error(
-        `Cannot broadcast: sender "${from}" is not registered to node "${nodeId}"`,
-      ));
+      return Promise.reject(
+        new Error(`Cannot broadcast: sender "${from}" is not registered to node "${nodeId}"`),
+      );
     }
 
     for (const [agentId, queue] of nodeQueues) {

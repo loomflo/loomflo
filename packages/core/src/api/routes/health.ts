@@ -1,5 +1,5 @@
-import type { FastifyPluginAsync } from 'fastify';
-import type { WorkflowStatus } from '../../types.js';
+import type { FastifyPluginAsync } from "fastify";
+import type { WorkflowStatus } from "../../types.js";
 
 // ============================================================================
 // Types
@@ -20,7 +20,7 @@ export interface WorkflowSummary {
 /** Shape of the GET /health JSON response. */
 export interface HealthResponse {
   /** Daemon status indicator. */
-  status: 'ok';
+  status: "ok";
   /** Seconds since the daemon process started. */
   uptime: number;
   /** Daemon version string. */
@@ -42,7 +42,7 @@ export interface HealthRoutesOptions {
 // ============================================================================
 
 /** Daemon version reported in the health response. */
-const VERSION = '0.1.0';
+const VERSION = "0.1.0";
 
 // ============================================================================
 // Plugin Factory
@@ -62,9 +62,9 @@ export function healthRoutes(options: HealthRoutesOptions): FastifyPluginAsync {
   const { getUptime, getWorkflow } = options;
 
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
-    fastify.get('/health', (): HealthResponse => {
+    fastify.get("/health", (): HealthResponse => {
       return {
-        status: 'ok',
+        status: "ok",
         uptime: getUptime(),
         version: VERSION,
         workflow: getWorkflow(),

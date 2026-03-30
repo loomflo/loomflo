@@ -1,9 +1,9 @@
-import { exec } from 'node:child_process';
-import { platform } from 'node:os';
+import { exec } from "node:child_process";
+import { platform } from "node:os";
 
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { readDaemonConfig } from '../client.js';
+import { readDaemonConfig } from "../client.js";
 
 // ============================================================================
 // Helpers
@@ -18,9 +18,9 @@ import { readDaemonConfig } from '../client.js';
  */
 function openCommand(url: string): string {
   switch (platform()) {
-    case 'darwin':
+    case "darwin":
       return `open "${url}"`;
-    case 'win32':
+    case "win32":
       return `start "${url}"`;
     default:
       // Linux and other POSIX systems.
@@ -44,13 +44,10 @@ function openCommand(url: string): string {
  * @returns A configured commander Command instance.
  */
 export function createDashboardCommand(): Command {
-  const cmd = new Command('dashboard')
-    .description('Open the web dashboard in the default browser')
-    .option(
-      '-p, --port <port>',
-      'Override the dashboard port (defaults to daemon port)',
-    )
-    .option('--no-open', 'Print the URL without opening the browser')
+  const cmd = new Command("dashboard")
+    .description("Open the web dashboard in the default browser")
+    .option("-p, --port <port>", "Override the dashboard port (defaults to daemon port)")
+    .option("--no-open", "Print the URL without opening the browser")
     .action(async (options: { port?: string; open?: boolean }): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Read daemon config to get port                                     */
@@ -69,9 +66,7 @@ export function createDashboardCommand(): Command {
           const config = await readDaemonConfig();
           port = config.port;
         } catch {
-          console.error(
-            'Daemon is not running. Start with: loomflo start',
-          );
+          console.error("Daemon is not running. Start with: loomflo start");
           process.exit(1);
         }
       }

@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync } from 'fastify';
-import type { Config } from '../../config.js';
-import { ConfigSchema } from '../../config.js';
+import type { FastifyPluginAsync } from "fastify";
+import type { Config } from "../../config.js";
+import { ConfigSchema } from "../../config.js";
 
 // ============================================================================
 // Types
@@ -48,7 +48,7 @@ export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
      *
      * Returns the current merged configuration object.
      */
-    fastify.get('/config', async (_request, reply): Promise<void> => {
+    fastify.get("/config", async (_request, reply): Promise<void> => {
       const response: ConfigResponse = { config: getConfig() };
       await reply.code(200).send(response);
     });
@@ -61,12 +61,12 @@ export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
      * and persists the change. On failure, returns 400 with zod validation
      * details.
      */
-    fastify.put('/config', async (request, reply): Promise<void> => {
+    fastify.put("/config", async (request, reply): Promise<void> => {
       const parseResult = ConfigSchema.partial().safeParse(request.body);
 
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid config',
+          error: "Invalid config",
           details: parseResult.error.issues,
         });
         return;

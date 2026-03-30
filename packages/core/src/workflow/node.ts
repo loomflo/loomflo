@@ -5,9 +5,9 @@
  * agent management, file ownership enforcement, and serialization.
  */
 
-import picomatch from 'picomatch';
-import type { AgentInfo, Node, NodeStatus, ReviewReport } from '../types.js';
-import { FileOwnershipManager, generateTestPaths } from './file-ownership.js';
+import picomatch from "picomatch";
+import type { AgentInfo, Node, NodeStatus, ReviewReport } from "../types.js";
+import { FileOwnershipManager, generateTestPaths } from "./file-ownership.js";
 
 /**
  * Valid state transitions for the node lifecycle.
@@ -16,10 +16,10 @@ import { FileOwnershipManager, generateTestPaths } from './file-ownership.js';
  * it may transition to.
  */
 const TRANSITIONS: Readonly<Record<NodeStatus, readonly NodeStatus[]>> = {
-  pending: ['waiting'],
-  waiting: ['running'],
-  running: ['review', 'done', 'failed', 'blocked'],
-  review: ['done', 'running', 'blocked', 'failed'],
+  pending: ["waiting"],
+  waiting: ["running"],
+  running: ["review", "done", "failed", "blocked"],
+  review: ["done", "running", "blocked", "failed"],
   done: [],
   failed: [],
   blocked: [],
@@ -115,7 +115,7 @@ export class WorkflowNode {
     if (!this.canTransition(to)) {
       throw new Error(
         `Invalid transition: "${this.data.status}" → "${to}". ` +
-          `Valid transitions: ${TRANSITIONS[this.data.status].join(', ') || 'none'}`,
+          `Valid transitions: ${TRANSITIONS[this.data.status].join(", ") || "none"}`,
       );
     }
 
@@ -123,11 +123,11 @@ export class WorkflowNode {
 
     const now = new Date().toISOString();
 
-    if (to === 'running' && this.data.startedAt === null) {
+    if (to === "running" && this.data.startedAt === null) {
       this.data.startedAt = now;
     }
 
-    if (to === 'done' || to === 'failed' || to === 'blocked') {
+    if (to === "done" || to === "failed" || to === "blocked") {
       this.data.completedAt = now;
     }
   }
@@ -185,9 +185,7 @@ export class WorkflowNode {
    */
   addAgent(agent: AgentInfo): void {
     if (this.data.agents.some((a) => a.id === agent.id)) {
-      throw new Error(
-        `Agent "${agent.id}" already exists in node "${this.data.id}"`,
-      );
+      throw new Error(`Agent "${agent.id}" already exists in node "${this.data.id}"`);
     }
     this.data.agents.push(agent);
   }
@@ -273,9 +271,7 @@ export class WorkflowNode {
 
         for (const testPath of testPaths) {
           if (matcherA(testPath) && matcherB(testPath)) {
-            overlaps.push(
-              `Agents "${idA}" and "${idB}" both match "${testPath}"`,
-            );
+            overlaps.push(`Agents "${idA}" and "${idB}" both match "${testPath}"`);
             break;
           }
         }
@@ -351,9 +347,9 @@ export class WorkflowNode {
     return new WorkflowNode({
       id,
       title,
-      status: 'pending',
+      status: "pending",
       instructions,
-      delay: options?.delay ?? '0',
+      delay: options?.delay ?? "0",
       resumeAt: null,
       agents: options?.agents ?? [],
       fileOwnership: options?.fileOwnership ?? {},
@@ -366,4 +362,3 @@ export class WorkflowNode {
     });
   }
 }
-

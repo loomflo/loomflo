@@ -5,16 +5,16 @@
 // cost summary with budget progress, and recent events.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import type { Event, NodeStatus } from '../lib/types.js';
-import type { CostsResponse, NodeSummary } from '../lib/api.js';
-import { apiClient } from '../lib/api.js';
-import { LogStream } from '../components/LogStream.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
-import { useWorkflow } from '../hooks/useWorkflow.js';
+import type { Event, NodeStatus } from "../lib/types.js";
+import type { CostsResponse, NodeSummary } from "../lib/api.js";
+import { apiClient } from "../lib/api.js";
+import { LogStream } from "../components/LogStream.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
+import { useWorkflow } from "../hooks/useWorkflow.js";
 
 // ============================================================================
 // Constants
@@ -22,35 +22,35 @@ import { useWorkflow } from '../hooks/useWorkflow.js';
 
 /** Node status to Tailwind class mapping for color-coded badges. */
 const NODE_STATUS_STYLES: Record<NodeStatus, { bg: string; text: string; dot: string }> = {
-  pending: { bg: 'bg-gray-700', text: 'text-gray-300', dot: 'bg-gray-400' },
-  waiting: { bg: 'bg-amber-900', text: 'text-amber-300', dot: 'bg-amber-400' },
-  running: { bg: 'bg-blue-900', text: 'text-blue-300', dot: 'bg-blue-400' },
-  review: { bg: 'bg-purple-900', text: 'text-purple-300', dot: 'bg-purple-400' },
-  done: { bg: 'bg-green-900', text: 'text-green-300', dot: 'bg-green-400' },
-  failed: { bg: 'bg-red-900', text: 'text-red-300', dot: 'bg-red-400' },
-  blocked: { bg: 'bg-orange-900', text: 'text-orange-300', dot: 'bg-orange-400' },
+  pending: { bg: "bg-gray-700", text: "text-gray-300", dot: "bg-gray-400" },
+  waiting: { bg: "bg-amber-900", text: "text-amber-300", dot: "bg-amber-400" },
+  running: { bg: "bg-blue-900", text: "text-blue-300", dot: "bg-blue-400" },
+  review: { bg: "bg-purple-900", text: "text-purple-300", dot: "bg-purple-400" },
+  done: { bg: "bg-green-900", text: "text-green-300", dot: "bg-green-400" },
+  failed: { bg: "bg-red-900", text: "text-red-300", dot: "bg-red-400" },
+  blocked: { bg: "bg-orange-900", text: "text-orange-300", dot: "bg-orange-400" },
 };
 
 /** Workflow status to Tailwind class mapping. */
 const WORKFLOW_STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  init: { bg: 'bg-gray-700', text: 'text-gray-300', dot: 'bg-gray-400' },
-  spec: { bg: 'bg-purple-900', text: 'text-purple-300', dot: 'bg-purple-400' },
-  building: { bg: 'bg-cyan-900', text: 'text-cyan-300', dot: 'bg-cyan-400' },
-  running: { bg: 'bg-blue-900', text: 'text-blue-300', dot: 'bg-blue-400' },
-  paused: { bg: 'bg-amber-900', text: 'text-amber-300', dot: 'bg-amber-400' },
-  done: { bg: 'bg-green-900', text: 'text-green-300', dot: 'bg-green-400' },
-  failed: { bg: 'bg-red-900', text: 'text-red-300', dot: 'bg-red-400' },
+  init: { bg: "bg-gray-700", text: "text-gray-300", dot: "bg-gray-400" },
+  spec: { bg: "bg-purple-900", text: "text-purple-300", dot: "bg-purple-400" },
+  building: { bg: "bg-cyan-900", text: "text-cyan-300", dot: "bg-cyan-400" },
+  running: { bg: "bg-blue-900", text: "text-blue-300", dot: "bg-blue-400" },
+  paused: { bg: "bg-amber-900", text: "text-amber-300", dot: "bg-amber-400" },
+  done: { bg: "bg-green-900", text: "text-green-300", dot: "bg-green-400" },
+  failed: { bg: "bg-red-900", text: "text-red-300", dot: "bg-red-400" },
 };
 
 /** All node statuses displayed in the summary. */
 const ALL_NODE_STATUSES: readonly { key: NodeStatus; label: string }[] = [
-  { key: 'pending', label: 'Pending' },
-  { key: 'waiting', label: 'Waiting' },
-  { key: 'running', label: 'Running' },
-  { key: 'review', label: 'Review' },
-  { key: 'done', label: 'Done' },
-  { key: 'failed', label: 'Failed' },
-  { key: 'blocked', label: 'Blocked' },
+  { key: "pending", label: "Pending" },
+  { key: "waiting", label: "Waiting" },
+  { key: "running", label: "Running" },
+  { key: "review", label: "Review" },
+  { key: "done", label: "Done" },
+  { key: "failed", label: "Failed" },
+  { key: "blocked", label: "Blocked" },
 ] as const;
 
 // ============================================================================
@@ -65,12 +65,12 @@ const ALL_NODE_STATUSES: readonly { key: NodeStatus; label: string }[] = [
  */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -115,7 +115,7 @@ function computeNodeCounts(nodes: readonly NodeSummary[]): Map<NodeStatus, numbe
  */
 export const HomePage = memo(function HomePage(): ReactElement {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
 
   const { subscribe } = useWebSocket(token);
   const { workflow, nodes, loading, error } = useWorkflow(subscribe);
@@ -164,19 +164,19 @@ export const HomePage = memo(function HomePage(): ReactElement {
     const unsubs: (() => void)[] = [];
 
     unsubs.push(
-      subscribe('workflow_status', (): void => {
+      subscribe("workflow_status", (): void => {
         void refetchEvents();
       }),
     );
 
     unsubs.push(
-      subscribe('node_status', (): void => {
+      subscribe("node_status", (): void => {
         void refetchEvents();
       }),
     );
 
     unsubs.push(
-      subscribe('cost_update', (): void => {
+      subscribe("cost_update", (): void => {
         void refetchCosts();
         void refetchEvents();
       }),
@@ -230,14 +230,12 @@ export const HomePage = memo(function HomePage(): ReactElement {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-300">
-            No active workflow
-          </p>
+          <p className="text-lg font-medium text-gray-300">No active workflow</p>
           <p className="mt-2 text-sm text-gray-500">
-            Run{' '}
+            Run{" "}
             <code className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-300">
               loomflo init
-            </code>{' '}
+            </code>{" "}
             to create a workflow and start building.
           </p>
         </div>
@@ -249,15 +247,17 @@ export const HomePage = memo(function HomePage(): ReactElement {
   // Loaded state
   // --------------------------------------------------------------------------
 
-  const workflowStyle = WORKFLOW_STATUS_STYLES[workflow.status] ?? { bg: 'bg-gray-700', text: 'text-gray-300', dot: 'bg-gray-400' };
+  const workflowStyle = WORKFLOW_STATUS_STYLES[workflow.status] ?? {
+    bg: "bg-gray-700",
+    text: "text-gray-300",
+    dot: "bg-gray-400",
+  };
 
   const totalCost = costs?.total ?? workflow.totalCost;
   const budgetLimit = costs?.budgetLimit ?? workflow.config.budgetLimit;
   const budgetRemaining = costs?.budgetRemaining ?? null;
   const budgetUsedPercent =
-    budgetLimit !== null && budgetLimit > 0
-      ? Math.min((totalCost / budgetLimit) * 100, 100)
-      : null;
+    budgetLimit !== null && budgetLimit > 0 ? Math.min((totalCost / budgetLimit) * 100, 100) : null;
 
   return (
     <div className="space-y-6">
@@ -270,7 +270,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${workflowStyle.dot}${
-                workflow.status === 'running' ? ' animate-pulse' : ''
+                workflow.status === "running" ? " animate-pulse" : ""
               }`}
             />
             {workflow.status}
@@ -344,13 +344,13 @@ export const HomePage = memo(function HomePage(): ReactElement {
             <div>
               <span className="text-xs uppercase tracking-wider text-gray-500">Budget Limit</span>
               <p className="mt-1 text-lg font-semibold text-gray-100">
-                {budgetLimit !== null ? formatUsd(budgetLimit) : '\u2014'}
+                {budgetLimit !== null ? formatUsd(budgetLimit) : "\u2014"}
               </p>
             </div>
             <div>
               <span className="text-xs uppercase tracking-wider text-gray-500">Remaining</span>
               <p className="mt-1 text-lg font-semibold text-gray-100">
-                {budgetRemaining !== null ? formatUsd(budgetRemaining) : '\u2014'}
+                {budgetRemaining !== null ? formatUsd(budgetRemaining) : "\u2014"}
               </p>
             </div>
           </div>
@@ -365,10 +365,10 @@ export const HomePage = memo(function HomePage(): ReactElement {
                 <div
                   className={`h-full rounded-full transition-all ${
                     budgetUsedPercent >= 90
-                      ? 'bg-red-500'
+                      ? "bg-red-500"
                       : budgetUsedPercent >= 70
-                        ? 'bg-amber-500'
-                        : 'bg-blue-500'
+                        ? "bg-amber-500"
+                        : "bg-blue-500"
                   }`}
                   style={{ width: `${String(budgetUsedPercent)}%` }}
                 />

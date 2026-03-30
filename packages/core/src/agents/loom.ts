@@ -12,38 +12,38 @@
  * - Tracking costs via CostTracker
  */
 
-import type { CostTracker } from '../costs/tracker.js';
-import type { SharedMemoryManager } from '../memory/shared-memory.js';
-import { createEvent, appendEvent } from '../persistence/events.js';
-import type { LLMProvider } from '../providers/base.js';
+import type { CostTracker } from "../costs/tracker.js";
+import type { SharedMemoryManager } from "../memory/shared-memory.js";
+import { createEvent, appendEvent } from "../persistence/events.js";
+import type { LLMProvider } from "../providers/base.js";
 import type {
   SpecPipelineResult,
   SpecStepEvent,
   ClarificationCallback,
-} from '../spec/spec-engine.js';
-import { SpecEngine } from '../spec/spec-engine.js';
-import type { EscalationRequest } from '../tools/escalate.js';
-import type { GraphModification, GraphModifierLike } from './escalation.js';
-import type { EventType } from '../types.js';
+} from "../spec/spec-engine.js";
+import { SpecEngine } from "../spec/spec-engine.js";
+import type { EscalationRequest } from "../tools/escalate.js";
+import type { GraphModification, GraphModifierLike } from "./escalation.js";
+import type { EventType } from "../types.js";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 /** Default LLM model for the Loom agent per constitution (claude-opus-4-6). */
-const DEFAULT_LOOM_MODEL = 'claude-opus-4-6';
+const DEFAULT_LOOM_MODEL = "claude-opus-4-6";
 
 /** Agent ID used for event logging and shared memory attribution. */
-const LOOM_AGENT_ID = 'loom';
+const LOOM_AGENT_ID = "loom";
 
 /** Shared memory files monitored for critical issues. */
-const MONITORED_MEMORY_FILES = ['ERRORS.md', 'ISSUES.md', 'PROGRESS.md'];
+const MONITORED_MEMORY_FILES = ["ERRORS.md", "ISSUES.md", "PROGRESS.md"];
 
 /** Maximum tokens for the lightweight classification LLM call. */
 const CLASSIFICATION_MAX_TOKENS = 150;
 
 /** Shared memory files read for project context in question handling. */
-const CONTEXT_MEMORY_FILES = ['DECISIONS.md', 'PROGRESS.md', 'ARCHITECTURE_CHANGES.md'];
+const CONTEXT_MEMORY_FILES = ["DECISIONS.md", "PROGRESS.md", "ARCHITECTURE_CHANGES.md"];
 
 // ============================================================================
 // LoomAgentStatus
@@ -60,12 +60,12 @@ const CONTEXT_MEMORY_FILES = ['DECISIONS.md', 'PROGRESS.md', 'ARCHITECTURE_CHANG
  * - `idle`: Work completed or awaiting further instructions.
  */
 export type LoomAgentStatus =
-  | 'created'
-  | 'running_spec'
-  | 'running_execution'
-  | 'handling_escalation'
-  | 'handling_chat'
-  | 'idle';
+  | "created"
+  | "running_spec"
+  | "running_execution"
+  | "handling_escalation"
+  | "handling_chat"
+  | "idle";
 
 // ============================================================================
 // LoomConfig
@@ -127,7 +127,7 @@ export interface EscalationResult {
  * - `instruction`: Giving a directive to be relayed to orchestrators.
  * - `graph_change`: Requesting structural changes to the workflow graph.
  */
-export type ChatMessageCategory = 'question' | 'instruction' | 'graph_change';
+export type ChatMessageCategory = "question" | "instruction" | "graph_change";
 
 /**
  * Result of classifying a user chat message.
@@ -186,23 +186,23 @@ export interface MonitoringResult {
  */
 function buildEscalationHandlingPrompt(): string {
   return [
-    'You are Loom, the Architect agent in the Loomflo AI agent orchestration framework.',
-    'An Orchestrator agent (Loomi) has escalated an issue to you because a node is blocked or has exhausted all retries.',
-    '',
-    'Your job is to decide how to modify the workflow graph to resolve the issue and ensure forward progress.',
-    'The workflow must NEVER deadlock.',
-    '',
-    'Available actions:',
-    '- add_node: Insert a new node to handle the work differently.',
-    '- modify_node: Change the failed node\'s instructions for a fresh approach.',
-    '- remove_node: Remove the node if its work is not critical.',
-    '- skip_node: Mark as done and move on (for optional or deferrable work).',
-    '- no_action: No graph change needed.',
-    '',
-    'Respond with ONLY a JSON object:',
+    "You are Loom, the Architect agent in the Loomflo AI agent orchestration framework.",
+    "An Orchestrator agent (Loomi) has escalated an issue to you because a node is blocked or has exhausted all retries.",
+    "",
+    "Your job is to decide how to modify the workflow graph to resolve the issue and ensure forward progress.",
+    "The workflow must NEVER deadlock.",
+    "",
+    "Available actions:",
+    "- add_node: Insert a new node to handle the work differently.",
+    "- modify_node: Change the failed node's instructions for a fresh approach.",
+    "- remove_node: Remove the node if its work is not critical.",
+    "- skip_node: Mark as done and move on (for optional or deferrable work).",
+    "- no_action: No graph change needed.",
+    "",
+    "Respond with ONLY a JSON object:",
     '{"action": "...", "nodeId": "...", "newNode": {"title": "...", "instructions": "...", "insertAfter": "...", "insertBefore": "..."}, "modifiedInstructions": "...", "reason": "..."}',
-    'Include only the fields relevant to your chosen action.',
-  ].join('\n');
+    "Include only the fields relevant to your chosen action.",
+  ].join("\n");
 }
 
 /**
@@ -212,20 +212,20 @@ function buildEscalationHandlingPrompt(): string {
  */
 function buildMonitoringPrompt(): string {
   return [
-    'You are Loom, the Architect agent monitoring the Loomflo workflow for critical issues.',
-    '',
-    'Review the shared memory content below. Look for:',
-    '- Repeated failures or errors that suggest a systemic problem',
-    '- Contradictions between agents or decisions',
-    '- Blockers that agents have reported but not escalated',
-    '- Architecture issues that need proactive intervention',
-    '',
-    'If you detect a critical issue requiring graph modification, respond with a JSON object:',
+    "You are Loom, the Architect agent monitoring the Loomflo workflow for critical issues.",
+    "",
+    "Review the shared memory content below. Look for:",
+    "- Repeated failures or errors that suggest a systemic problem",
+    "- Contradictions between agents or decisions",
+    "- Blockers that agents have reported but not escalated",
+    "- Architecture issues that need proactive intervention",
+    "",
+    "If you detect a critical issue requiring graph modification, respond with a JSON object:",
     '{"issuesDetected": true, "action": "add_node|modify_node|remove_node|skip_node", "nodeId": "...", "reason": "...", "summary": "..."}',
-    '',
-    'If no critical issues are found, respond with:',
+    "",
+    "If no critical issues are found, respond with:",
     '{"issuesDetected": false, "summary": "Brief summary of current state"}',
-  ].join('\n');
+  ].join("\n");
 }
 
 /**
@@ -235,14 +235,14 @@ function buildMonitoringPrompt(): string {
  */
 function buildClassificationPrompt(): string {
   return [
-    'Classify the following user message into exactly one category:',
-    '- question: Asking about the project, its state, architecture, or progress.',
+    "Classify the following user message into exactly one category:",
+    "- question: Asking about the project, its state, architecture, or progress.",
     '- instruction: Giving a directive or preference (e.g., "use bcrypt", "prefer PostgreSQL").',
     '- graph_change: Requesting structural workflow changes (e.g., "add a node", "remove the docs step").',
-    '',
-    'Respond with ONLY a JSON object:',
+    "",
+    "Respond with ONLY a JSON object:",
     '{"category": "question|instruction|graph_change", "confidence": 0.0-1.0, "reasoning": "brief explanation"}',
-  ].join('\n');
+  ].join("\n");
 }
 
 /**
@@ -252,13 +252,13 @@ function buildClassificationPrompt(): string {
  */
 function buildQuestionHandlingPrompt(): string {
   return [
-    'You are Loom, the Architect agent in the Loomflo framework.',
-    'A developer is asking you a question about their project.',
-    '',
-    'Answer using the project context provided (shared memory, graph state, specifications).',
-    'Be informative, specific, and concise.',
-    'Reference concrete details from the context when available.',
-  ].join('\n');
+    "You are Loom, the Architect agent in the Loomflo framework.",
+    "A developer is asking you a question about their project.",
+    "",
+    "Answer using the project context provided (shared memory, graph state, specifications).",
+    "Be informative, specific, and concise.",
+    "Reference concrete details from the context when available.",
+  ].join("\n");
 }
 
 /**
@@ -268,16 +268,16 @@ function buildQuestionHandlingPrompt(): string {
  */
 function buildInstructionHandlingPrompt(): string {
   return [
-    'You are Loom, the Architect agent in the Loomflo framework.',
-    'A developer has given you an instruction or directive about their project.',
-    '',
-    'Your job is to:',
-    '1. Acknowledge the instruction clearly.',
-    '2. Explain how it will be applied (which nodes or agents it affects).',
-    '3. Confirm that the instruction has been recorded in project decisions.',
-    '',
-    'Be concise and action-oriented.',
-  ].join('\n');
+    "You are Loom, the Architect agent in the Loomflo framework.",
+    "A developer has given you an instruction or directive about their project.",
+    "",
+    "Your job is to:",
+    "1. Acknowledge the instruction clearly.",
+    "2. Explain how it will be applied (which nodes or agents it affects).",
+    "3. Confirm that the instruction has been recorded in project decisions.",
+    "",
+    "Be concise and action-oriented.",
+  ].join("\n");
 }
 
 /**
@@ -287,17 +287,17 @@ function buildInstructionHandlingPrompt(): string {
  */
 function buildGraphChangeHandlingPrompt(): string {
   return [
-    'You are Loom, the Architect agent in the Loomflo framework.',
-    'A developer has requested a structural change to the workflow graph.',
-    '',
-    'Analyze the request and respond with:',
-    '1. A brief confirmation of the change.',
-    '2. A JSON block describing the modification:',
-    '```json',
+    "You are Loom, the Architect agent in the Loomflo framework.",
+    "A developer has requested a structural change to the workflow graph.",
+    "",
+    "Analyze the request and respond with:",
+    "1. A brief confirmation of the change.",
+    "2. A JSON block describing the modification:",
+    "```json",
     '{"graphChange": {"action": "add_node|modify_node|remove_node|skip_node", "nodeId": "...", "newNode": {"title": "...", "instructions": "...", "insertAfter": "...", "insertBefore": "..."}, "modifiedInstructions": "...", "reason": "..."}}',
-    '```',
-    'Include only the fields relevant to the action.',
-  ].join('\n');
+    "```",
+    "Include only the fields relevant to the action.",
+  ].join("\n");
 }
 
 // ============================================================================
@@ -328,8 +328,8 @@ function extractJson(text: string): Record<string, unknown> | null {
     }
   }
 
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     try {
       return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
@@ -352,36 +352,46 @@ function parseGraphModification(
   json: Record<string, unknown>,
   fallbackNodeId: string,
 ): GraphModification {
-  const action = json['action'] as GraphModification['action'] | undefined;
-  const validActions = new Set(['add_node', 'modify_node', 'remove_node', 'skip_node', 'no_action']);
+  const action = json["action"] as GraphModification["action"] | undefined;
+  const validActions = new Set([
+    "add_node",
+    "modify_node",
+    "remove_node",
+    "skip_node",
+    "no_action",
+  ]);
 
   const modification: GraphModification = {
-    action: action !== undefined && validActions.has(action) ? action : 'skip_node',
-    reason: typeof json['reason'] === 'string' ? json['reason'] : 'No reason provided',
+    action: action !== undefined && validActions.has(action) ? action : "skip_node",
+    reason: typeof json["reason"] === "string" ? json["reason"] : "No reason provided",
   };
 
-  if (typeof json['nodeId'] === 'string') {
-    modification.nodeId = json['nodeId'];
-  } else if (modification.action !== 'add_node' && modification.action !== 'no_action') {
+  if (typeof json["nodeId"] === "string") {
+    modification.nodeId = json["nodeId"];
+  } else if (modification.action !== "add_node" && modification.action !== "no_action") {
     modification.nodeId = fallbackNodeId;
   }
 
-  if (modification.action === 'add_node' && typeof json['newNode'] === 'object' && json['newNode'] !== null) {
-    const newNode = json['newNode'] as Record<string, unknown>;
+  if (
+    modification.action === "add_node" &&
+    typeof json["newNode"] === "object" &&
+    json["newNode"] !== null
+  ) {
+    const newNode = json["newNode"] as Record<string, unknown>;
     modification.newNode = {
-      title: typeof newNode['title'] === 'string' ? newNode['title'] : 'Recovery Node',
-      instructions: typeof newNode['instructions'] === 'string' ? newNode['instructions'] : '',
+      title: typeof newNode["title"] === "string" ? newNode["title"] : "Recovery Node",
+      instructions: typeof newNode["instructions"] === "string" ? newNode["instructions"] : "",
     };
-    if (typeof newNode['insertAfter'] === 'string') {
-      modification.newNode.insertAfter = newNode['insertAfter'];
+    if (typeof newNode["insertAfter"] === "string") {
+      modification.newNode.insertAfter = newNode["insertAfter"];
     }
-    if (typeof newNode['insertBefore'] === 'string') {
-      modification.newNode.insertBefore = newNode['insertBefore'];
+    if (typeof newNode["insertBefore"] === "string") {
+      modification.newNode.insertBefore = newNode["insertBefore"];
     }
   }
 
-  if (modification.action === 'modify_node' && typeof json['modifiedInstructions'] === 'string') {
-    modification.modifiedInstructions = json['modifiedInstructions'];
+  if (modification.action === "modify_node" && typeof json["modifiedInstructions"] === "string") {
+    modification.modifiedInstructions = json["modifiedInstructions"];
   }
 
   return modification;
@@ -423,7 +433,7 @@ function parseGraphModification(
 export class LoomAgent {
   private readonly config: LoomConfig;
   private readonly model: string;
-  private status: LoomAgentStatus = 'created';
+  private status: LoomAgentStatus = "created";
 
   /**
    * Creates a new Loom agent instance.
@@ -448,10 +458,10 @@ export class LoomAgent {
    * @throws {SpecPipelineError} If any pipeline step fails.
    */
   async runSpecGeneration(description: string): Promise<SpecPipelineResult> {
-    this.status = 'running_spec';
+    this.status = "running_spec";
 
-    await this.logEvent('spec_phase_started', {
-      phase: 'pipeline',
+    await this.logEvent("spec_phase_started", {
+      phase: "pipeline",
       description: description.slice(0, 200),
     });
 
@@ -474,8 +484,8 @@ export class LoomAgent {
     try {
       const result = await engine.runPipeline(description, onProgress);
 
-      await this.logEvent('spec_phase_completed', {
-        phase: 'pipeline',
+      await this.logEvent("spec_phase_completed", {
+        phase: "pipeline",
         artifactCount: result.artifacts.length,
         nodeCount: Object.keys(result.graph.nodes).length,
         topology: result.graph.topology,
@@ -485,24 +495,22 @@ export class LoomAgent {
       const edgeCount = result.graph.edges.length;
       await this.writeProgress(
         `## Spec Generation Completed\n` +
-        `Artifacts: ${String(result.artifacts.length)}\n` +
-        `Graph: ${String(nodeCount)} nodes, ${String(edgeCount)} edges (${result.graph.topology})\n`,
+          `Artifacts: ${String(result.artifacts.length)}\n` +
+          `Graph: ${String(nodeCount)} nodes, ${String(edgeCount)} edges (${result.graph.topology})\n`,
       );
 
-      this.status = 'idle';
+      this.status = "idle";
       return result;
     } catch (error: unknown) {
-      this.status = 'idle';
+      this.status = "idle";
 
       const message = error instanceof Error ? error.message : String(error);
-      await this.logEvent('spec_phase_completed', {
-        phase: 'pipeline',
+      await this.logEvent("spec_phase_completed", {
+        phase: "pipeline",
         error: message,
       });
 
-      await this.writeProgress(
-        `## Spec Generation Failed\nError: ${message}\n`,
-      );
+      await this.writeProgress(`## Spec Generation Failed\nError: ${message}\n`);
 
       throw error;
     }
@@ -522,10 +530,10 @@ export class LoomAgent {
    * @returns Result with the decided graph modification.
    */
   async handleEscalation(request: EscalationRequest): Promise<EscalationResult> {
-    this.status = 'handling_escalation';
+    this.status = "handling_escalation";
 
     try {
-      await this.logEventGeneric('escalation_triggered', {
+      await this.logEventGeneric("escalation_triggered", {
         nodeId: request.nodeId,
         agentId: request.agentId,
         reason: request.reason,
@@ -534,18 +542,22 @@ export class LoomAgent {
 
       // Build escalation context
       const userMessage = [
-        '## Escalation Report',
+        "## Escalation Report",
         `**Node:** ${request.nodeId}`,
         `**Agent:** ${request.agentId}`,
         `**Reason:** ${request.reason}`,
-        request.suggestedAction !== undefined ? `**Suggested:** ${request.suggestedAction}` : '',
-        request.details !== undefined ? `\n**Details:**\n${request.details}` : '',
-        this.config.graphSummary !== undefined ? `\n## Current Graph\n${this.config.graphSummary}` : '',
-      ].filter((l) => l.length > 0).join('\n');
+        request.suggestedAction !== undefined ? `**Suggested:** ${request.suggestedAction}` : "",
+        request.details !== undefined ? `\n**Details:**\n${request.details}` : "",
+        this.config.graphSummary !== undefined
+          ? `\n## Current Graph\n${this.config.graphSummary}`
+          : "",
+      ]
+        .filter((l) => l.length > 0)
+        .join("\n");
 
       // LLM call to decide
       const response = await this.config.provider.complete({
-        messages: [{ role: 'user', content: userMessage }],
+        messages: [{ role: "user", content: userMessage }],
         system: buildEscalationHandlingPrompt(),
         model: this.model,
       });
@@ -559,21 +571,22 @@ export class LoomAgent {
       );
 
       const textBlocks = response.content.filter(
-        (block): block is { type: 'text'; text: string } => block.type === 'text',
+        (block): block is { type: "text"; text: string } => block.type === "text",
       );
-      const responseText = textBlocks.map((b) => b.text).join('\n');
+      const responseText = textBlocks.map((b) => b.text).join("\n");
 
       const json = extractJson(responseText);
-      const modification = json !== null
-        ? parseGraphModification(json, request.nodeId)
-        : {
-            action: 'skip_node' as const,
-            nodeId: request.nodeId,
-            reason: 'Failed to parse architect response — skipping node for forward progress',
-          };
+      const modification =
+        json !== null
+          ? parseGraphModification(json, request.nodeId)
+          : {
+              action: "skip_node" as const,
+              nodeId: request.nodeId,
+              reason: "Failed to parse architect response — skipping node for forward progress",
+            };
 
       // Apply modification if graphModifier is available
-      if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+      if (this.config.graphModifier !== undefined && modification.action !== "no_action") {
         try {
           await this.config.graphModifier.applyModification(modification);
         } catch (err: unknown) {
@@ -583,7 +596,7 @@ export class LoomAgent {
       }
 
       // Log the graph modification
-      await this.logEventGeneric('graph_modified', {
+      await this.logEventGeneric("graph_modified", {
         action: modification.action,
         nodeId: modification.nodeId ?? request.nodeId,
         reason: modification.reason,
@@ -596,15 +609,15 @@ export class LoomAgent {
         `**Reason:** ${modification.reason}`,
         `**Original Issue:** ${request.reason}`,
         `**Timestamp:** ${new Date().toISOString()}`,
-        '',
-      ].join('\n');
+        "",
+      ].join("\n");
 
-      await this.writeMemory('ARCHITECTURE_CHANGES.md', changeEntry);
+      await this.writeMemory("ARCHITECTURE_CHANGES.md", changeEntry);
 
-      this.status = 'idle';
+      this.status = "idle";
       return { success: true, modification };
     } catch (err: unknown) {
-      this.status = 'idle';
+      this.status = "idle";
       const message = err instanceof Error ? err.message : String(err);
       return { success: false, modification: null, error: message };
     }
@@ -637,13 +650,17 @@ export class LoomAgent {
       }
 
       if (memoryContents.length === 0) {
-        return { issuesDetected: false, modification: null, summary: 'No shared memory content to monitor' };
+        return {
+          issuesDetected: false,
+          modification: null,
+          summary: "No shared memory content to monitor",
+        };
       }
 
-      const userMessage = memoryContents.join('\n\n');
+      const userMessage = memoryContents.join("\n\n");
 
       const response = await this.config.provider.complete({
-        messages: [{ role: 'user', content: userMessage }],
+        messages: [{ role: "user", content: userMessage }],
         system: buildMonitoringPrompt(),
         model: this.model,
       });
@@ -657,33 +674,37 @@ export class LoomAgent {
       );
 
       const textBlocks = response.content.filter(
-        (block): block is { type: 'text'; text: string } => block.type === 'text',
+        (block): block is { type: "text"; text: string } => block.type === "text",
       );
-      const responseText = textBlocks.map((b) => b.text).join('\n');
+      const responseText = textBlocks.map((b) => b.text).join("\n");
 
       const json = extractJson(responseText);
       if (json === null) {
-        return { issuesDetected: false, modification: null, summary: 'Could not parse monitoring response' };
+        return {
+          issuesDetected: false,
+          modification: null,
+          summary: "Could not parse monitoring response",
+        };
       }
 
-      const issuesDetected = json['issuesDetected'] === true;
-      const summary = typeof json['summary'] === 'string' ? json['summary'] : 'No summary';
+      const issuesDetected = json["issuesDetected"] === true;
+      const summary = typeof json["summary"] === "string" ? json["summary"] : "No summary";
 
       if (!issuesDetected) {
         return { issuesDetected: false, modification: null, summary };
       }
 
-      const modification = parseGraphModification(json, '');
+      const modification = parseGraphModification(json, "");
 
       // Apply modification if possible
-      if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+      if (this.config.graphModifier !== undefined && modification.action !== "no_action") {
         try {
           await this.config.graphModifier.applyModification(modification);
-          await this.logEventGeneric('graph_modified', {
+          await this.logEventGeneric("graph_modified", {
             action: modification.action,
-            nodeId: modification.nodeId ?? 'proactive',
+            nodeId: modification.nodeId ?? "proactive",
             reason: modification.reason,
-            source: 'monitoring',
+            source: "monitoring",
           });
         } catch {
           // Non-critical
@@ -709,39 +730,39 @@ export class LoomAgent {
    * @returns Result with response text, category, and optional graph modification.
    */
   async handleChat(message: string, chatHistory?: string): Promise<ChatResult> {
-    this.status = 'handling_chat';
+    this.status = "handling_chat";
 
     try {
       const classification = await this.classifyMessage(message);
 
       let result: ChatResult;
       switch (classification.category) {
-        case 'question':
+        case "question":
           result = await this.handleQuestion(message, chatHistory);
           break;
-        case 'instruction':
+        case "instruction":
           result = await this.handleInstruction(message, chatHistory);
           break;
-        case 'graph_change':
+        case "graph_change":
           result = await this.handleGraphChange(message, chatHistory);
           break;
       }
 
-      await this.logEventGeneric('message_sent', {
-        direction: 'outbound',
+      await this.logEventGeneric("message_sent", {
+        direction: "outbound",
         category: classification.category,
         confidence: classification.confidence,
         content: result.response.slice(0, 500),
       });
 
-      this.status = 'idle';
+      this.status = "idle";
       return result;
     } catch (err: unknown) {
-      this.status = 'idle';
+      this.status = "idle";
       const errorMsg = err instanceof Error ? err.message : String(err);
       return {
         response: `I encountered an error processing your message: ${errorMsg}`,
-        category: 'question',
+        category: "question",
         modification: null,
         error: errorMsg,
       };
@@ -761,7 +782,7 @@ export class LoomAgent {
   async classifyMessage(message: string): Promise<ChatClassification> {
     try {
       const response = await this.config.provider.complete({
-        messages: [{ role: 'user', content: message }],
+        messages: [{ role: "user", content: message }],
         system: buildClassificationPrompt(),
         model: this.model,
         maxTokens: CLASSIFICATION_MAX_TOKENS,
@@ -776,26 +797,34 @@ export class LoomAgent {
       );
 
       const textBlocks = response.content.filter(
-        (block): block is { type: 'text'; text: string } => block.type === 'text',
+        (block): block is { type: "text"; text: string } => block.type === "text",
       );
-      const responseText = textBlocks.map((b) => b.text).join('\n');
+      const responseText = textBlocks.map((b) => b.text).join("\n");
 
       const json = extractJson(responseText);
       if (json !== null) {
-        const category = json['category'] as string;
-        const validCategories = new Set<string>(['question', 'instruction', 'graph_change']);
+        const category = json["category"] as string;
+        const validCategories = new Set<string>(["question", "instruction", "graph_change"]);
         if (validCategories.has(category)) {
           return {
             category: category as ChatMessageCategory,
-            confidence: typeof json['confidence'] === 'number' ? json['confidence'] : 0.5,
-            reasoning: typeof json['reasoning'] === 'string' ? json['reasoning'] : '',
+            confidence: typeof json["confidence"] === "number" ? json["confidence"] : 0.5,
+            reasoning: typeof json["reasoning"] === "string" ? json["reasoning"] : "",
           };
         }
       }
 
-      return { category: 'question', confidence: 0, reasoning: 'Classification parsing failed — defaulting to question' };
+      return {
+        category: "question",
+        confidence: 0,
+        reasoning: "Classification parsing failed — defaulting to question",
+      };
     } catch {
-      return { category: 'question', confidence: 0, reasoning: 'Classification call failed — defaulting to question' };
+      return {
+        category: "question",
+        confidence: 0,
+        reasoning: "Classification call failed — defaulting to question",
+      };
     }
   }
 
@@ -846,7 +875,7 @@ export class LoomAgent {
     }
 
     const response = await this.config.provider.complete({
-      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      messages: [{ role: "user", content: contextParts.join("\n") }],
       system: buildQuestionHandlingPrompt(),
       model: this.model,
     });
@@ -860,12 +889,15 @@ export class LoomAgent {
     );
 
     const textBlocks = response.content.filter(
-      (block): block is { type: 'text'; text: string } => block.type === 'text',
+      (block): block is { type: "text"; text: string } => block.type === "text",
     );
 
     return {
-      response: textBlocks.map((b) => b.text).join('\n').trim(),
-      category: 'question',
+      response: textBlocks
+        .map((b) => b.text)
+        .join("\n")
+        .trim(),
+      category: "question",
       modification: null,
     };
   }
@@ -890,7 +922,7 @@ export class LoomAgent {
     }
 
     const response = await this.config.provider.complete({
-      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      messages: [{ role: "user", content: contextParts.join("\n") }],
       system: buildInstructionHandlingPrompt(),
       model: this.model,
     });
@@ -904,22 +936,25 @@ export class LoomAgent {
     );
 
     const textBlocks = response.content.filter(
-      (block): block is { type: 'text'; text: string } => block.type === 'text',
+      (block): block is { type: "text"; text: string } => block.type === "text",
     );
-    const responseText = textBlocks.map((b) => b.text).join('\n').trim();
+    const responseText = textBlocks
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
 
     const decisionEntry = [
       `## Developer Instruction`,
       `**Instruction:** ${message}`,
       `**Timestamp:** ${new Date().toISOString()}`,
-      '',
-    ].join('\n');
+      "",
+    ].join("\n");
 
-    await this.writeMemory('DECISIONS.md', decisionEntry);
+    await this.writeMemory("DECISIONS.md", decisionEntry);
 
     return {
       response: responseText,
-      category: 'instruction',
+      category: "instruction",
       modification: null,
     };
   }
@@ -944,7 +979,7 @@ export class LoomAgent {
     }
 
     const response = await this.config.provider.complete({
-      messages: [{ role: 'user', content: contextParts.join('\n') }],
+      messages: [{ role: "user", content: contextParts.join("\n") }],
       system: buildGraphChangeHandlingPrompt(),
       model: this.model,
     });
@@ -958,28 +993,34 @@ export class LoomAgent {
     );
 
     const textBlocks = response.content.filter(
-      (block): block is { type: 'text'; text: string } => block.type === 'text',
+      (block): block is { type: "text"; text: string } => block.type === "text",
     );
-    const responseText = textBlocks.map((b) => b.text).join('\n');
+    const responseText = textBlocks.map((b) => b.text).join("\n");
 
     let modification: GraphModification | null = null;
-    const graphChangeMatch = /```json\s*\n?\s*\{[\s\S]*?"graphChange"[\s\S]*?\}\s*\n?\s*```/i.exec(responseText);
+    const graphChangeMatch = /```json\s*\n?\s*\{[\s\S]*?"graphChange"[\s\S]*?\}\s*\n?\s*```/i.exec(
+      responseText,
+    );
     if (graphChangeMatch !== null) {
       const changeJson = extractJson(graphChangeMatch[0]);
-      if (changeJson !== null && typeof changeJson['graphChange'] === 'object' && changeJson['graphChange'] !== null) {
+      if (
+        changeJson !== null &&
+        typeof changeJson["graphChange"] === "object" &&
+        changeJson["graphChange"] !== null
+      ) {
         modification = parseGraphModification(
-          changeJson['graphChange'] as Record<string, unknown>,
-          '',
+          changeJson["graphChange"] as Record<string, unknown>,
+          "",
         );
 
-        if (this.config.graphModifier !== undefined && modification.action !== 'no_action') {
+        if (this.config.graphModifier !== undefined && modification.action !== "no_action") {
           try {
             await this.config.graphModifier.applyModification(modification);
-            await this.logEventGeneric('graph_modified', {
+            await this.logEventGeneric("graph_modified", {
               action: modification.action,
-              nodeId: modification.nodeId ?? 'chat-requested',
+              nodeId: modification.nodeId ?? "chat-requested",
               reason: modification.reason,
-              source: 'chat',
+              source: "chat",
             });
           } catch {
             // Non-critical — graph modification failure doesn't block response
@@ -988,11 +1029,11 @@ export class LoomAgent {
       }
     }
 
-    const cleanResponse = responseText.replace(/```json[\s\S]*?```/g, '').trim();
+    const cleanResponse = responseText.replace(/```json[\s\S]*?```/g, "").trim();
 
     return {
       response: cleanResponse,
-      category: 'graph_change',
+      category: "graph_change",
       modification,
     };
   }
@@ -1021,7 +1062,7 @@ export class LoomAgent {
         // File may not exist yet — skip
       }
     }
-    return parts.join('\n\n');
+    return parts.join("\n\n");
   }
 
   /**
@@ -1035,8 +1076,8 @@ export class LoomAgent {
    */
   private handleSpecProgress(event: SpecStepEvent): void {
     switch (event.type) {
-      case 'spec_step_started':
-        void this.logEvent('spec_phase_started', {
+      case "spec_step_started":
+        void this.logEvent("spec_phase_started", {
           phase: event.stepName,
           stepIndex: event.stepIndex,
         });
@@ -1045,8 +1086,8 @@ export class LoomAgent {
         );
         break;
 
-      case 'spec_step_completed':
-        void this.logEvent('spec_phase_completed', {
+      case "spec_step_completed":
+        void this.logEvent("spec_phase_completed", {
           phase: event.stepName,
           stepIndex: event.stepIndex,
           artifactPath: event.artifactPath,
@@ -1056,8 +1097,8 @@ export class LoomAgent {
         );
         break;
 
-      case 'spec_step_error':
-        void this.logEvent('spec_phase_completed', {
+      case "spec_step_error":
+        void this.logEvent("spec_phase_completed", {
           phase: event.stepName,
           stepIndex: event.stepIndex,
           error: event.error.message,
@@ -1067,19 +1108,17 @@ export class LoomAgent {
         );
         break;
 
-      case 'clarification_requested':
+      case "clarification_requested":
         void this.writeProgress(
           `### Clarification requested in ${event.stepName} (${String(event.questions.length)} questions)\n`,
         );
         break;
 
-      case 'clarification_answered':
-        void this.writeProgress(
-          `### Clarification answered in ${event.stepName}\n`,
-        );
+      case "clarification_answered":
+        void this.writeProgress(`### Clarification answered in ${event.stepName}\n`);
         break;
 
-      case 'spec_pipeline_completed':
+      case "spec_pipeline_completed":
         // Handled in runSpecGeneration after the pipeline returns
         break;
     }
@@ -1092,7 +1131,7 @@ export class LoomAgent {
    * @param details - Event-specific payload data.
    */
   private async logEvent(
-    type: 'spec_phase_started' | 'spec_phase_completed',
+    type: "spec_phase_started" | "spec_phase_completed",
     details: Record<string, unknown>,
   ): Promise<void> {
     const event = createEvent({
@@ -1111,10 +1150,7 @@ export class LoomAgent {
    * @param type - Event type identifier.
    * @param details - Event-specific payload data.
    */
-  private async logEventGeneric(
-    type: EventType,
-    details: Record<string, unknown>,
-  ): Promise<void> {
+  private async logEventGeneric(type: EventType, details: Record<string, unknown>): Promise<void> {
     try {
       const event = createEvent({
         type,
@@ -1134,7 +1170,7 @@ export class LoomAgent {
    * @param content - Markdown content to append.
    */
   private async writeProgress(content: string): Promise<void> {
-    await this.config.sharedMemory.write('PROGRESS.md', content, LOOM_AGENT_ID);
+    await this.config.sharedMemory.write("PROGRESS.md", content, LOOM_AGENT_ID);
   }
 
   /**

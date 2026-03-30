@@ -6,8 +6,8 @@
 // Designed for the dark-themed monitoring dashboard.
 // ============================================================================
 
-import { memo, useMemo } from 'react';
-import type { ReactElement } from 'react';
+import { memo, useMemo } from "react";
+import type { ReactElement } from "react";
 
 // ============================================================================
 // Types
@@ -72,12 +72,12 @@ function formatUsd(value: number): string {
  */
 function getBarColorClass(ratio: number): string {
   if (ratio >= BUDGET_THRESHOLDS.danger) {
-    return 'bg-red-500';
+    return "bg-red-500";
   }
   if (ratio >= BUDGET_THRESHOLDS.warning) {
-    return 'bg-yellow-500';
+    return "bg-yellow-500";
   }
-  return 'bg-green-500';
+  return "bg-green-500";
 }
 
 // ============================================================================
@@ -134,9 +134,7 @@ export const CostTracker = memo(function CostTracker({
             />
           </div>
           {budgetRemaining !== null && (
-            <div className="mt-1 text-xs text-gray-400">
-              {formatUsd(budgetRemaining)} remaining
-            </div>
+            <div className="mt-1 text-xs text-gray-400">{formatUsd(budgetRemaining)} remaining</div>
           )}
         </div>
       )}
@@ -184,9 +182,7 @@ export const CostTracker = memo(function CostTracker({
       {/* Total cost */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-700 pt-3">
         <span className="text-sm font-medium text-gray-100">Total</span>
-        <span className="text-sm font-semibold tabular-nums text-gray-100">
-          {formatUsd(total)}
-        </span>
+        <span className="text-sm font-semibold tabular-nums text-gray-100">{formatUsd(total)}</span>
       </div>
     </div>
   );

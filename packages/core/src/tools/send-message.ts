@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 // ============================================================================
 // MessageBusLike
@@ -33,9 +33,9 @@ export interface MessageBusLike {
 /** Zod schema for send_message tool input. */
 const SendMessageInputSchema = z.object({
   /** Target agent ID within the same node. */
-  to: z.string().describe('Target agent ID within the same node'),
+  to: z.string().describe("Target agent ID within the same node"),
   /** Message text to send. */
-  content: z.string().describe('Message text to send to the target agent'),
+  content: z.string().describe("Message text to send to the target agent"),
 });
 
 // ============================================================================
@@ -57,12 +57,12 @@ const SendMessageInputSchema = z.object({
  */
 export function createSendMessageTool(messageBus: MessageBusLike): Tool {
   return {
-    name: 'send_message',
+    name: "send_message",
     description:
-      'Send a message to another agent within the same node. ' +
-      'Provide the target agent ID and the message content. ' +
-      'Messages are only routable within the same node — use shared memory ' +
-      'for cross-node communication. Returns a confirmation with message details.',
+      "Send a message to another agent within the same node. " +
+      "Provide the target agent ID and the message content. " +
+      "Messages are only routable within the same node — use shared memory " +
+      "for cross-node communication. Returns a confirmation with message details.",
     inputSchema: SendMessageInputSchema,
 
     async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -76,7 +76,7 @@ export function createSendMessageTool(messageBus: MessageBusLike): Tool {
         } catch {
           return (
             `Error: failed to send message to agent "${to}" — ` +
-            'the message bus rejected the delivery'
+            "the message bus rejected the delivery"
           );
         }
 

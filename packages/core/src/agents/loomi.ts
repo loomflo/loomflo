@@ -13,23 +13,23 @@
  * Loomi does NOT write project code — it plans, coordinates, and supervises.
  */
 
-import picomatch from 'picomatch';
-import { z } from 'zod';
-import type { Config } from '../config.js';
-import type { CostTracker } from '../costs/tracker.js';
-import type { SharedMemoryManager } from '../memory/shared-memory.js';
-import { createEvent, appendEvent } from '../persistence/events.js';
-import type { LLMProvider } from '../providers/base.js';
-import type { AgentInfo, EventType, ReviewReport } from '../types.js';
-import type { AgentLoopResult } from './base-agent.js';
-import { runAgentLoop } from './base-agent.js';
-import type { MessageBus } from './message-bus.js';
-import { buildLoomaPrompt } from './prompts.js';
-import type { Tool } from '../tools/base.js';
-import type { EscalationHandlerLike } from '../tools/escalate.js';
-import type { CompletionHandlerLike, CompletionReport } from '../tools/report-complete.js';
-import { createReportCompleteTool } from '../tools/report-complete.js';
-import { createSendMessageTool } from '../tools/send-message.js';
+import picomatch from "picomatch";
+import { z } from "zod";
+import type { Config } from "../config.js";
+import type { CostTracker } from "../costs/tracker.js";
+import type { SharedMemoryManager } from "../memory/shared-memory.js";
+import { createEvent, appendEvent } from "../persistence/events.js";
+import type { LLMProvider } from "../providers/base.js";
+import type { AgentInfo, EventType, ReviewReport } from "../types.js";
+import type { AgentLoopResult } from "./base-agent.js";
+import { runAgentLoop } from "./base-agent.js";
+import type { MessageBus } from "./message-bus.js";
+import { buildLoomaPrompt } from "./prompts.js";
+import type { Tool } from "../tools/base.js";
+import type { EscalationHandlerLike } from "../tools/escalate.js";
+import type { CompletionHandlerLike, CompletionReport } from "../tools/report-complete.js";
+import { createReportCompleteTool } from "../tools/report-complete.js";
+import { createSendMessageTool } from "../tools/send-message.js";
 
 // ============================================================================
 // Types
@@ -122,7 +122,7 @@ export interface LoomiConfig {
  */
 export interface LoomiResult {
   /** Final orchestration outcome. */
-  status: 'completed' | 'failed' | 'blocked' | 'escalated';
+  status: "completed" | "failed" | "blocked" | "escalated";
   /** Agent IDs that reported successful completion. */
   completedAgents: string[];
   /** Agent IDs that failed or did not report completion. */
@@ -204,34 +204,35 @@ class CompletionTracker implements CompletionHandlerLike {
  * @returns System prompt string for the planning call.
  */
 function buildPlanningSystemPrompt(maxWorkers: number | null): string {
-  const maxWorkerLine = maxWorkers !== null
-    ? `You MUST NOT plan more than ${String(maxWorkers)} worker(s).`
-    : 'There is no limit on the number of workers.';
+  const maxWorkerLine =
+    maxWorkers !== null
+      ? `You MUST NOT plan more than ${String(maxWorkers)} worker(s).`
+      : "There is no limit on the number of workers.";
 
   return [
-    'You are Loomi, the Orchestrator agent in the Loomflo AI agent framework.',
-    'Your task is to analyze node instructions and plan a team of Worker agents (Loomas).',
-    '',
-    'Rules:',
-    '- Each worker must have a clear, specific task description.',
-    '- Each worker must have an exclusive file write scope defined as glob patterns.',
-    '- File write scopes MUST NOT overlap between workers — no two workers may write to the same file.',
+    "You are Loomi, the Orchestrator agent in the Loomflo AI agent framework.",
+    "Your task is to analyze node instructions and plan a team of Worker agents (Loomas).",
+    "",
+    "Rules:",
+    "- Each worker must have a clear, specific task description.",
+    "- Each worker must have an exclusive file write scope defined as glob patterns.",
+    "- File write scopes MUST NOT overlap between workers — no two workers may write to the same file.",
     '- Use descriptive worker IDs prefixed with "looma-" (e.g., "looma-auth-1", "looma-api-routes-1").',
     `- ${maxWorkerLine}`,
-    '- If the work is small enough for one worker, plan one worker. Do not split unnecessarily.',
-    '',
-    'Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):',
-    '{',
+    "- If the work is small enough for one worker, plan one worker. Do not split unnecessarily.",
+    "",
+    "Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):",
+    "{",
     '  "reasoning": "Brief explanation of why you are dividing the work this way",',
     '  "workers": [',
-    '    {',
+    "    {",
     '      "id": "looma-descriptive-name-1",',
     '      "taskDescription": "Detailed description of what this worker should accomplish",',
     '      "writeScope": ["glob/pattern/**/*.ts"]',
-    '    }',
-    '  ]',
-    '}',
-  ].join('\n');
+    "    }",
+    "  ]",
+    "}",
+  ].join("\n");
 }
 
 /**
@@ -249,22 +250,17 @@ function buildPlanningUserMessage(
   specContext?: string,
   sharedMemoryContent?: string,
 ): string {
-  const parts = [
-    `## Node: ${nodeTitle}`,
-    '',
-    '## Instructions',
-    instructions,
-  ];
+  const parts = [`## Node: ${nodeTitle}`, "", "## Instructions", instructions];
 
   if (specContext !== undefined && specContext.length > 0) {
-    parts.push('', '## Spec Context', specContext);
+    parts.push("", "## Spec Context", specContext);
   }
 
   if (sharedMemoryContent !== undefined && sharedMemoryContent.length > 0) {
-    parts.push('', '## Shared Memory', sharedMemoryContent);
+    parts.push("", "## Shared Memory", sharedMemoryContent);
   }
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 /**
@@ -274,27 +270,27 @@ function buildPlanningUserMessage(
  */
 function buildRetryPlanningSystemPrompt(): string {
   return [
-    'You are Loomi, the Orchestrator agent. Some of your workers failed their tasks.',
-    'Generate adapted task descriptions that incorporate the reviewer feedback.',
-    '',
-    'Rules:',
-    '- Only generate plans for the failed workers listed below.',
-    '- Keep the same worker IDs and file write scopes — only adapt the task descriptions.',
-    '- Address the specific issues raised in the review feedback.',
-    '- Be more specific and explicit about what the worker should do differently.',
-    '',
-    'Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):',
-    '{',
+    "You are Loomi, the Orchestrator agent. Some of your workers failed their tasks.",
+    "Generate adapted task descriptions that incorporate the reviewer feedback.",
+    "",
+    "Rules:",
+    "- Only generate plans for the failed workers listed below.",
+    "- Keep the same worker IDs and file write scopes — only adapt the task descriptions.",
+    "- Address the specific issues raised in the review feedback.",
+    "- Be more specific and explicit about what the worker should do differently.",
+    "",
+    "Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):",
+    "{",
     '  "reasoning": "What changes you are making to address the feedback",',
     '  "workers": [',
-    '    {',
+    "    {",
     '      "id": "existing-worker-id",',
     '      "taskDescription": "Adapted task description addressing the feedback",',
     '      "writeScope": ["same/scope/as/before/**"]',
-    '    }',
-    '  ]',
-    '}',
-  ].join('\n');
+    "    }",
+    "  ]",
+    "}",
+  ].join("\n");
 }
 
 /**
@@ -311,19 +307,19 @@ function buildRetryUserMessage(
   originalInstructions: string,
 ): string {
   const planDescriptions = failedPlans
-    .map((p) => `- ${p.id}: ${p.taskDescription} (scope: ${p.writeScope.join(', ')})`)
-    .join('\n');
+    .map((p) => `- ${p.id}: ${p.taskDescription} (scope: ${p.writeScope.join(", ")})`)
+    .join("\n");
 
   return [
-    '## Failed Workers',
+    "## Failed Workers",
     planDescriptions,
-    '',
-    '## Review Feedback',
+    "",
+    "## Review Feedback",
     reviewFeedback,
-    '',
-    '## Original Node Instructions',
+    "",
+    "## Original Node Instructions",
     originalInstructions,
-  ].join('\n');
+  ].join("\n");
 }
 
 // ============================================================================
@@ -356,13 +352,13 @@ function extractJson(text: string): unknown {
     return JSON.parse(fenceMatch[1].trim());
   }
 
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
   }
 
-  throw new Error('Failed to extract JSON from LLM response');
+  throw new Error("Failed to extract JSON from LLM response");
 }
 
 // ============================================================================
@@ -378,9 +374,7 @@ function extractJson(text: string): unknown {
  * @param workers - Array of worker plans with write scopes.
  * @returns Validation result with `valid` boolean and any overlaps found.
  */
-function validateFileScopes(
-  workers: WorkerPlan[],
-): { valid: boolean; overlaps: string[] } {
+function validateFileScopes(workers: WorkerPlan[]): { valid: boolean; overlaps: string[] } {
   const overlaps: string[] = [];
 
   for (let i = 0; i < workers.length; i++) {
@@ -395,9 +389,7 @@ function validateFileScopes(
 
       for (const testPath of testPaths) {
         if (matcherA(testPath) && matcherB(testPath)) {
-          overlaps.push(
-            `Workers "${a.id}" and "${b.id}" both match "${testPath}"`,
-          );
+          overlaps.push(`Workers "${a.id}" and "${b.id}" both match "${testPath}"`);
           break;
         }
       }
@@ -420,13 +412,13 @@ function generateTestPaths(patterns: string[]): string[] {
   const paths = new Set<string>();
 
   for (const pattern of patterns) {
-    let path = pattern.replace(/\*\*/g, 'a/b');
-    path = path.replace(/\*/g, 'test.file');
+    let path = pattern.replace(/\*\*/g, "a/b");
+    path = path.replace(/\*/g, "test.file");
     path = path.replace(/\{([^}]+)\}/g, (_match, group: string) => {
-      const first = group.split(',')[0];
-      return first ?? 'x';
+      const first = group.split(",")[0];
+      return first ?? "x";
     });
-    path = path.replace(/\?/g, 'x');
+    path = path.replace(/\?/g, "x");
     paths.add(path);
   }
 
@@ -447,14 +439,14 @@ function generateTestPaths(patterns: string[]): string[] {
 function buildTeamContext(currentId: string, allPlans: WorkerPlan[]): string {
   const others = allPlans.filter((p) => p.id !== currentId);
   if (others.length === 0) {
-    return 'You are the only worker in this node.';
+    return "You are the only worker in this node.";
   }
 
   const lines = others.map(
-    (p) => `- ${p.id}: ${p.taskDescription} (writes to: ${p.writeScope.join(', ')})`,
+    (p) => `- ${p.id}: ${p.taskDescription} (writes to: ${p.writeScope.join(", ")})`,
   );
 
-  return ['Your teammates in this node:', ...lines].join('\n');
+  return ["Your teammates in this node:", ...lines].join("\n");
 }
 
 /**
@@ -467,9 +459,9 @@ function buildTeamContext(currentId: string, allPlans: WorkerPlan[]): string {
 export function createWorkerAgentInfo(plan: WorkerPlan, model: string): AgentInfo {
   return {
     id: plan.id,
-    role: 'looma',
+    role: "looma",
     model,
-    status: 'created',
+    status: "created",
     writeScope: [...plan.writeScope],
     taskDescription: plan.taskDescription,
     tokenUsage: { input: 0, output: 0 },
@@ -494,7 +486,7 @@ function buildWorkerTools(
   messageBus: MessageBus,
   completionTracker: CompletionTracker,
 ): Tool[] {
-  const dynamicNames = new Set(['send_message', 'report_complete']);
+  const dynamicNames = new Set(["send_message", "report_complete"]);
   const filtered = baseTools.filter((t) => !dynamicNames.has(t.name));
 
   return [
@@ -539,12 +531,8 @@ async function logEvent(
  * @param agentId - Agent ID for write attribution.
  * @param content - Markdown content to append.
  */
-async function writeProgress(
-  config: LoomiConfig,
-  agentId: string,
-  content: string,
-): Promise<void> {
-  await config.sharedMemory.write('PROGRESS.md', content, agentId);
+async function writeProgress(config: LoomiConfig, agentId: string, content: string): Promise<void> {
+  await config.sharedMemory.write("PROGRESS.md", content, agentId);
 }
 
 // ============================================================================
@@ -573,7 +561,7 @@ async function planTeam(config: LoomiConfig): Promise<TeamPlan> {
   );
 
   const response = await config.provider.complete({
-    messages: [{ role: 'user', content: userMessage }],
+    messages: [{ role: "user", content: userMessage }],
     system: systemPrompt,
     model: config.model,
   });
@@ -588,12 +576,12 @@ async function planTeam(config: LoomiConfig): Promise<TeamPlan> {
   );
 
   const textBlocks = response.content.filter(
-    (block): block is { type: 'text'; text: string } => block.type === 'text',
+    (block): block is { type: "text"; text: string } => block.type === "text",
   );
-  const responseText = textBlocks.map((b) => b.text).join('\n');
+  const responseText = textBlocks.map((b) => b.text).join("\n");
 
   if (responseText.length === 0) {
-    throw new Error('LLM returned empty response for team planning');
+    throw new Error("LLM returned empty response for team planning");
   }
 
   const json = extractJson(responseText);
@@ -633,14 +621,10 @@ async function adaptPlansForRetry(
   reviewFeedback: string,
 ): Promise<WorkerPlan[]> {
   const systemPrompt = buildRetryPlanningSystemPrompt();
-  const userMessage = buildRetryUserMessage(
-    failedPlans,
-    reviewFeedback,
-    config.instructions,
-  );
+  const userMessage = buildRetryUserMessage(failedPlans, reviewFeedback, config.instructions);
 
   const response = await config.provider.complete({
-    messages: [{ role: 'user', content: userMessage }],
+    messages: [{ role: "user", content: userMessage }],
     system: systemPrompt,
     model: config.model,
   });
@@ -655,12 +639,12 @@ async function adaptPlansForRetry(
   );
 
   const textBlocks = response.content.filter(
-    (block): block is { type: 'text'; text: string } => block.type === 'text',
+    (block): block is { type: "text"; text: string } => block.type === "text",
   );
-  const responseText = textBlocks.map((b) => b.text).join('\n');
+  const responseText = textBlocks.map((b) => b.text).join("\n");
 
   if (responseText.length === 0) {
-    throw new Error('LLM returned empty response for retry planning');
+    throw new Error("LLM returned empty response for retry planning");
   }
 
   const json = extractJson(responseText);
@@ -754,9 +738,9 @@ function classifyWorkerResults(
     const result = results[i] as AgentLoopResult;
     const report = tracker.getReport(plan.id);
 
-    if (result.status !== 'completed') {
+    if (result.status !== "completed") {
       failedIds.push(plan.id);
-    } else if (report !== undefined && report.status !== 'success') {
+    } else if (report !== undefined && report.status !== "success") {
       failedIds.push(plan.id);
     } else {
       completedIds.push(plan.id);
@@ -794,7 +778,7 @@ async function handleEscalation(
   failedAgents: string[],
   retryCount: number,
 ): Promise<LoomiResult> {
-  await logEvent(config, loomiAgentId, 'escalation_triggered', {
+  await logEvent(config, loomiAgentId, "escalation_triggered", {
     reason,
     details,
   });
@@ -803,18 +787,14 @@ async function handleEscalation(
     reason,
     nodeId: config.nodeId,
     agentId: loomiAgentId,
-    suggestedAction: 'modify_node',
+    suggestedAction: "modify_node",
     details,
   });
 
-  await writeProgress(
-    config,
-    loomiAgentId,
-    `## Escalated to Architect\nReason: ${reason}\n`,
-  );
+  await writeProgress(config, loomiAgentId, `## Escalated to Architect\nReason: ${reason}\n`);
 
   return {
-    status: 'escalated',
+    status: "escalated",
     completedAgents,
     failedAgents,
     retryCount,
@@ -852,12 +832,8 @@ function applyPerTaskRetryLimits(
     taskRetryTracker.set(plan.id, current + 1);
   }
 
-  const eligible = retryable.filter(
-    (p) => (taskRetryTracker.get(p.id) ?? 0) <= maxRetriesPerTask,
-  );
-  const exhausted = retryable.filter(
-    (p) => (taskRetryTracker.get(p.id) ?? 0) > maxRetriesPerTask,
-  );
+  const eligible = retryable.filter((p) => (taskRetryTracker.get(p.id) ?? 0) <= maxRetriesPerTask);
+  const exhausted = retryable.filter((p) => (taskRetryTracker.get(p.id) ?? 0) > maxRetriesPerTask);
 
   return { eligible, exhausted };
 }
@@ -898,7 +874,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
   // ---- Phase 1: Plan the team ----
 
-  await logEvent(config, loomiAgentId, 'node_started', {
+  await logEvent(config, loomiAgentId, "node_started", {
     nodeTitle: config.nodeTitle,
   });
   await writeProgress(
@@ -912,19 +888,19 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
     teamPlan = await planTeam(config);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    await logEvent(config, loomiAgentId, 'node_failed', {
+    await logEvent(config, loomiAgentId, "node_failed", {
       error: `Planning failed: ${message}`,
     });
     await writeProgress(config, loomiAgentId, `## Planning Failed\n${message}\n`);
-    return { status: 'failed', completedAgents: [], failedAgents: [], retryCount: 0 };
+    return { status: "failed", completedAgents: [], failedAgents: [], retryCount: 0 };
   }
 
   await writeProgress(
     config,
     loomiAgentId,
     `## Team Planned\n${teamPlan.reasoning}\nWorkers: ${String(teamPlan.workers.length)}\n` +
-      teamPlan.workers.map((p) => `- ${p.id}: ${p.taskDescription}`).join('\n') +
-      '\n',
+      teamPlan.workers.map((p) => `- ${p.id}: ${p.taskDescription}`).join("\n") +
+      "\n",
   );
 
   // ---- Phase 2: Validate file scopes ----
@@ -934,26 +910,26 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
     await writeProgress(
       config,
       loomiAgentId,
-      `## File Scope Overlap Detected — Replanning\n${scopeValidation.overlaps.join('\n')}\n`,
+      `## File Scope Overlap Detected — Replanning\n${scopeValidation.overlaps.join("\n")}\n`,
     );
 
     try {
       const retryPlan = await planTeam(config);
       const revalidation = validateFileScopes(retryPlan.workers);
       if (!revalidation.valid) {
-        await logEvent(config, loomiAgentId, 'node_failed', {
-          error: 'File scope overlap persists after replanning',
+        await logEvent(config, loomiAgentId, "node_failed", {
+          error: "File scope overlap persists after replanning",
           overlaps: revalidation.overlaps,
         });
-        return { status: 'failed', completedAgents: [], failedAgents: [], retryCount: 0 };
+        return { status: "failed", completedAgents: [], failedAgents: [], retryCount: 0 };
       }
       teamPlan = retryPlan;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      await logEvent(config, loomiAgentId, 'node_failed', {
+      await logEvent(config, loomiAgentId, "node_failed", {
         error: `Replanning failed: ${message}`,
       });
-      return { status: 'failed', completedAgents: [], failedAgents: [], retryCount: 0 };
+      return { status: "failed", completedAgents: [], failedAgents: [], retryCount: 0 };
     }
   }
 
@@ -975,24 +951,31 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
       // Log agent creation events
       for (const plan of activePlans) {
-        await logEvent(config, loomiAgentId, 'agent_created', {
+        await logEvent(config, loomiAgentId, "agent_created", {
           agentId: plan.id,
-          role: 'looma',
+          role: "looma",
           taskDescription: plan.taskDescription,
           writeScope: plan.writeScope,
           retry: retryCount > 0,
         });
       }
 
-      const retryContext = retryCount > 0
-        ? `This is retry attempt ${String(retryCount)}. Address the issues from the previous attempt.`
-        : undefined;
+      const retryContext =
+        retryCount > 0
+          ? `This is retry attempt ${String(retryCount)}. Address the issues from the previous attempt.`
+          : undefined;
 
-      const retryDetails = retryCount > 0
-        ? '\n' + activePlans
-            .map((p) => `  - ${p.id} (task retry ${String(taskRetryTracker.get(p.id) ?? 0)}/${String(maxRetriesPerTask)})`)
-            .join('\n') + '\n'
-        : '';
+      const retryDetails =
+        retryCount > 0
+          ? "\n" +
+            activePlans
+              .map(
+                (p) =>
+                  `  - ${p.id} (task retry ${String(taskRetryTracker.get(p.id) ?? 0)}/${String(maxRetriesPerTask)})`,
+              )
+              .join("\n") +
+            "\n"
+          : "";
 
       await writeProgress(
         config,
@@ -1023,7 +1006,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
         );
 
         const agentEventType: EventType =
-          result.status === 'completed' ? 'agent_completed' : 'agent_failed';
+          result.status === "completed" ? "agent_completed" : "agent_failed";
         await logEvent(config, loomiAgentId, agentEventType, {
           agentId: plan.id,
           loopStatus: result.status,
@@ -1048,8 +1031,8 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       await writeProgress(
         config,
         loomiAgentId,
-        `## Workers Finished\nCompleted: ${completedIds.join(', ') || 'none'}\n` +
-          `Failed: ${failedIds.join(', ') || 'none'}\n`,
+        `## Workers Finished\nCompleted: ${completedIds.join(", ") || "none"}\n` +
+          `Failed: ${failedIds.join(", ") || "none"}\n`,
       );
 
       // ---- Handle results ----
@@ -1057,28 +1040,28 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       if (failedIds.length === 0) {
         // All workers completed — check review if enabled
         if (config.reviewCallback !== undefined) {
-          await logEvent(config, loomiAgentId, 'reviewer_started', {});
+          await logEvent(config, loomiAgentId, "reviewer_started", {});
           const reviewReport = await config.reviewCallback();
 
-          if (reviewReport === null || reviewReport.verdict === 'PASS') {
+          if (reviewReport === null || reviewReport.verdict === "PASS") {
             if (reviewReport !== null) {
-              await logEvent(config, loomiAgentId, 'reviewer_verdict', { verdict: 'PASS' });
+              await logEvent(config, loomiAgentId, "reviewer_verdict", { verdict: "PASS" });
             }
-            await logEvent(config, loomiAgentId, 'node_completed', { retryCount });
+            await logEvent(config, loomiAgentId, "node_completed", { retryCount });
             await writeProgress(config, loomiAgentId, `## Node Completed Successfully\n`);
             return {
-              status: 'completed',
+              status: "completed",
               completedAgents: allCompletedAgents,
               failedAgents: [],
               retryCount,
             };
           }
 
-          await logEvent(config, loomiAgentId, 'reviewer_verdict', {
+          await logEvent(config, loomiAgentId, "reviewer_verdict", {
             verdict: reviewReport.verdict,
           });
 
-          if (reviewReport.verdict === 'BLOCKED') {
+          if (reviewReport.verdict === "BLOCKED") {
             return await handleEscalation(
               config,
               loomiAgentId,
@@ -1096,7 +1079,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
               config,
               loomiAgentId,
               `Node "${config.nodeTitle}" exhausted ${String(maxRetries)} retries: ${reviewReport.details}`,
-              `${reviewReport.recommendation}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed workers (per-task limit): ${permanentlyFailedAgents.join(', ')}` : ''}`,
+              `${reviewReport.recommendation}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed workers (per-task limit): ${permanentlyFailedAgents.join(", ")}` : ""}`,
               allCompletedAgents,
               permanentlyFailedAgents,
               retryCount,
@@ -1105,7 +1088,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
           // Identify failed tasks from review and map to worker plans
           const failedTaskIds = reviewReport.tasksVerified
-            .filter((t) => t.status !== 'pass')
+            .filter((t) => t.status !== "pass")
             .map((t) => t.taskId);
 
           const failedWorkerPlans = teamPlan.workers.filter(
@@ -1116,8 +1099,12 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
             failedWorkerPlans.length > 0 ? failedWorkerPlans : [...teamPlan.workers];
 
           // Apply per-task retry limits
-          const { eligible: reviewEligible, exhausted: reviewExhausted } =
-            applyPerTaskRetryLimits(candidatePlans, taskRetryTracker, maxRetriesPerTask, permanentlyFailedAgents);
+          const { eligible: reviewEligible, exhausted: reviewExhausted } = applyPerTaskRetryLimits(
+            candidatePlans,
+            taskRetryTracker,
+            maxRetriesPerTask,
+            permanentlyFailedAgents,
+          );
 
           if (reviewExhausted.length > 0) {
             permanentlyFailedAgents.push(...reviewExhausted.map((p) => p.id));
@@ -1125,7 +1112,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
               config,
               loomiAgentId,
               `## Per-task retry limit reached\n` +
-                `Permanently failed: ${reviewExhausted.map((p) => p.id).join(', ')}\n`,
+                `Permanently failed: ${reviewExhausted.map((p) => p.id).join(", ")}\n`,
             );
           }
 
@@ -1134,7 +1121,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
               config,
               loomiAgentId,
               `Node "${config.nodeTitle}" — all failed workers exhausted per-task retry limit (${String(maxRetriesPerTask)})`,
-              `Permanently failed workers: ${permanentlyFailedAgents.join(', ')}`,
+              `Permanently failed workers: ${permanentlyFailedAgents.join(", ")}`,
               allCompletedAgents,
               permanentlyFailedAgents,
               retryCount,
@@ -1143,7 +1130,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
           activePlans = reviewEligible;
 
-          await logEvent(config, loomiAgentId, 'retry_triggered', {
+          await logEvent(config, loomiAgentId, "retry_triggered", {
             retryCount: retryCount + 1,
             failedWorkers: activePlans.map((p) => p.id),
             taskRetryCounts: Object.fromEntries(taskRetryTracker),
@@ -1166,10 +1153,10 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
         }
 
         // No review callback — all workers completed successfully
-        await logEvent(config, loomiAgentId, 'node_completed', { retryCount });
+        await logEvent(config, loomiAgentId, "node_completed", { retryCount });
         await writeProgress(config, loomiAgentId, `## Node Completed Successfully\n`);
         return {
-          status: 'completed',
+          status: "completed",
           completedAgents: allCompletedAgents,
           failedAgents: [],
           retryCount,
@@ -1183,7 +1170,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
           config,
           loomiAgentId,
           `Node "${config.nodeTitle}" has ${String(failedIds.length)} failed worker(s) after ${String(maxRetries)} retries`,
-          `Failed workers: ${failedIds.join(', ')}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed (per-task limit): ${permanentlyFailedAgents.join(', ')}` : ''}`,
+          `Failed workers: ${failedIds.join(", ")}${permanentlyFailedAgents.length > 0 ? `\nPermanently failed (per-task limit): ${permanentlyFailedAgents.join(", ")}` : ""}`,
           allCompletedAgents,
           allFailed,
           retryCount,
@@ -1193,8 +1180,12 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       const failedWorkerPlans = teamPlan.workers.filter((p) => failedIds.includes(p.id));
 
       // Apply per-task retry limits
-      const { eligible: workerEligible, exhausted: workerExhausted } =
-        applyPerTaskRetryLimits(failedWorkerPlans, taskRetryTracker, maxRetriesPerTask, permanentlyFailedAgents);
+      const { eligible: workerEligible, exhausted: workerExhausted } = applyPerTaskRetryLimits(
+        failedWorkerPlans,
+        taskRetryTracker,
+        maxRetriesPerTask,
+        permanentlyFailedAgents,
+      );
 
       if (workerExhausted.length > 0) {
         permanentlyFailedAgents.push(...workerExhausted.map((p) => p.id));
@@ -1202,7 +1193,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
           config,
           loomiAgentId,
           `## Per-task retry limit reached\n` +
-            `Permanently failed: ${workerExhausted.map((p) => p.id).join(', ')}\n`,
+            `Permanently failed: ${workerExhausted.map((p) => p.id).join(", ")}\n`,
         );
       }
 
@@ -1211,7 +1202,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
           config,
           loomiAgentId,
           `Node "${config.nodeTitle}" — all failed workers exhausted per-task retry limit (${String(maxRetriesPerTask)})`,
-          `Permanently failed workers: ${permanentlyFailedAgents.join(', ')}`,
+          `Permanently failed workers: ${permanentlyFailedAgents.join(", ")}`,
           allCompletedAgents,
           permanentlyFailedAgents,
           retryCount,
@@ -1220,7 +1211,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
       activePlans = workerEligible;
 
-      await logEvent(config, loomiAgentId, 'retry_triggered', {
+      await logEvent(config, loomiAgentId, "retry_triggered", {
         retryCount: retryCount + 1,
         failedWorkers: activePlans.map((p) => p.id),
         taskRetryCounts: Object.fromEntries(taskRetryTracker),
@@ -1234,7 +1225,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
   }
 
   return {
-    status: 'failed',
+    status: "failed",
     completedAgents: allCompletedAgents,
     failedAgents: permanentlyFailedAgents,
     retryCount,

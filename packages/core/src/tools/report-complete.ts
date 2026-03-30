@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 // ============================================================================
 // CompletionReport
@@ -19,7 +19,7 @@ export interface CompletionReport {
   /** Absolute or workspace-relative paths of files the agent modified. */
   filesModified: string[];
   /** Whether the task completed fully or only partially. */
-  status: 'success' | 'partial';
+  status: "success" | "partial";
 }
 
 // ============================================================================
@@ -52,24 +52,24 @@ export interface CompletionHandlerLike {
 /** Zod schema for report_complete tool input. */
 const ReportCompleteInputSchema = z.object({
   /** Summary of what was accomplished. */
-  summary: z.string().describe('Summary of what was accomplished during the task'),
+  summary: z.string().describe("Summary of what was accomplished during the task"),
   /** Files created during the task (paths relative to workspace root). */
   filesCreated: z
     .array(z.string())
     .optional()
     .default([])
-    .describe('List of file paths created during the task'),
+    .describe("List of file paths created during the task"),
   /** Files modified during the task (paths relative to workspace root). */
   filesModified: z
     .array(z.string())
     .optional()
     .default([])
-    .describe('List of file paths modified during the task'),
+    .describe("List of file paths modified during the task"),
   /** Whether the task completed fully or only partially. */
   status: z
-    .enum(['success', 'partial'])
+    .enum(["success", "partial"])
     .optional()
-    .default('success')
+    .default("success")
     .describe('Completion status: "success" for full completion, "partial" for incomplete work'),
 });
 
@@ -93,12 +93,12 @@ const ReportCompleteInputSchema = z.object({
  */
 export function createReportCompleteTool(handler: CompletionHandlerLike): Tool {
   return {
-    name: 'report_complete',
+    name: "report_complete",
     description:
-      'Signal the orchestrator (Loomi) that this worker agent has finished its task. ' +
-      'Provide a summary of what was done, lists of files created and modified, and ' +
-      'a status indicating success or partial completion. This tool should be called ' +
-      'exactly once when the assigned task is complete.',
+      "Signal the orchestrator (Loomi) that this worker agent has finished its task. " +
+      "Provide a summary of what was done, lists of files created and modified, and " +
+      "a status indicating success or partial completion. This tool should be called " +
+      "exactly once when the assigned task is complete.",
     inputSchema: ReportCompleteInputSchema,
 
     async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -123,16 +123,16 @@ export function createReportCompleteTool(handler: CompletionHandlerLike): Tool {
 
         const filesSummary: string[] = [];
         if (report.filesCreated.length > 0) {
-          filesSummary.push(`created: ${report.filesCreated.join(', ')}`);
+          filesSummary.push(`created: ${report.filesCreated.join(", ")}`);
         }
         if (report.filesModified.length > 0) {
-          filesSummary.push(`modified: ${report.filesModified.join(', ')}`);
+          filesSummary.push(`modified: ${report.filesModified.join(", ")}`);
         }
 
         return (
           `Completion reported — agent: ${context.agentId}, ` +
           `node: ${context.nodeId}, status: ${report.status}` +
-          (filesSummary.length > 0 ? `, ${filesSummary.join('; ')}` : '')
+          (filesSummary.length > 0 ? `, ${filesSummary.join("; ")}` : "")
         );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);

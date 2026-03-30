@@ -1,7 +1,7 @@
-import { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { Command } from "commander";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
 // ============================================================================
 // Types
@@ -52,25 +52,25 @@ interface Spinner {
  * @returns The parsed daemon configuration containing port and auth token.
  */
 async function readDaemonConfig(): Promise<DaemonConfig> {
-  const configPath = join(homedir(), '.loomflo', 'daemon.json');
+  const configPath = join(homedir(), ".loomflo", "daemon.json");
 
   let raw: string;
   try {
-    raw = await readFile(configPath, 'utf-8');
+    raw = await readFile(configPath, "utf-8");
   } catch {
-    console.error('Daemon not running. Start with: loomflo start');
+    console.error("Daemon not running. Start with: loomflo start");
     process.exit(1);
   }
 
   const parsed: unknown = JSON.parse(raw);
 
   if (
-    typeof parsed !== 'object' ||
+    typeof parsed !== "object" ||
     parsed === null ||
-    typeof (parsed as DaemonConfig).port !== 'number' ||
-    typeof (parsed as DaemonConfig).token !== 'string'
+    typeof (parsed as DaemonConfig).port !== "number" ||
+    typeof (parsed as DaemonConfig).token !== "string"
   ) {
-    console.error('Invalid daemon.json. Re-start the daemon with: loomflo start');
+    console.error("Invalid daemon.json. Re-start the daemon with: loomflo start");
     process.exit(1);
   }
 
@@ -88,7 +88,7 @@ async function readDaemonConfig(): Promise<DaemonConfig> {
  * @returns A spinner handle with a `stop` method.
  */
 function createSpinner(message: string): Spinner {
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let i = 0;
 
   process.stdout.write(`${String(frames[0])} ${message}`);
@@ -101,7 +101,7 @@ function createSpinner(message: string): Spinner {
   return {
     stop(): void {
       clearInterval(interval);
-      process.stdout.write(`\r${' '.repeat(message.length + 3)}\r`);
+      process.stdout.write(`\r${" ".repeat(message.length + 3)}\r`);
     },
   };
 }
@@ -126,12 +126,12 @@ function createSpinner(message: string): Spinner {
  * @returns A configured commander Command instance.
  */
 export function createInitCommand(): Command {
-  const cmd = new Command('init')
-    .description('Initialize a new workflow from a project description')
-    .argument('<description>', 'Natural language description of the project')
-    .option('--project-path <path>', 'Project directory path', process.cwd())
-    .option('--budget <number>', 'Budget limit in dollars')
-    .option('--reviewer', 'Enable the reviewer agent')
+  const cmd = new Command("init")
+    .description("Initialize a new workflow from a project description")
+    .argument("<description>", "Natural language description of the project")
+    .option("--project-path <path>", "Project directory path", process.cwd())
+    .option("--budget <number>", "Budget limit in dollars")
+    .option("--reviewer", "Enable the reviewer agent")
     .action(async (description: string, options: InitOptions): Promise<void> => {
       const daemon = await readDaemonConfig();
       const projectPath = resolve(options.projectPath);
@@ -140,13 +140,13 @@ export function createInitCommand(): Command {
       if (options.budget !== undefined) {
         const budgetLimit = Number(options.budget);
         if (Number.isNaN(budgetLimit) || budgetLimit <= 0) {
-          console.error('Error: --budget must be a positive number');
+          console.error("Error: --budget must be a positive number");
           process.exit(1);
         }
-        config['budgetLimit'] = budgetLimit;
+        config["budgetLimit"] = budgetLimit;
       }
       if (options.reviewer === true) {
-        config['reviewerEnabled'] = true;
+        config["reviewerEnabled"] = true;
       }
 
       const body: Record<string, unknown> = {
@@ -154,17 +154,17 @@ export function createInitCommand(): Command {
         projectPath,
       };
       if (Object.keys(config).length > 0) {
-        body['config'] = config;
+        body["config"] = config;
       }
 
       const url = `http://127.0.0.1:${String(daemon.port)}/workflow/init`;
-      const spinner = createSpinner('Initializing workflow...');
+      const spinner = createSpinner("Initializing workflow...");
 
       try {
         const response = await fetch(url, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             Authorization: `Bearer ${daemon.token}`,
           },
           body: JSON.stringify(body),
@@ -174,7 +174,7 @@ export function createInitCommand(): Command {
 
         if (response.status === 201) {
           const data = (await response.json()) as InitSuccessResponse;
-          console.log('Workflow initialized successfully.');
+          console.log("Workflow initialized successfully.");
           console.log(`  ID:     ${data.id}`);
           console.log(`  Status: ${data.status}`);
         } else {

@@ -1,11 +1,11 @@
-import { readdir, realpath } from 'node:fs/promises';
-import { join, normalize, relative, resolve } from 'node:path';
-import picomatch from 'picomatch';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { readdir, realpath } from "node:fs/promises";
+import { join, normalize, relative, resolve } from "node:path";
+import picomatch from "picomatch";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 /** Directories to always skip during recursive traversal. */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist']);
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist"]);
 
 /** Zod schema for list_files tool input. */
 const ListFilesInputSchema = z.object({
@@ -13,14 +13,14 @@ const ListFilesInputSchema = z.object({
   glob: z
     .string()
     .optional()
-    .describe('Glob pattern to filter which files to list (default: **/*)'),
+    .describe("Glob pattern to filter which files to list (default: **/*)"),
   /** Maximum number of file paths to return. Defaults to 200. */
   maxResults: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe('Maximum number of file paths to return (default: 200)'),
+    .describe("Maximum number of file paths to return (default: 200)"),
 });
 
 /**
@@ -57,17 +57,16 @@ async function walkDirectory(dir: string): Promise<string[]> {
  * All errors are returned as descriptive strings — this tool never throws.
  */
 export const listFilesTool: Tool = {
-  name: 'list_files',
+  name: "list_files",
   description:
-    'List files in the workspace matching a glob pattern. ' +
-    'Returns relative file paths, one per line. ' +
-    'Skips node_modules, .git, and dist directories.',
+    "List files in the workspace matching a glob pattern. " +
+    "Returns relative file paths, one per line. " +
+    "Skips node_modules, .git, and dist directories.",
   inputSchema: ListFilesInputSchema,
 
   async execute(input: unknown, context: ToolContext): Promise<string> {
     try {
-      const { glob: globPattern = '**/*', maxResults = 200 } =
-        ListFilesInputSchema.parse(input);
+      const { glob: globPattern = "**/*", maxResults = 200 } = ListFilesInputSchema.parse(input);
 
       const workspaceRoot = normalize(resolve(context.workspacePath));
       const realWorkspace = await realpath(workspaceRoot);
@@ -85,7 +84,7 @@ export const listFilesTool: Tool = {
 
         // Validate the file is still inside workspace (guards against symlinks).
         const realFile = await realpath(absolutePath);
-        if (!realFile.startsWith(realWorkspace + '/') && realFile !== realWorkspace) {
+        if (!realFile.startsWith(realWorkspace + "/") && realFile !== realWorkspace) {
           continue;
         }
 
@@ -96,10 +95,10 @@ export const listFilesTool: Tool = {
       }
 
       if (totalMatches === 0) {
-        return 'No files found matching the pattern';
+        return "No files found matching the pattern";
       }
 
-      let result = matched.join('\n');
+      let result = matched.join("\n");
       if (totalMatches > maxResults) {
         result += `\n\n(Showing ${String(maxResults)} of ${String(totalMatches)} matching files)`;
       }

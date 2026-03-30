@@ -1,0 +1,15 @@
+
+> loomflo-sdk@0.0.0 build /tmp/loomflo-fix/packages/sdk
+> tsup src/index.ts --format esm --dts --clean
+
+CLI Building entry: src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Target: es2022
+CLI Cleaning output folder
+ESM Build start
+ESM dist/index.js 11.41 KB
+ESM ⚡️ Build success in 55ms
+DTS Build start
+DTS ⚡️ Build success in 2051ms
+DTS dist/index.d.ts 28.88 KB

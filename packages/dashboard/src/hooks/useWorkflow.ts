@@ -5,19 +5,19 @@
 // WebSocket events from the Loomflo daemon.
 // ============================================================================
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import type { Workflow } from '../lib/types.js';
-import { apiClient, ApiError } from '../lib/api.js';
-import type { NodeSummary } from '../lib/api.js';
-import type { UseWebSocketReturn } from './useWebSocket.js';
+import type { Workflow } from "../lib/types.js";
+import { apiClient, ApiError } from "../lib/api.js";
+import type { NodeSummary } from "../lib/api.js";
+import type { UseWebSocketReturn } from "./useWebSocket.js";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /** The subscribe function signature extracted from useWebSocket. */
-export type Subscribe = UseWebSocketReturn['subscribe'];
+export type Subscribe = UseWebSocketReturn["subscribe"];
 
 /** Return value of the useWorkflow hook. */
 export interface UseWorkflowReturn {
@@ -65,26 +65,24 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
         apiClient.getNodes(),
       ]);
 
-      if (workflowResult.status === 'fulfilled') {
+      if (workflowResult.status === "fulfilled") {
         setWorkflow(workflowResult.value);
       } else {
         const reason = workflowResult.reason as unknown;
         if (reason instanceof ApiError && reason.status === 404) {
           setWorkflow(null);
         } else {
-          setError(
-            reason instanceof Error ? reason.message : 'Failed to fetch workflow',
-          );
+          setError(reason instanceof Error ? reason.message : "Failed to fetch workflow");
         }
       }
 
-      if (nodesResult.status === 'fulfilled') {
+      if (nodesResult.status === "fulfilled") {
         setNodes(nodesResult.value.nodes);
       } else {
         const reason = nodesResult.reason as unknown;
         if (!(reason instanceof ApiError && reason.status === 404)) {
-          setError((prev) =>
-            prev ?? (reason instanceof Error ? reason.message : 'Failed to fetch nodes'),
+          setError(
+            (prev) => prev ?? (reason instanceof Error ? reason.message : "Failed to fetch nodes"),
           );
         }
       }
@@ -103,31 +101,25 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
     const unsubscribers: (() => void)[] = [];
 
     unsubscribers.push(
-      subscribe('workflow_status', (event): void => {
-        setWorkflow((prev) =>
-          prev ? { ...prev, status: event.status } : prev,
-        );
+      subscribe("workflow_status", (event): void => {
+        setWorkflow((prev) => (prev ? { ...prev, status: event.status } : prev));
       }),
     );
 
     unsubscribers.push(
-      subscribe('node_status', (event): void => {
+      subscribe("node_status", (event): void => {
         setNodes((prev) =>
-          prev.map((node) =>
-            node.id === event.nodeId ? { ...node, status: event.status } : node,
-          ),
+          prev.map((node) => (node.id === event.nodeId ? { ...node, status: event.status } : node)),
         );
       }),
     );
 
     unsubscribers.push(
-      subscribe('agent_status', (event): void => {
-        if (event.status === 'created') {
+      subscribe("agent_status", (event): void => {
+        if (event.status === "created") {
           setNodes((prev) =>
             prev.map((node) =>
-              node.id === event.nodeId
-                ? { ...node, agentCount: node.agentCount + 1 }
-                : node,
+              node.id === event.nodeId ? { ...node, agentCount: node.agentCount + 1 } : node,
             ),
           );
         }
@@ -135,21 +127,17 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
     );
 
     unsubscribers.push(
-      subscribe('graph_modified', (): void => {
+      subscribe("graph_modified", (): void => {
         void fetchData();
       }),
     );
 
     unsubscribers.push(
-      subscribe('cost_update', (event): void => {
+      subscribe("cost_update", (event): void => {
         setNodes((prev) =>
-          prev.map((node) =>
-            node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node,
-          ),
+          prev.map((node) => (node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node)),
         );
-        setWorkflow((prev) =>
-          prev ? { ...prev, totalCost: event.totalCost } : prev,
-        );
+        setWorkflow((prev) => (prev ? { ...prev, totalCost: event.totalCost } : prev));
       }),
     );
 

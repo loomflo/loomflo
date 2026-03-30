@@ -7,10 +7,10 @@
 // dark-themed dashboard.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactElement } from "react";
 
-import type { Event, EventType } from '../lib/types.js';
+import type { Event, EventType } from "../lib/types.js";
 
 // ============================================================================
 // Types
@@ -38,43 +38,43 @@ const DETAILS_MAX_LENGTH = 100;
 /** Color classes keyed by event type for the log entry badge. */
 const EVENT_TYPE_STYLES: Record<EventType, { bg: string; text: string }> = {
   // Workflow lifecycle — gray
-  workflow_created: { bg: 'bg-gray-700', text: 'text-gray-300' },
-  workflow_started: { bg: 'bg-blue-900', text: 'text-blue-300' },
-  workflow_paused: { bg: 'bg-amber-900', text: 'text-amber-300' },
-  workflow_resumed: { bg: 'bg-blue-900', text: 'text-blue-300' },
-  workflow_completed: { bg: 'bg-green-900', text: 'text-green-300' },
+  workflow_created: { bg: "bg-gray-700", text: "text-gray-300" },
+  workflow_started: { bg: "bg-blue-900", text: "text-blue-300" },
+  workflow_paused: { bg: "bg-amber-900", text: "text-amber-300" },
+  workflow_resumed: { bg: "bg-blue-900", text: "text-blue-300" },
+  workflow_completed: { bg: "bg-green-900", text: "text-green-300" },
 
   // Spec phase — purple
-  spec_phase_started: { bg: 'bg-purple-900', text: 'text-purple-300' },
-  spec_phase_completed: { bg: 'bg-purple-900', text: 'text-purple-300' },
+  spec_phase_started: { bg: "bg-purple-900", text: "text-purple-300" },
+  spec_phase_completed: { bg: "bg-purple-900", text: "text-purple-300" },
 
   // Graph — cyan
-  graph_built: { bg: 'bg-cyan-900', text: 'text-cyan-300' },
-  graph_modified: { bg: 'bg-cyan-900', text: 'text-cyan-300' },
+  graph_built: { bg: "bg-cyan-900", text: "text-cyan-300" },
+  graph_modified: { bg: "bg-cyan-900", text: "text-cyan-300" },
 
   // Node lifecycle — blue / green / red / orange
-  node_started: { bg: 'bg-blue-900', text: 'text-blue-300' },
-  node_completed: { bg: 'bg-green-900', text: 'text-green-300' },
-  node_failed: { bg: 'bg-red-900', text: 'text-red-300' },
-  node_blocked: { bg: 'bg-orange-900', text: 'text-orange-300' },
+  node_started: { bg: "bg-blue-900", text: "text-blue-300" },
+  node_completed: { bg: "bg-green-900", text: "text-green-300" },
+  node_failed: { bg: "bg-red-900", text: "text-red-300" },
+  node_blocked: { bg: "bg-orange-900", text: "text-orange-300" },
 
   // Agent lifecycle — blue / green / red
-  agent_created: { bg: 'bg-gray-700', text: 'text-gray-300' },
-  agent_completed: { bg: 'bg-green-900', text: 'text-green-300' },
-  agent_failed: { bg: 'bg-red-900', text: 'text-red-300' },
+  agent_created: { bg: "bg-gray-700", text: "text-gray-300" },
+  agent_completed: { bg: "bg-green-900", text: "text-green-300" },
+  agent_failed: { bg: "bg-red-900", text: "text-red-300" },
 
   // Review — purple
-  reviewer_started: { bg: 'bg-purple-900', text: 'text-purple-300' },
-  reviewer_verdict: { bg: 'bg-purple-900', text: 'text-purple-300' },
+  reviewer_started: { bg: "bg-purple-900", text: "text-purple-300" },
+  reviewer_verdict: { bg: "bg-purple-900", text: "text-purple-300" },
 
   // Retry & escalation — amber / red
-  retry_triggered: { bg: 'bg-amber-900', text: 'text-amber-300' },
-  escalation_triggered: { bg: 'bg-red-900', text: 'text-red-300' },
+  retry_triggered: { bg: "bg-amber-900", text: "text-amber-300" },
+  escalation_triggered: { bg: "bg-red-900", text: "text-red-300" },
 
   // Misc — gray / teal
-  message_sent: { bg: 'bg-gray-700', text: 'text-gray-300' },
-  cost_tracked: { bg: 'bg-teal-900', text: 'text-teal-300' },
-  memory_updated: { bg: 'bg-teal-900', text: 'text-teal-300' },
+  message_sent: { bg: "bg-gray-700", text: "text-gray-300" },
+  cost_tracked: { bg: "bg-teal-900", text: "text-teal-300" },
+  memory_updated: { bg: "bg-teal-900", text: "text-teal-300" },
 };
 
 // ============================================================================
@@ -89,10 +89,10 @@ const EVENT_TYPE_STYLES: Record<EventType, { bg: string; text: string }> = {
  */
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
@@ -107,7 +107,7 @@ function formatTimestamp(iso: string): string {
 function summarizeDetails(details: Record<string, unknown>): string {
   const keys = Object.keys(details);
   if (keys.length === 0) {
-    return '';
+    return "";
   }
   const raw = JSON.stringify(details);
   // Strip outer braces for a cleaner inline display.
@@ -206,19 +206,13 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
     setAutoScroll(isNearBottom);
   }, []);
 
-  const handleAgentChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>): void => {
-      setSelectedAgent(e.target.value === '' ? null : e.target.value);
-    },
-    [],
-  );
+  const handleAgentChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>): void => {
+    setSelectedAgent(e.target.value === "" ? null : e.target.value);
+  }, []);
 
-  const handleTypeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>): void => {
-      setSelectedType(e.target.value === '' ? null : (e.target.value as EventType));
-    },
-    [],
-  );
+  const handleTypeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>): void => {
+    setSelectedType(e.target.value === "" ? null : (e.target.value as EventType));
+  }, []);
 
   // ---- Render ----
   return (
@@ -229,7 +223,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
 
         {/* Agent filter */}
         <select
-          value={selectedAgent ?? ''}
+          value={selectedAgent ?? ""}
           onChange={handleAgentChange}
           className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500"
           aria-label="Filter by agent"
@@ -244,7 +238,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
 
         {/* Event type filter */}
         <select
-          value={selectedType ?? ''}
+          value={selectedType ?? ""}
           onChange={handleTypeChange}
           className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500"
           aria-label="Filter by event type"
@@ -261,7 +255,9 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
         {!autoScroll && (
           <button
             type="button"
-            onClick={() => { setAutoScroll(true); }}
+            onClick={() => {
+              setAutoScroll(true);
+            }}
             className="ml-auto rounded bg-blue-800 px-2 py-0.5 text-xs text-blue-200 transition-colors hover:bg-blue-700"
           >
             Resume auto-scroll
@@ -281,7 +277,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
       >
         {filteredEvents.length === 0 ? (
           <div className="flex h-full items-center justify-center text-gray-500">
-            {events.length === 0 ? 'No events yet' : 'No events match the current filters'}
+            {events.length === 0 ? "No events yet" : "No events match the current filters"}
           </div>
         ) : (
           <table className="w-full border-collapse">
@@ -311,16 +307,16 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
 
                     {/* Node ID */}
                     <td className="whitespace-nowrap px-2 py-1 text-gray-400">
-                      {event.nodeId ?? '—'}
+                      {event.nodeId ?? "—"}
                     </td>
 
                     {/* Agent ID */}
                     <td className="whitespace-nowrap px-2 py-1 text-gray-400">
-                      {event.agentId ?? '—'}
+                      {event.agentId ?? "—"}
                     </td>
 
                     {/* Details summary */}
-                    <td className="truncate px-2 py-1 text-gray-300">{details || '—'}</td>
+                    <td className="truncate px-2 py-1 text-gray-300">{details || "—"}</td>
                   </tr>
                 );
               })}

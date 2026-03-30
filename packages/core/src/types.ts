@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { ConfigSchema } from './config.js';
+import { z } from "zod";
+import { ConfigSchema } from "./config.js";
 
 // ============================================================================
 // Enums / Literals
@@ -7,13 +7,13 @@ import { ConfigSchema } from './config.js';
 
 /** Zod schema for workflow lifecycle states. */
 export const WorkflowStatusSchema = z.enum([
-  'init',
-  'spec',
-  'building',
-  'running',
-  'paused',
-  'done',
-  'failed',
+  "init",
+  "spec",
+  "building",
+  "running",
+  "paused",
+  "done",
+  "failed",
 ]);
 
 /** Workflow lifecycle state. */
@@ -21,72 +21,61 @@ export type WorkflowStatus = z.infer<typeof WorkflowStatusSchema>;
 
 /** Zod schema for node execution states. */
 export const NodeStatusSchema = z.enum([
-  'pending',
-  'waiting',
-  'running',
-  'review',
-  'done',
-  'failed',
-  'blocked',
+  "pending",
+  "waiting",
+  "running",
+  "review",
+  "done",
+  "failed",
+  "blocked",
 ]);
 
 /** Node execution state. */
 export type NodeStatus = z.infer<typeof NodeStatusSchema>;
 
 /** Zod schema for agent role identifiers. */
-export const AgentRoleSchema = z.enum(['loom', 'loomi', 'looma', 'loomex']);
+export const AgentRoleSchema = z.enum(["loom", "loomi", "looma", "loomex"]);
 
 /** Agent role: loom (architect), loomi (orchestrator), looma (worker), loomex (reviewer). */
 export type AgentRole = z.infer<typeof AgentRoleSchema>;
 
 /** Zod schema for agent lifecycle states. */
-export const AgentStatusSchema = z.enum([
-  'created',
-  'running',
-  'completed',
-  'failed',
-]);
+export const AgentStatusSchema = z.enum(["created", "running", "completed", "failed"]);
 
 /** Agent lifecycle state. */
 export type AgentStatus = z.infer<typeof AgentStatusSchema>;
 
 /** Zod schema for graph topology classifications. */
-export const TopologyTypeSchema = z.enum([
-  'linear',
-  'divergent',
-  'convergent',
-  'tree',
-  'mixed',
-]);
+export const TopologyTypeSchema = z.enum(["linear", "divergent", "convergent", "tree", "mixed"]);
 
 /** Graph topology classification. */
 export type TopologyType = z.infer<typeof TopologyTypeSchema>;
 
 /** Zod schema for all event types emitted by the engine. */
 export const EventTypeSchema = z.enum([
-  'workflow_created',
-  'workflow_started',
-  'workflow_paused',
-  'workflow_resumed',
-  'workflow_completed',
-  'spec_phase_started',
-  'spec_phase_completed',
-  'graph_built',
-  'graph_modified',
-  'node_started',
-  'node_completed',
-  'node_failed',
-  'node_blocked',
-  'agent_created',
-  'agent_completed',
-  'agent_failed',
-  'reviewer_started',
-  'reviewer_verdict',
-  'retry_triggered',
-  'escalation_triggered',
-  'message_sent',
-  'cost_tracked',
-  'memory_updated',
+  "workflow_created",
+  "workflow_started",
+  "workflow_paused",
+  "workflow_resumed",
+  "workflow_completed",
+  "spec_phase_started",
+  "spec_phase_completed",
+  "graph_built",
+  "graph_modified",
+  "node_started",
+  "node_completed",
+  "node_failed",
+  "node_blocked",
+  "agent_created",
+  "agent_completed",
+  "agent_failed",
+  "reviewer_started",
+  "reviewer_verdict",
+  "retry_triggered",
+  "escalation_triggered",
+  "message_sent",
+  "cost_tracked",
+  "memory_updated",
 ]);
 
 /** Event type identifier for the event log. */
@@ -112,7 +101,7 @@ export const TaskVerificationSchema = z.object({
   /** Identifier of the verified task. */
   taskId: z.string(),
   /** Task-level verification result. */
-  status: z.enum(['pass', 'fail', 'blocked']),
+  status: z.enum(["pass", "fail", "blocked"]),
   /** Explanation of what was found during verification. */
   details: z.string(),
 });
@@ -123,7 +112,7 @@ export type TaskVerification = z.infer<typeof TaskVerificationSchema>;
 /** Zod schema for a text content block in an LLM response. */
 const TextBlockSchema = z.object({
   /** Block type discriminator. */
-  type: z.literal('text'),
+  type: z.literal("text"),
   /** The text content. */
   text: z.string(),
 });
@@ -131,7 +120,7 @@ const TextBlockSchema = z.object({
 /** Zod schema for a tool-use content block in an LLM response. */
 const ToolUseBlockSchema = z.object({
   /** Block type discriminator. */
-  type: z.literal('tool_use'),
+  type: z.literal("tool_use"),
   /** Unique tool-use invocation ID. */
   id: z.string(),
   /** Tool name being invoked. */
@@ -143,7 +132,7 @@ const ToolUseBlockSchema = z.object({
 /** Zod schema for a tool-result content block in an LLM response. */
 const ToolResultBlockSchema = z.object({
   /** Block type discriminator. */
-  type: z.literal('tool_result'),
+  type: z.literal("tool_result"),
   /** ID of the tool-use invocation this result responds to. */
   toolUseId: z.string(),
   /** Tool execution result as a string. */
@@ -151,7 +140,7 @@ const ToolResultBlockSchema = z.object({
 });
 
 /** Zod schema for a content block in an LLM response (text, tool_use, or tool_result). */
-export const ContentBlockSchema = z.discriminatedUnion('type', [
+export const ContentBlockSchema = z.discriminatedUnion("type", [
   TextBlockSchema,
   ToolUseBlockSchema,
   ToolResultBlockSchema,
@@ -231,7 +220,7 @@ export type AgentInfo = z.infer<typeof AgentInfoSchema>;
 /** Zod schema for a structured review report from Loomex. */
 export const ReviewReportSchema = z.object({
   /** Overall review verdict. */
-  verdict: z.enum(['PASS', 'FAIL', 'BLOCKED']),
+  verdict: z.enum(["PASS", "FAIL", "BLOCKED"]),
   /** Per-task verification results. */
   tasksVerified: z.array(TaskVerificationSchema),
   /** Detailed findings: what works, what's missing, what's blocked. */
@@ -288,7 +277,7 @@ export const LLMResponseSchema = z.object({
   /** Response content blocks. */
   content: z.array(ContentBlockSchema),
   /** Reason the LLM stopped generating. */
-  stopReason: z.enum(['end_turn', 'tool_use']),
+  stopReason: z.enum(["end_turn", "tool_use"]),
   /** Token usage for this response. */
   usage: z.object({
     /** Input tokens consumed. */
@@ -357,7 +346,7 @@ export type Graph = z.infer<typeof GraphSchema>;
 
 // Re-export the full Config type from config.ts.
 // ConfigSchema is imported above for use in WorkflowSchema and exported from config.ts via index.ts.
-export type { Config } from './config.js';
+export type { Config } from "./config.js";
 
 /** Zod schema for the top-level workflow entity. */
 export const WorkflowSchema = z.object({

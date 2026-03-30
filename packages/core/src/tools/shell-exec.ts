@@ -1,8 +1,8 @@
-import { exec } from 'node:child_process';
-import { realpath } from 'node:fs/promises';
-import { normalize, resolve } from 'node:path';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { exec } from "node:child_process";
+import { realpath } from "node:fs/promises";
+import { normalize, resolve } from "node:path";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 /** Default timeout for shell commands in milliseconds. */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -13,14 +13,14 @@ const MAX_BUFFER_BYTES = 1_024 * 1_024;
 /** Zod schema for exec_command tool input. */
 const ShellExecInputSchema = z.object({
   /** Shell command to execute within the workspace. */
-  command: z.string().describe('Shell command to execute within the workspace'),
+  command: z.string().describe("Shell command to execute within the workspace"),
   /** Max execution time in milliseconds (default 30000). */
   timeout: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe('Max execution time in milliseconds (default 30000)'),
+    .describe("Max execution time in milliseconds (default 30000)"),
 });
 
 /**
@@ -30,16 +30,16 @@ const ShellExecInputSchema = z.object({
  * clear rejection messages.
  */
 const DANGEROUS_PATTERNS: readonly [RegExp, string][] = [
-  [/\.\.[\\/]/, 'path traversal (../)'],
-  [/\/etc(\/|$)/, 'access to /etc'],
-  [/\/root(\/|$)/, 'access to /root'],
-  [/\/proc(\/|$)/, 'access to /proc'],
-  [/\/sys(\/|$)/, 'access to /sys'],
-  [/\/dev(\/|$)/, 'access to /dev'],
-  [/\/var(\/|$)/, 'access to /var'],
-  [/\/tmp(\/|$)/, 'access to /tmp'],
-  [/~\//, 'home directory expansion (~/)'],
-  [/\bcd\s+\//, 'directory escape (cd /)'],
+  [/\.\.[\\/]/, "path traversal (../)"],
+  [/\/etc(\/|$)/, "access to /etc"],
+  [/\/root(\/|$)/, "access to /root"],
+  [/\/proc(\/|$)/, "access to /proc"],
+  [/\/sys(\/|$)/, "access to /sys"],
+  [/\/dev(\/|$)/, "access to /dev"],
+  [/\/var(\/|$)/, "access to /var"],
+  [/\/tmp(\/|$)/, "access to /tmp"],
+  [/~\//, "home directory expansion (~/)"],
+  [/\bcd\s+\//, "directory escape (cd /)"],
 ];
 
 /**
@@ -74,12 +74,12 @@ function detectDangerousPattern(command: string): string | null {
  * scanning, workspace sandboxing, and timeout limits.
  */
 export const shellExecTool: Tool = {
-  name: 'exec_command',
+  name: "exec_command",
   description:
-    'Execute a shell command within the workspace directory. ' +
-    'The command is sandboxed to the project workspace — path traversal ' +
-    'and access to system directories are rejected. ' +
-    'Returns the combined stdout and stderr output, or an error message on failure.',
+    "Execute a shell command within the workspace directory. " +
+    "The command is sandboxed to the project workspace — path traversal " +
+    "and access to system directories are rejected. " +
+    "Returns the combined stdout and stderr output, or an error message on failure.",
   inputSchema: ShellExecInputSchema,
 
   async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -89,7 +89,7 @@ export const shellExecTool: Tool = {
 
       // Reject empty commands.
       if (command.trim().length === 0) {
-        return 'Error: command must not be empty';
+        return "Error: command must not be empty";
       }
 
       // Scan command for dangerous patterns before execution.
@@ -108,7 +108,7 @@ export const shellExecTool: Tool = {
       }
 
       if (!realWorkspace.startsWith(workspaceRoot) && realWorkspace !== workspaceRoot) {
-        return 'Error: workspace path resolves outside expected location via symlink';
+        return "Error: workspace path resolves outside expected location via symlink";
       }
 
       // Execute the command with workspace as cwd.
@@ -130,19 +130,19 @@ export const shellExecTool: Tool = {
               if (error.killed) {
                 resolvePromise(
                   `Error: command timed out after ${String(timeoutMs)}ms` +
-                    (output.length > 0 ? `\n${output}` : ''),
+                    (output.length > 0 ? `\n${output}` : ""),
                 );
                 return;
               }
               // Non-zero exit code — include the output for context.
               resolvePromise(
                 `Error: command exited with code ${String(error.code ?? 1)}` +
-                  (output.length > 0 ? `\n${output}` : ''),
+                  (output.length > 0 ? `\n${output}` : ""),
               );
               return;
             }
 
-            resolvePromise(output.length > 0 ? output : '(no output)');
+            resolvePromise(output.length > 0 ? output : "(no output)");
           },
         );
       });
@@ -166,5 +166,5 @@ function combineOutput(stdout: string, stderr: string): string {
   const err = stderr.trim();
   if (out.length > 0) parts.push(out);
   if (err.length > 0) parts.push(err);
-  return parts.join('\n');
+  return parts.join("\n");
 }

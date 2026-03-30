@@ -9,20 +9,15 @@
  * @module providers/anthropic
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import type {
-  LLMProvider,
-  ProviderConfig,
-  CompletionParams,
-  LLMMessage,
-} from './base.js';
-import type { ContentBlock, LLMResponse, ToolDefinition } from '../types.js';
+import Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ProviderConfig, CompletionParams, LLMMessage } from "./base.js";
+import type { ContentBlock, LLMResponse, ToolDefinition } from "../types.js";
 
 /** Default maximum tokens when not specified in params or config. */
 const DEFAULT_MAX_TOKENS = 8192;
 
 /** Default model when not specified in config. */
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 /**
  * Translates our ToolDefinition[] to the Anthropic tool format.
@@ -30,14 +25,12 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
  * @param tools - Provider-agnostic tool definitions.
  * @returns Tools in Anthropic API format with input_schema.
  */
-function toAnthropicTools(
-  tools: ToolDefinition[],
-): Anthropic.Messages.Tool[] {
+function toAnthropicTools(tools: ToolDefinition[]): Anthropic.Messages.Tool[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
     input_schema: {
-      type: 'object' as const,
+      type: "object" as const,
       ...tool.inputSchema,
     },
   }));
@@ -57,24 +50,24 @@ function toAnthropicTools(
 function toAnthropicContent(
   content: string | ContentBlock[],
 ): string | Anthropic.Messages.ContentBlockParam[] {
-  if (typeof content === 'string') {
+  if (typeof content === "string") {
     return content;
   }
 
   return content.map((block): Anthropic.Messages.ContentBlockParam => {
     switch (block.type) {
-      case 'text':
-        return { type: 'text', text: block.text };
-      case 'tool_use':
+      case "text":
+        return { type: "text", text: block.text };
+      case "tool_use":
         return {
-          type: 'tool_use',
+          type: "tool_use",
           id: block.id,
           name: block.name,
           input: block.input,
         };
-      case 'tool_result':
+      case "tool_result":
         return {
-          type: 'tool_result',
+          type: "tool_result",
           tool_use_id: block.toolUseId,
           content: block.content,
         };
@@ -88,9 +81,7 @@ function toAnthropicContent(
  * @param messages - Provider-agnostic conversation messages.
  * @returns Messages in Anthropic API format.
  */
-function toAnthropicMessages(
-  messages: LLMMessage[],
-): Anthropic.Messages.MessageParam[] {
+function toAnthropicMessages(messages: LLMMessage[]): Anthropic.Messages.MessageParam[] {
   return messages.map((msg) => ({
     role: msg.role,
     content: toAnthropicContent(msg.content),
@@ -107,18 +98,16 @@ function toAnthropicMessages(
  * @param blocks - Anthropic response content blocks.
  * @returns Provider-agnostic content blocks.
  */
-function fromAnthropicContent(
-  blocks: Anthropic.Messages.ContentBlock[],
-): ContentBlock[] {
+function fromAnthropicContent(blocks: Anthropic.Messages.ContentBlock[]): ContentBlock[] {
   const result: ContentBlock[] = [];
   for (const block of blocks) {
     switch (block.type) {
-      case 'text':
-        result.push({ type: 'text', text: block.text });
+      case "text":
+        result.push({ type: "text", text: block.text });
         break;
-      case 'tool_use':
+      case "tool_use":
         result.push({
-          type: 'tool_use',
+          type: "tool_use",
           id: block.id,
           name: block.name,
           input: block.input as Record<string, unknown>,
@@ -142,13 +131,11 @@ function fromAnthropicContent(
  * @param stopReason - Anthropic stop_reason value.
  * @returns Normalized stop reason.
  */
-function fromAnthropicStopReason(
-  stopReason: string | null,
-): 'end_turn' | 'tool_use' {
-  if (stopReason === 'tool_use') {
-    return 'tool_use';
+function fromAnthropicStopReason(stopReason: string | null): "end_turn" | "tool_use" {
+  if (stopReason === "tool_use") {
+    return "tool_use";
   }
-  return 'end_turn';
+  return "end_turn";
 }
 
 /**
@@ -215,9 +202,7 @@ export class AnthropicProvider implements LLMProvider {
       max_tokens: maxTokens,
       system: params.system,
       messages: toAnthropicMessages(params.messages),
-      ...(params.tools?.length
-        ? { tools: toAnthropicTools(params.tools) }
-        : {}),
+      ...(params.tools?.length ? { tools: toAnthropicTools(params.tools) } : {}),
     };
 
     try {
@@ -234,9 +219,7 @@ export class AnthropicProvider implements LLMProvider {
       };
     } catch (error: unknown) {
       if (error instanceof Anthropic.APIError) {
-        throw new Error(
-          `Anthropic API error (${String(error.status)}): ${error.message}`,
-        );
+        throw new Error(`Anthropic API error (${String(error.status)}): ${error.message}`);
       }
       throw error;
     }

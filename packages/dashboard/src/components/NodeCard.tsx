@@ -6,10 +6,10 @@
 // or grid layouts on the dark-themed dashboard.
 // ============================================================================
 
-import { memo, useCallback } from 'react';
-import type { ReactElement } from 'react';
+import { memo, useCallback } from "react";
+import type { ReactElement } from "react";
 
-import type { NodeStatus } from '../lib/types.js';
+import type { NodeStatus } from "../lib/types.js";
 
 // ============================================================================
 // Types
@@ -39,13 +39,13 @@ export interface NodeCardProps {
 
 /** Status-to-Tailwind class mapping for the color-coded badge. */
 const STATUS_BADGE_STYLES: Record<NodeStatus, { bg: string; text: string }> = {
-  pending: { bg: 'bg-gray-700', text: 'text-gray-300' },
-  waiting: { bg: 'bg-amber-900', text: 'text-amber-300' },
-  running: { bg: 'bg-blue-900', text: 'text-blue-300' },
-  review: { bg: 'bg-purple-900', text: 'text-purple-300' },
-  done: { bg: 'bg-green-900', text: 'text-green-300' },
-  failed: { bg: 'bg-red-900', text: 'text-red-300' },
-  blocked: { bg: 'bg-orange-900', text: 'text-orange-300' },
+  pending: { bg: "bg-gray-700", text: "text-gray-300" },
+  waiting: { bg: "bg-amber-900", text: "text-amber-300" },
+  running: { bg: "bg-blue-900", text: "text-blue-300" },
+  review: { bg: "bg-purple-900", text: "text-purple-300" },
+  done: { bg: "bg-green-900", text: "text-green-300" },
+  failed: { bg: "bg-red-900", text: "text-red-300" },
+  blocked: { bg: "bg-orange-900", text: "text-orange-300" },
 };
 
 // ============================================================================
@@ -104,7 +104,7 @@ export const NodeCard = memo(function NodeCard({
       <div className="mt-2 flex items-center gap-2">
         <span
           className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}${
-            status === 'running' ? ' animate-pulse' : ''
+            status === "running" ? " animate-pulse" : ""
           }`}
         >
           {status}
@@ -114,12 +114,12 @@ export const NodeCard = memo(function NodeCard({
       {/* Metrics row */}
       <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
         <span>
-          {agentCount} {agentCount === 1 ? 'agent' : 'agents'}
+          {agentCount} {agentCount === 1 ? "agent" : "agents"}
         </span>
         <span>{formatUsd(cost)}</span>
         {retryCount > 0 && (
           <span className="text-amber-400">
-            {retryCount} {retryCount === 1 ? 'retry' : 'retries'}
+            {retryCount} {retryCount === 1 ? "retry" : "retries"}
           </span>
         )}
       </div>

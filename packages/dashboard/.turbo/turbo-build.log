@@ -1,0 +1,18 @@
+
+> @loomflo/dashboard@0.0.0 build /tmp/loomflo-fix/packages/dashboard
+> vite build
+
+vite v6.4.1 building for production...
+transforming...
+✓ 427 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:   0.27 kB
+dist/assets/index-VwzT-i5A.css   31.90 kB │ gzip:   6.66 kB
+dist/assets/index-BYgcYFbu.js   587.35 kB │ gzip: 178.04 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.13s

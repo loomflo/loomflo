@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
-import type { AgentInfo, Node, ReviewReport, Workflow } from '../../types.js';
+import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
+import type { AgentInfo, Node, ReviewReport, Workflow } from "../../types.js";
 
 // ============================================================================
 // Types
@@ -145,11 +145,11 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
      * Returns an array of node summaries for the active workflow.
      * Returns 404 if no workflow is active.
      */
-    fastify.get('/nodes', async (_request, reply): Promise<void> => {
+    fastify.get("/nodes", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
@@ -164,18 +164,18 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
      * Returns detailed node data including agents, file ownership, and review report.
      * Returns 404 if no workflow is active or the node is not found.
      */
-    fastify.get('/nodes/:id', async (request, reply): Promise<void> => {
+    fastify.get("/nodes/:id", async (request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
       const parseResult = NodeParamsSchema.safeParse(request.params);
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid node ID',
+          error: "Invalid node ID",
           details: parseResult.error.issues,
         });
         return;
@@ -184,7 +184,7 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
       const node: Node | undefined = workflow.graph.nodes[parseResult.data.id];
 
       if (node === undefined) {
-        await reply.code(404).send({ error: 'Node not found' });
+        await reply.code(404).send({ error: "Node not found" });
         return;
       }
 
@@ -197,18 +197,18 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
      * Returns the Loomex review report for a specific node.
      * Returns 404 if no workflow is active, the node is not found, or no review report exists.
      */
-    fastify.get('/nodes/:id/review', async (request, reply): Promise<void> => {
+    fastify.get("/nodes/:id/review", async (request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
       const parseResult = NodeParamsSchema.safeParse(request.params);
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid node ID',
+          error: "Invalid node ID",
           details: parseResult.error.issues,
         });
         return;
@@ -217,12 +217,12 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
       const node: Node | undefined = workflow.graph.nodes[parseResult.data.id];
 
       if (node === undefined) {
-        await reply.code(404).send({ error: 'Node not found' });
+        await reply.code(404).send({ error: "Node not found" });
         return;
       }
 
       if (node.reviewReport === null) {
-        await reply.code(404).send({ error: 'No review report for this node' });
+        await reply.code(404).send({ error: "No review report for this node" });
         return;
       }
 

@@ -35,7 +35,7 @@ const UNIT_MS: Readonly<Record<string, number>> = {
  * @throws Error if the delay string format is invalid.
  */
 export function parseDelay(delay: string | undefined): number {
-  if (delay === undefined || delay === '' || delay === '0') {
+  if (delay === undefined || delay === "" || delay === "0") {
     return 0;
   }
 
@@ -48,7 +48,7 @@ export function parseDelay(delay: string | undefined): number {
   }
 
   const value = Number(match[1]);
-  const unit = match[2] ?? 's';
+  const unit = match[2] ?? "s";
   const multiplier = UNIT_MS[unit];
 
   if (multiplier === undefined) {
@@ -168,11 +168,7 @@ export class Scheduler {
    * @param callback - Function to invoke when the delay expires.
    * @throws Error if the node is already scheduled.
    */
-  rescheduleFromPersistence(
-    nodeId: string,
-    resumeAt: string,
-    callback: () => void,
-  ): void {
+  rescheduleFromPersistence(nodeId: string, resumeAt: string, callback: () => void): void {
     if (this.entries.has(nodeId)) {
       throw new Error(`Node "${nodeId}" is already scheduled.`);
     }

@@ -11,70 +11,70 @@
 
 /** Workflow lifecycle state. */
 export type WorkflowStatus =
-  | 'init'
-  | 'spec'
-  | 'building'
-  | 'running'
-  | 'paused'
-  | 'done'
-  | 'failed';
+  | "init"
+  | "spec"
+  | "building"
+  | "running"
+  | "paused"
+  | "done"
+  | "failed";
 
 /** Node execution state. */
 export type NodeStatus =
-  | 'pending'
-  | 'waiting'
-  | 'running'
-  | 'review'
-  | 'done'
-  | 'failed'
-  | 'blocked';
+  | "pending"
+  | "waiting"
+  | "running"
+  | "review"
+  | "done"
+  | "failed"
+  | "blocked";
 
 /** Agent role: loom (architect), loomi (orchestrator), looma (worker), loomex (reviewer). */
-export type AgentRole = 'loom' | 'loomi' | 'looma' | 'loomex';
+export type AgentRole = "loom" | "loomi" | "looma" | "loomex";
 
 /** Agent lifecycle state. */
-export type AgentStatus = 'created' | 'running' | 'completed' | 'failed';
+export type AgentStatus = "created" | "running" | "completed" | "failed";
 
 /** Graph topology classification. */
-export type TopologyType = 'linear' | 'divergent' | 'convergent' | 'tree' | 'mixed';
+export type TopologyType = "linear" | "divergent" | "convergent" | "tree" | "mixed";
 
 /** Event type identifier for the event log. */
 export type EventType =
-  | 'workflow_created'
-  | 'workflow_started'
-  | 'workflow_paused'
-  | 'workflow_resumed'
-  | 'workflow_completed'
-  | 'spec_phase_started'
-  | 'spec_phase_completed'
-  | 'graph_built'
-  | 'graph_modified'
-  | 'node_started'
-  | 'node_completed'
-  | 'node_failed'
-  | 'node_blocked'
-  | 'agent_created'
-  | 'agent_completed'
-  | 'agent_failed'
-  | 'reviewer_started'
-  | 'reviewer_verdict'
-  | 'retry_triggered'
-  | 'escalation_triggered'
-  | 'message_sent'
-  | 'cost_tracked'
-  | 'memory_updated';
+  | "workflow_created"
+  | "workflow_started"
+  | "workflow_paused"
+  | "workflow_resumed"
+  | "workflow_completed"
+  | "spec_phase_started"
+  | "spec_phase_completed"
+  | "graph_built"
+  | "graph_modified"
+  | "node_started"
+  | "node_completed"
+  | "node_failed"
+  | "node_blocked"
+  | "agent_created"
+  | "agent_completed"
+  | "agent_failed"
+  | "reviewer_started"
+  | "reviewer_verdict"
+  | "retry_triggered"
+  | "escalation_triggered"
+  | "message_sent"
+  | "cost_tracked"
+  | "memory_updated";
 
 /** Review verdict from Loomex. */
-export type ReviewVerdict = 'PASS' | 'FAIL' | 'BLOCKED';
+export type ReviewVerdict = "PASS" | "FAIL" | "BLOCKED";
 
 /** Task-level verification result. */
-export type TaskVerificationStatus = 'pass' | 'fail' | 'blocked';
+export type TaskVerificationStatus = "pass" | "fail" | "blocked";
 
 /** Level preset selector. */
-export type Level = 1 | 2 | 3 | 'custom';
+export type Level = 1 | 2 | 3 | "custom";
 
 /** Retry strategy: 'adaptive' modifies the prompt on retry, 'same' retries as-is. */
-export type RetryStrategy = 'adaptive' | 'same';
+export type RetryStrategy = "adaptive" | "same";
 
 // ============================================================================
 // Simple Types

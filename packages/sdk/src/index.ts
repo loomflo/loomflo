@@ -20,7 +20,7 @@
  */
 
 // Re-export the client class and its error type.
-export { LoomfloClient, LoomfloApiError } from './client.js';
+export { LoomfloClient, LoomfloApiError } from "./client.js";
 
 // Re-export all public types.
 export type {
@@ -93,4 +93,4 @@ export type {
   // Client options
   LoomfloClientOptions,
   EventCallback,
-} from './types.js';
+} from "./types.js";

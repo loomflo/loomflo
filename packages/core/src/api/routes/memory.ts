@@ -1,5 +1,5 @@
-import type { FastifyPluginAsync } from 'fastify';
-import type { SharedMemoryManager } from '../../memory/shared-memory.js';
+import type { FastifyPluginAsync } from "fastify";
+import type { SharedMemoryManager } from "../../memory/shared-memory.js";
 
 // ============================================================================
 // Types
@@ -50,11 +50,11 @@ export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
      * Lists all shared memory files with metadata (name, lastModifiedBy, lastModifiedAt).
      * Returns 404 if no workflow is active.
      */
-    fastify.get('/memory', async (_request, reply): Promise<void> => {
+    fastify.get("/memory", async (_request, reply): Promise<void> => {
       const sharedMemory = getSharedMemory();
 
       if (sharedMemory === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
@@ -77,27 +77,27 @@ export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
      * Returns 404 if no workflow is active or the file does not exist.
      */
     fastify.get<{ Params: { name: string } }>(
-      '/memory/:name',
+      "/memory/:name",
       async (request, reply): Promise<void> => {
         const sharedMemory = getSharedMemory();
 
         if (sharedMemory === null) {
-          await reply.code(404).send({ error: 'No active workflow' });
+          await reply.code(404).send({ error: "No active workflow" });
           return;
         }
 
         const { name } = request.params;
 
         if (!isValidMemoryFileName(name)) {
-          await reply.code(400).send({ error: 'Invalid memory file name' });
+          await reply.code(400).send({ error: "Invalid memory file name" });
           return;
         }
 
         try {
           const file = await sharedMemory.read(name);
-          await reply.type('text/markdown').code(200).send(file.content);
+          await reply.type("text/markdown").code(200).send(file.content);
         } catch {
-          await reply.code(404).send({ error: 'Memory file not found' });
+          await reply.code(404).send({ error: "Memory file not found" });
         }
       },
     );
@@ -124,7 +124,7 @@ function isValidMemoryFileName(name: string): boolean {
     return false;
   }
 
-  if (name.includes('..') || name.includes('/') || name.includes('\\') || name.includes('\0')) {
+  if (name.includes("..") || name.includes("/") || name.includes("\\") || name.includes("\0")) {
     return false;
   }
 

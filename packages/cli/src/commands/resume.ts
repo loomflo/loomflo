@@ -1,6 +1,6 @@
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from '../client.js';
+import { DaemonClient, readDaemonConfig } from "../client.js";
 
 // ============================================================================
 // Types
@@ -46,8 +46,8 @@ interface ErrorResponse {
  * @returns A configured commander Command instance.
  */
 export function createResumeCommand(): Command {
-  const cmd = new Command('resume')
-    .description('Resume a paused or interrupted workflow')
+  const cmd = new Command("resume")
+    .description("Resume a paused or interrupted workflow")
     .action(async (): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Connect to daemon                                                  */
@@ -57,7 +57,7 @@ export function createResumeCommand(): Command {
       try {
         config = await readDaemonConfig();
       } catch {
-        console.error('Daemon is not running. Start with: loomflo start');
+        console.error("Daemon is not running. Start with: loomflo start");
         process.exit(1);
       }
 
@@ -67,9 +67,9 @@ export function createResumeCommand(): Command {
       /* Send resume request                                                */
       /* ------------------------------------------------------------------ */
 
-      console.log('Resuming workflow...');
+      console.log("Resuming workflow...");
 
-      const response = await client.post<ResumeResponse | ErrorResponse>('/workflow/resume');
+      const response = await client.post<ResumeResponse | ErrorResponse>("/workflow/resume");
 
       if (!response.ok) {
         const errorData = response.data as ErrorResponse;
@@ -85,7 +85,7 @@ export function createResumeCommand(): Command {
       /* ------------------------------------------------------------------ */
 
       console.log(`Workflow resumed. Status: ${data.status}`);
-      console.log('');
+      console.log("");
 
       if (info.completedNodeIds.length > 0) {
         console.log(`  Completed (skipped): ${String(info.completedNodeIds.length)} nodes`);
@@ -106,8 +106,8 @@ export function createResumeCommand(): Command {
         console.log(`  Resuming from: ${info.resumedFrom}`);
       }
 
-      console.log('');
-      console.log('Execution will continue from where it left off.');
+      console.log("");
+      console.log("Execution will continue from where it left off.");
     });
 
   return cmd;

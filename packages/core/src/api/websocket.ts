@@ -1,4 +1,4 @@
-import type { NodeStatus, AgentStatus, ReviewReport } from '../types.js';
+import type { NodeStatus, AgentStatus, ReviewReport } from "../types.js";
 
 // ============================================================================
 // Types
@@ -6,15 +6,15 @@ import type { NodeStatus, AgentStatus, ReviewReport } from '../types.js';
 
 /** WebSocket event type identifiers broadcast to connected clients. */
 export type WsEventType =
-  | 'node_status'
-  | 'agent_status'
-  | 'agent_message'
-  | 'review_verdict'
-  | 'graph_modified'
-  | 'cost_update'
-  | 'chat_response'
-  | 'spec_artifact_ready'
-  | 'memory_updated';
+  | "node_status"
+  | "agent_status"
+  | "agent_message"
+  | "review_verdict"
+  | "graph_modified"
+  | "cost_update"
+  | "chat_response"
+  | "spec_artifact_ready"
+  | "memory_updated";
 
 /** Base shape shared by all WebSocket events. */
 export interface WsEventBase {
@@ -26,7 +26,7 @@ export interface WsEventBase {
 
 /** Payload broadcast when a node changes execution state. */
 export interface WsNodeStatusEvent extends WsEventBase {
-  type: 'node_status';
+  type: "node_status";
   /** Node whose status changed. */
   nodeId: string;
   /** New node status. */
@@ -37,7 +37,7 @@ export interface WsNodeStatusEvent extends WsEventBase {
 
 /** Payload broadcast when an agent changes lifecycle state. */
 export interface WsAgentStatusEvent extends WsEventBase {
-  type: 'agent_status';
+  type: "agent_status";
   /** Node the agent belongs to. */
   nodeId: string;
   /** Agent whose status changed. */
@@ -50,7 +50,7 @@ export interface WsAgentStatusEvent extends WsEventBase {
 
 /** Payload broadcast when an agent sends or receives a message. */
 export interface WsAgentMessageEvent extends WsEventBase {
-  type: 'agent_message';
+  type: "agent_message";
   /** Node context for the message. */
   nodeId: string;
   /** Agent that sent or received the message. */
@@ -61,21 +61,26 @@ export interface WsAgentMessageEvent extends WsEventBase {
 
 /** Payload broadcast when a Loomex reviewer produces a verdict. */
 export interface WsReviewVerdictEvent extends WsEventBase {
-  type: 'review_verdict';
+  type: "review_verdict";
   /** Node that was reviewed. */
   nodeId: string;
   /** Overall review verdict. */
-  verdict: ReviewReport['verdict'];
+  verdict: ReviewReport["verdict"];
   /** Full structured review report. */
   report: ReviewReport;
 }
 
 /** Graph modification action types. */
-export type GraphAction = 'node_added' | 'node_removed' | 'node_modified' | 'edge_added' | 'edge_removed';
+export type GraphAction =
+  | "node_added"
+  | "node_removed"
+  | "node_modified"
+  | "edge_added"
+  | "edge_removed";
 
 /** Payload broadcast when the workflow graph is modified. */
 export interface WsGraphModifiedEvent extends WsEventBase {
-  type: 'graph_modified';
+  type: "graph_modified";
   /** What kind of modification occurred. */
   action: GraphAction;
   /** Node affected by the modification, if applicable. */
@@ -86,7 +91,7 @@ export interface WsGraphModifiedEvent extends WsEventBase {
 
 /** Payload broadcast after every LLM call with updated cost information. */
 export interface WsCostUpdateEvent extends WsEventBase {
-  type: 'cost_update';
+  type: "cost_update";
   /** Node where the LLM call occurred. */
   nodeId: string;
   /** Cost of the individual LLM call in USD. */
@@ -109,7 +114,7 @@ export interface WsChatAction {
 
 /** Payload broadcast when Loom sends a chat response to the dashboard. */
 export interface WsChatResponseEvent extends WsEventBase {
-  type: 'chat_response';
+  type: "chat_response";
   /** The text response from Loom. */
   response: string;
   /** Category the message was classified as (question, instruction, or graph_change). */
@@ -120,7 +125,7 @@ export interface WsChatResponseEvent extends WsEventBase {
 
 /** Payload broadcast when a spec artifact is generated during Phase 1. */
 export interface WsSpecArtifactReadyEvent extends WsEventBase {
-  type: 'spec_artifact_ready';
+  type: "spec_artifact_ready";
   /** File name of the generated artifact (e.g. "spec.md"). */
   name: string;
   /** Relative path to the artifact (e.g. ".loomflo/specs/spec.md"). */
@@ -129,7 +134,7 @@ export interface WsSpecArtifactReadyEvent extends WsEventBase {
 
 /** Payload broadcast when a shared memory file is updated. */
 export interface WsMemoryUpdatedEvent extends WsEventBase {
-  type: 'memory_updated';
+  type: "memory_updated";
   /** Name of the memory file that was updated. */
   file: string;
   /** Description of what was updated. */
@@ -195,7 +200,7 @@ export class WebSocketBroadcaster {
    */
   emitNodeStatus(nodeId: string, status: NodeStatus, details?: Record<string, unknown>): void {
     const event: WsNodeStatusEvent = {
-      type: 'node_status',
+      type: "node_status",
       timestamp: new Date().toISOString(),
       nodeId,
       status,
@@ -219,7 +224,7 @@ export class WebSocketBroadcaster {
     details?: Record<string, unknown>,
   ): void {
     const event: WsAgentStatusEvent = {
-      type: 'agent_status',
+      type: "agent_status",
       timestamp: new Date().toISOString(),
       nodeId,
       agentId,
@@ -238,7 +243,7 @@ export class WebSocketBroadcaster {
    */
   emitAgentMessage(nodeId: string, agentId: string, message: string): void {
     const event: WsAgentMessageEvent = {
-      type: 'agent_message',
+      type: "agent_message",
       timestamp: new Date().toISOString(),
       nodeId,
       agentId,
@@ -254,9 +259,9 @@ export class WebSocketBroadcaster {
    * @param verdict - The overall review verdict (PASS, FAIL, or BLOCKED).
    * @param report - The full structured review report.
    */
-  emitReviewVerdict(nodeId: string, verdict: ReviewReport['verdict'], report: ReviewReport): void {
+  emitReviewVerdict(nodeId: string, verdict: ReviewReport["verdict"], report: ReviewReport): void {
     const event: WsReviewVerdictEvent = {
-      type: 'review_verdict',
+      type: "review_verdict",
       timestamp: new Date().toISOString(),
       nodeId,
       verdict,
@@ -274,7 +279,7 @@ export class WebSocketBroadcaster {
    */
   emitGraphModified(action: GraphAction, nodeId?: string, details?: Record<string, unknown>): void {
     const event: WsGraphModifiedEvent = {
-      type: 'graph_modified',
+      type: "graph_modified",
       timestamp: new Date().toISOString(),
       action,
       ...(nodeId !== undefined && { nodeId }),
@@ -300,7 +305,7 @@ export class WebSocketBroadcaster {
     budgetRemaining?: number,
   ): void {
     const event: WsCostUpdateEvent = {
-      type: 'cost_update',
+      type: "cost_update",
       timestamp: new Date().toISOString(),
       nodeId,
       callCost,
@@ -320,7 +325,7 @@ export class WebSocketBroadcaster {
    */
   emitChatResponse(response: string, category: string, action: WsChatAction | null): void {
     const event: WsChatResponseEvent = {
-      type: 'chat_response',
+      type: "chat_response",
       timestamp: new Date().toISOString(),
       response,
       category,
@@ -337,7 +342,7 @@ export class WebSocketBroadcaster {
    */
   emitSpecArtifactReady(name: string, path: string): void {
     const event: WsSpecArtifactReadyEvent = {
-      type: 'spec_artifact_ready',
+      type: "spec_artifact_ready",
       timestamp: new Date().toISOString(),
       name,
       path,
@@ -354,7 +359,7 @@ export class WebSocketBroadcaster {
    */
   emitMemoryUpdated(file: string, summary: string, agentId?: string): void {
     const event: WsMemoryUpdatedEvent = {
-      type: 'memory_updated',
+      type: "memory_updated",
       timestamp: new Date().toISOString(),
       file,
       summary,

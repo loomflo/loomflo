@@ -6,9 +6,9 @@
 // Subscribes to WebSocket events for real-time updates filtered by node ID.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { memo, useCallback, useEffect, useState } from "react";
+import type { ReactElement } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import type {
   AgentRole,
@@ -16,13 +16,13 @@ import type {
   Event,
   NodeStatus,
   ReviewReport as ReviewReportData,
-} from '../lib/types.js';
-import type { NodeDetailResponse } from '../lib/api.js';
-import { apiClient, ApiError } from '../lib/api.js';
-import { AgentStatusCard } from '../components/AgentStatus.js';
-import { LogStream } from '../components/LogStream.js';
-import { ReviewReport } from '../components/ReviewReport.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
+} from "../lib/types.js";
+import type { NodeDetailResponse } from "../lib/api.js";
+import { apiClient, ApiError } from "../lib/api.js";
+import { AgentStatusCard } from "../components/AgentStatus.js";
+import { LogStream } from "../components/LogStream.js";
+import { ReviewReport } from "../components/ReviewReport.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
 
 // ============================================================================
 // Constants
@@ -30,13 +30,13 @@ import { useWebSocket } from '../hooks/useWebSocket.js';
 
 /** Node status to Tailwind class mapping for the color-coded status badge. */
 const NODE_STATUS_STYLES: Record<NodeStatus, { bg: string; text: string; dot: string }> = {
-  pending: { bg: 'bg-gray-700', text: 'text-gray-300', dot: 'bg-gray-400' },
-  waiting: { bg: 'bg-amber-900', text: 'text-amber-300', dot: 'bg-amber-400' },
-  running: { bg: 'bg-blue-900', text: 'text-blue-300', dot: 'bg-blue-400' },
-  review: { bg: 'bg-purple-900', text: 'text-purple-300', dot: 'bg-purple-400' },
-  done: { bg: 'bg-green-900', text: 'text-green-300', dot: 'bg-green-400' },
-  failed: { bg: 'bg-red-900', text: 'text-red-300', dot: 'bg-red-400' },
-  blocked: { bg: 'bg-orange-900', text: 'text-orange-300', dot: 'bg-orange-400' },
+  pending: { bg: "bg-gray-700", text: "text-gray-300", dot: "bg-gray-400" },
+  waiting: { bg: "bg-amber-900", text: "text-amber-300", dot: "bg-amber-400" },
+  running: { bg: "bg-blue-900", text: "text-blue-300", dot: "bg-blue-400" },
+  review: { bg: "bg-purple-900", text: "text-purple-300", dot: "bg-purple-400" },
+  done: { bg: "bg-green-900", text: "text-green-300", dot: "bg-green-400" },
+  failed: { bg: "bg-red-900", text: "text-red-300", dot: "bg-red-400" },
+  blocked: { bg: "bg-orange-900", text: "text-orange-300", dot: "bg-orange-400" },
 };
 
 // ============================================================================
@@ -51,12 +51,12 @@ const NODE_STATUS_STYLES: Record<NodeStatus, { bg: string; text: string; dot: st
  */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -91,7 +91,7 @@ function formatUsd(value: number): string {
 export const NodePage = memo(function NodePage(): ReactElement {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
 
   const { subscribe } = useWebSocket(token);
 
@@ -164,24 +164,22 @@ export const NodePage = memo(function NodePage(): ReactElement {
         apiClient.getEvents({ nodeId: id }),
       ]);
 
-      if (nodeResult.status === 'fulfilled') {
+      if (nodeResult.status === "fulfilled") {
         setNode(nodeResult.value);
       } else {
         const reason = nodeResult.reason as unknown;
         if (reason instanceof ApiError && reason.status === 404) {
-          setError('Node not found');
+          setError("Node not found");
         } else {
-          setError(
-            reason instanceof Error ? reason.message : 'Failed to fetch node',
-          );
+          setError(reason instanceof Error ? reason.message : "Failed to fetch node");
         }
       }
 
-      if (reviewResult.status === 'fulfilled') {
+      if (reviewResult.status === "fulfilled") {
         setReview(reviewResult.value);
       }
 
-      if (eventsResult.status === 'fulfilled') {
+      if (eventsResult.status === "fulfilled") {
         setEvents(eventsResult.value.events);
       }
 
@@ -199,11 +197,11 @@ export const NodePage = memo(function NodePage(): ReactElement {
     const unsubs: (() => void)[] = [];
 
     unsubs.push(
-      subscribe('node_status', (event): void => {
+      subscribe("node_status", (event): void => {
         if (event.nodeId === id) {
           void refetchNode();
           void refetchEvents();
-          if (event.status === 'review' || event.status === 'done') {
+          if (event.status === "review" || event.status === "done") {
             void refetchReview();
           }
         }
@@ -211,7 +209,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
     );
 
     unsubs.push(
-      subscribe('agent_status', (event): void => {
+      subscribe("agent_status", (event): void => {
         if (event.nodeId === id) {
           void refetchNode();
           void refetchEvents();
@@ -220,7 +218,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
     );
 
     unsubs.push(
-      subscribe('cost_update', (event): void => {
+      subscribe("cost_update", (event): void => {
         if (event.nodeId === id) {
           void refetchNode();
         }
@@ -228,7 +226,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
     );
 
     unsubs.push(
-      subscribe('review_verdict', (event): void => {
+      subscribe("review_verdict", (event): void => {
         if (event.nodeId === id) {
           void refetchReview();
           void refetchEvents();
@@ -247,7 +245,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
   // Derived values
   // --------------------------------------------------------------------------
 
-  const backUrl = token ? `/graph?token=${encodeURIComponent(token)}` : '/graph';
+  const backUrl = token ? `/graph?token=${encodeURIComponent(token)}` : "/graph";
 
   // --------------------------------------------------------------------------
   // Loading state
@@ -315,10 +313,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
     <div className="space-y-6">
       {/* Back link + header */}
       <div>
-        <Link
-          to={backUrl}
-          className="text-sm text-blue-400 hover:text-blue-300"
-        >
+        <Link to={backUrl} className="text-sm text-blue-400 hover:text-blue-300">
           &larr; Back to Graph
         </Link>
 
@@ -329,7 +324,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}${
-                node.status === 'running' ? ' animate-pulse' : ''
+                node.status === "running" ? " animate-pulse" : ""
               }`}
             />
             {node.status}
@@ -344,13 +339,13 @@ export const NodePage = memo(function NodePage(): ReactElement {
         <div className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-3">
           <span className="text-xs uppercase tracking-wider text-gray-500">Started</span>
           <p className="mt-1 text-sm text-gray-200">
-            {node.startedAt ? formatTimestamp(node.startedAt) : '\u2014'}
+            {node.startedAt ? formatTimestamp(node.startedAt) : "\u2014"}
           </p>
         </div>
 
         <div className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-3">
           <span className="text-xs uppercase tracking-wider text-gray-500">Delay</span>
-          <p className="mt-1 text-sm text-gray-200">{node.delay || '0'}</p>
+          <p className="mt-1 text-sm text-gray-200">{node.delay || "0"}</p>
         </div>
 
         <div className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-3">

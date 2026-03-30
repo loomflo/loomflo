@@ -13,69 +13,64 @@
 
 /** Workflow lifecycle state. */
 export type WorkflowStatus =
-  | 'init'
-  | 'spec'
-  | 'building'
-  | 'running'
-  | 'paused'
-  | 'done'
-  | 'failed';
+  | "init"
+  | "spec"
+  | "building"
+  | "running"
+  | "paused"
+  | "done"
+  | "failed";
 
 /** Node execution state. */
 export type NodeStatus =
-  | 'pending'
-  | 'waiting'
-  | 'running'
-  | 'review'
-  | 'done'
-  | 'failed'
-  | 'blocked';
+  | "pending"
+  | "waiting"
+  | "running"
+  | "review"
+  | "done"
+  | "failed"
+  | "blocked";
 
 /** Agent role in the workflow hierarchy. */
-export type AgentRole = 'loom' | 'loomi' | 'looma' | 'loomex';
+export type AgentRole = "loom" | "loomi" | "looma" | "loomex";
 
 /** Agent lifecycle state. */
-export type AgentStatus = 'created' | 'running' | 'completed' | 'failed';
+export type AgentStatus = "created" | "running" | "completed" | "failed";
 
 /** Graph topology classification. */
-export type TopologyType =
-  | 'linear'
-  | 'divergent'
-  | 'convergent'
-  | 'tree'
-  | 'mixed';
+export type TopologyType = "linear" | "divergent" | "convergent" | "tree" | "mixed";
 
 /** Event type identifier for the event log. */
 export type EventType =
-  | 'workflow_created'
-  | 'workflow_started'
-  | 'workflow_paused'
-  | 'workflow_resumed'
-  | 'workflow_completed'
-  | 'spec_phase_started'
-  | 'spec_phase_completed'
-  | 'graph_built'
-  | 'graph_modified'
-  | 'node_started'
-  | 'node_completed'
-  | 'node_failed'
-  | 'node_blocked'
-  | 'agent_created'
-  | 'agent_completed'
-  | 'agent_failed'
-  | 'reviewer_started'
-  | 'reviewer_verdict'
-  | 'retry_triggered'
-  | 'escalation_triggered'
-  | 'message_sent'
-  | 'cost_tracked'
-  | 'memory_updated';
+  | "workflow_created"
+  | "workflow_started"
+  | "workflow_paused"
+  | "workflow_resumed"
+  | "workflow_completed"
+  | "spec_phase_started"
+  | "spec_phase_completed"
+  | "graph_built"
+  | "graph_modified"
+  | "node_started"
+  | "node_completed"
+  | "node_failed"
+  | "node_blocked"
+  | "agent_created"
+  | "agent_completed"
+  | "agent_failed"
+  | "reviewer_started"
+  | "reviewer_verdict"
+  | "retry_triggered"
+  | "escalation_triggered"
+  | "message_sent"
+  | "cost_tracked"
+  | "memory_updated";
 
 /** Review verdict from a Loomex reviewer agent. */
-export type ReviewVerdict = 'PASS' | 'FAIL' | 'BLOCKED';
+export type ReviewVerdict = "PASS" | "FAIL" | "BLOCKED";
 
 /** LLM response stop reason. */
-export type StopReason = 'end_turn' | 'tool_use';
+export type StopReason = "end_turn" | "tool_use";
 
 // ============================================================================
 // Simple Types
@@ -94,7 +89,7 @@ export interface TaskVerification {
   /** Identifier of the verified task. */
   taskId: string;
   /** Task-level verification result. */
-  status: 'pass' | 'fail' | 'blocked';
+  status: "pass" | "fail" | "blocked";
   /** Explanation of what was found during verification. */
   details: string;
 }
@@ -292,7 +287,7 @@ export interface RetryConfig {
   /** Maximum retries per individual task. */
   maxRetriesPerTask: number;
   /** Retry strategy: "adaptive" adjusts prompts, "same" retries unchanged. */
-  strategy: 'adaptive' | 'same';
+  strategy: "adaptive" | "same";
 }
 
 /** Loomflo configuration (merged from global, project, and CLI sources). */
@@ -570,7 +565,7 @@ export interface WebSocketEvent {
 /** WebSocket welcome event sent on connection. */
 export interface ConnectedEvent extends WebSocketEvent {
   /** Always "connected". */
-  type: 'connected';
+  type: "connected";
   /** Welcome message. */
   message: string;
 }
@@ -578,7 +573,7 @@ export interface ConnectedEvent extends WebSocketEvent {
 /** WebSocket event for node status changes. */
 export interface NodeStatusEvent extends WebSocketEvent {
   /** Always "node_status". */
-  type: 'node_status';
+  type: "node_status";
   /** Node identifier. */
   nodeId: string;
   /** New node status. */
@@ -588,7 +583,7 @@ export interface NodeStatusEvent extends WebSocketEvent {
 /** WebSocket event for agent status changes. */
 export interface AgentStatusEvent extends WebSocketEvent {
   /** Always "agent_status". */
-  type: 'agent_status';
+  type: "agent_status";
   /** Node identifier. */
   nodeId: string;
   /** Agent identifier. */
@@ -602,7 +597,7 @@ export interface AgentStatusEvent extends WebSocketEvent {
 /** WebSocket event for inter-agent messages. */
 export interface AgentMessageEvent extends WebSocketEvent {
   /** Always "agent_message". */
-  type: 'agent_message';
+  type: "agent_message";
   /** Node identifier. */
   nodeId: string;
   /** Sender agent ID. */
@@ -616,7 +611,7 @@ export interface AgentMessageEvent extends WebSocketEvent {
 /** WebSocket event for review verdicts. */
 export interface ReviewVerdictEvent extends WebSocketEvent {
   /** Always "review_verdict". */
-  type: 'review_verdict';
+  type: "review_verdict";
   /** Node identifier. */
   nodeId: string;
   /** Review verdict. */
@@ -628,9 +623,9 @@ export interface ReviewVerdictEvent extends WebSocketEvent {
 /** WebSocket event for graph modifications. */
 export interface GraphModifiedEvent extends WebSocketEvent {
   /** Always "graph_modified". */
-  type: 'graph_modified';
+  type: "graph_modified";
   /** Type of modification. */
-  action: 'add_node' | 'remove_node' | 'modify_node' | 'add_edge' | 'remove_edge';
+  action: "add_node" | "remove_node" | "modify_node" | "add_edge" | "remove_edge";
   /** Modified node or edge data. */
   data: Record<string, unknown>;
 }
@@ -638,7 +633,7 @@ export interface GraphModifiedEvent extends WebSocketEvent {
 /** WebSocket event for cost updates. */
 export interface CostUpdateEvent extends WebSocketEvent {
   /** Always "cost_update". */
-  type: 'cost_update';
+  type: "cost_update";
   /** Node identifier. */
   nodeId: string;
   /** Cost of this call in USD. */
@@ -654,7 +649,7 @@ export interface CostUpdateEvent extends WebSocketEvent {
 /** WebSocket event for chat responses from Loom. */
 export interface ChatResponseEvent extends WebSocketEvent {
   /** Always "chat_response". */
-  type: 'chat_response';
+  type: "chat_response";
   /** Loom's response text. */
   response: string;
   /** Action taken, or null. */
@@ -664,7 +659,7 @@ export interface ChatResponseEvent extends WebSocketEvent {
 /** WebSocket event for spec artifact readiness. */
 export interface SpecArtifactReadyEvent extends WebSocketEvent {
   /** Always "spec_artifact_ready". */
-  type: 'spec_artifact_ready';
+  type: "spec_artifact_ready";
   /** Artifact name. */
   name: string;
   /** Artifact file path. */

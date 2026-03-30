@@ -5,7 +5,7 @@
 // Currently throws on any completion attempt.
 // ============================================================================
 
-import type { LLMProvider } from './base.js';
+import type { LLMProvider } from "./base.js";
 
 /**
  * Stub OpenAI provider.
@@ -20,8 +20,6 @@ export class OpenAIProvider implements LLMProvider {
    * @throws {Error} Always, indicating the provider is not yet supported.
    */
   complete(): never {
-    throw new Error(
-      'OpenAI provider is not yet supported. Planned for a future release.',
-    );
+    throw new Error("OpenAI provider is not yet supported. Planned for a future release.");
   }
 }

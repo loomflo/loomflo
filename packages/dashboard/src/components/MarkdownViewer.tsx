@@ -6,11 +6,11 @@
 // highlighting of fenced code blocks.
 // ============================================================================
 
-import { memo } from 'react';
-import type { ReactElement } from 'react';
-import Markdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
-import type { Components } from 'react-markdown';
+import { memo } from "react";
+import type { ReactElement } from "react";
+import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import type { Components } from "react-markdown";
 
 // ============================================================================
 // Types
@@ -33,27 +33,17 @@ const REHYPE_PLUGINS = [rehypeHighlight];
 
 /** Custom component overrides for dark-theme styling. */
 const COMPONENTS: Components = {
-  h1: ({ children }) => (
-    <h1 className="mb-4 mt-6 text-2xl font-bold text-gray-100">{children}</h1>
-  ),
+  h1: ({ children }) => <h1 className="mb-4 mt-6 text-2xl font-bold text-gray-100">{children}</h1>,
   h2: ({ children }) => (
-    <h2 className="mb-3 mt-5 text-xl font-semibold text-gray-100">
-      {children}
-    </h2>
+    <h2 className="mb-3 mt-5 text-xl font-semibold text-gray-100">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mb-2 mt-4 text-lg font-semibold text-gray-100">
-      {children}
-    </h3>
+    <h3 className="mb-2 mt-4 text-lg font-semibold text-gray-100">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="mb-2 mt-3 text-base font-medium text-gray-100">
-      {children}
-    </h4>
+    <h4 className="mb-2 mt-3 text-base font-medium text-gray-100">{children}</h4>
   ),
-  p: ({ children }) => (
-    <p className="mb-3 leading-relaxed text-gray-300">{children}</p>
-  ),
+  p: ({ children }) => <p className="mb-3 leading-relaxed text-gray-300">{children}</p>,
   a: ({ href, children }) => (
     <a
       href={href}
@@ -64,13 +54,9 @@ const COMPONENTS: Components = {
       {children}
     </a>
   ),
-  ul: ({ children }) => (
-    <ul className="mb-3 ml-6 list-disc space-y-1 text-gray-300">{children}</ul>
-  ),
+  ul: ({ children }) => <ul className="mb-3 ml-6 list-disc space-y-1 text-gray-300">{children}</ul>,
   ol: ({ children }) => (
-    <ol className="mb-3 ml-6 list-decimal space-y-1 text-gray-300">
-      {children}
-    </ol>
+    <ol className="mb-3 ml-6 list-decimal space-y-1 text-gray-300">{children}</ol>
   ),
   li: ({ children }) => <li className="text-gray-300">{children}</li>,
   blockquote: ({ children }) => (
@@ -97,9 +83,7 @@ const COMPONENTS: Components = {
   },
   table: ({ children }) => (
     <div className="mb-3 overflow-x-auto">
-      <table className="w-full border-collapse text-sm text-gray-300">
-        {children}
-      </table>
+      <table className="w-full border-collapse text-sm text-gray-300">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
@@ -110,9 +94,7 @@ const COMPONENTS: Components = {
   tbody: ({ children }) => (
     <tbody className="[&>tr:nth-child(even)]:bg-gray-800/50">{children}</tbody>
   ),
-  tr: ({ children }) => (
-    <tr className="border-b border-gray-700">{children}</tr>
-  ),
+  tr: ({ children }) => <tr className="border-b border-gray-700">{children}</tr>,
   th: ({ children }) => <th className="px-3 py-2 font-medium">{children}</th>,
   td: ({ children }) => <td className="px-3 py-2">{children}</td>,
   hr: () => <hr className="my-4 border-gray-700" />,
@@ -138,14 +120,8 @@ export const MarkdownViewer = memo(function MarkdownViewer({
   maxHeight,
 }: MarkdownViewerProps): ReactElement {
   return (
-    <div
-      className="text-sm"
-      style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
-    >
-      <Markdown
-        rehypePlugins={REHYPE_PLUGINS}
-        components={COMPONENTS}
-      >
+    <div className="text-sm" style={maxHeight ? { maxHeight, overflowY: "auto" } : undefined}>
+      <Markdown rehypePlugins={REHYPE_PLUGINS} components={COMPONENTS}>
         {content}
       </Markdown>
     </div>

@@ -1,12 +1,12 @@
-import { readFile, realpath } from 'node:fs/promises';
-import { resolve, normalize } from 'node:path';
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { readFile, realpath } from "node:fs/promises";
+import { resolve, normalize } from "node:path";
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 /** Zod schema for read_file tool input. */
 const ReadFileInputSchema = z.object({
   /** File path relative to the workspace root. */
-  path: z.string().describe('File path relative to the workspace root'),
+  path: z.string().describe("File path relative to the workspace root"),
 });
 
 /**
@@ -19,12 +19,12 @@ const ReadFileInputSchema = z.object({
  * never throws.
  */
 export const readFileTool: Tool = {
-  name: 'read_file',
+  name: "read_file",
   description:
-    'Read the contents of a file from the workspace. ' +
-    'Provide a path relative to the workspace root. ' +
-    'Returns the file content as a string, or an error message if the file ' +
-    'cannot be read.',
+    "Read the contents of a file from the workspace. " +
+    "Provide a path relative to the workspace root. " +
+    "Returns the file content as a string, or an error message if the file " +
+    "cannot be read.",
   inputSchema: ReadFileInputSchema,
 
   async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -34,7 +34,7 @@ export const readFileTool: Tool = {
       const workspaceRoot = normalize(resolve(context.workspacePath));
       const resolved = normalize(resolve(workspaceRoot, filePath));
 
-      if (!resolved.startsWith(workspaceRoot + '/') && resolved !== workspaceRoot) {
+      if (!resolved.startsWith(workspaceRoot + "/") && resolved !== workspaceRoot) {
         return `Error: path "${filePath}" resolves outside the workspace`;
       }
 
@@ -47,11 +47,11 @@ export const readFileTool: Tool = {
       }
 
       const realWorkspace = await realpath(workspaceRoot);
-      if (!real.startsWith(realWorkspace + '/') && real !== realWorkspace) {
+      if (!real.startsWith(realWorkspace + "/") && real !== realWorkspace) {
         return `Error: path "${filePath}" resolves outside the workspace via symlink`;
       }
 
-      const content = await readFile(real, 'utf-8');
+      const content = await readFile(real, "utf-8");
       return content;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

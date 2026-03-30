@@ -22,7 +22,7 @@ export class LoomfloApiError extends Error {
 
   constructor(status: number, message: string, body: unknown) {
     super(message);
-    this.name = 'LoomfloApiError';
+    this.name = "LoomfloApiError";
     this.status = status;
     this.body = body;
   }
@@ -229,7 +229,7 @@ export class LoomfloClient {
    * @param options - Connection options including host, port, and auth token.
    */
   constructor(options: LoomfloClientOptions) {
-    const host = options.host ?? '127.0.0.1';
+    const host = options.host ?? "127.0.0.1";
     const port = options.port ?? 3000;
     this.token = options.token;
     this.baseUrl = `http://${host}:${String(port)}`;
@@ -246,7 +246,7 @@ export class LoomfloClient {
    * @returns The daemon health status including optional workflow summary.
    */
   async health(): Promise<HealthResponse> {
-    return this.request<HealthResponse>('GET', '/health');
+    return this.request<HealthResponse>("GET", "/health");
   }
 
   // -------------------------------------------------------------------------
@@ -260,7 +260,7 @@ export class LoomfloClient {
    */
   async getWorkflow(): Promise<WorkflowResponse | null> {
     try {
-      return await this.request<WorkflowResponse>('GET', '/workflow');
+      return await this.request<WorkflowResponse>("GET", "/workflow");
     } catch (err: unknown) {
       if (err instanceof LoomfloApiError && err.status === 404) {
         return null;
@@ -282,7 +282,7 @@ export class LoomfloClient {
     projectPath: string,
     config?: Record<string, unknown>,
   ): Promise<InitResponse> {
-    return this.request<InitResponse>('POST', '/workflow/init', {
+    return this.request<InitResponse>("POST", "/workflow/init", {
       description,
       projectPath,
       config,
@@ -293,7 +293,7 @@ export class LoomfloClient {
    * Confirm the generated spec and begin Phase 2 execution.
    */
   async start(): Promise<void> {
-    await this.request<unknown>('POST', '/workflow/start');
+    await this.request<unknown>("POST", "/workflow/start");
   }
 
   /**
@@ -301,14 +301,14 @@ export class LoomfloClient {
    * dispatched.
    */
   async pause(): Promise<void> {
-    await this.request<unknown>('POST', '/workflow/pause');
+    await this.request<unknown>("POST", "/workflow/pause");
   }
 
   /**
    * Resume a paused or interrupted workflow.
    */
   async resume(): Promise<void> {
-    await this.request<unknown>('POST', '/workflow/resume');
+    await this.request<unknown>("POST", "/workflow/resume");
   }
 
   // -------------------------------------------------------------------------
@@ -322,7 +322,7 @@ export class LoomfloClient {
    * @returns Loom's response and any action taken.
    */
   async chat(message: string): Promise<ChatResponse> {
-    return this.request<ChatResponse>('POST', '/chat', { message });
+    return this.request<ChatResponse>("POST", "/chat", { message });
   }
 
   /**
@@ -331,7 +331,7 @@ export class LoomfloClient {
    * @returns All chat messages exchanged with Loom.
    */
   async chatHistory(): Promise<ChatHistoryResponse> {
-    return this.request<ChatHistoryResponse>('GET', '/chat/history');
+    return this.request<ChatHistoryResponse>("GET", "/chat/history");
   }
 
   // -------------------------------------------------------------------------
@@ -344,7 +344,7 @@ export class LoomfloClient {
    * @returns An array of node summaries.
    */
   async getNodes(): Promise<NodeSummary[]> {
-    const data = await this.request<{ nodes: NodeSummary[] }>('GET', '/nodes');
+    const data = await this.request<{ nodes: NodeSummary[] }>("GET", "/nodes");
     return data.nodes;
   }
 
@@ -355,10 +355,7 @@ export class LoomfloClient {
    * @returns Full node detail with agents and file ownership.
    */
   async getNode(nodeId: string): Promise<NodeDetailResponse> {
-    return this.request<NodeDetailResponse>(
-      'GET',
-      `/nodes/${encodeURIComponent(nodeId)}`,
-    );
+    return this.request<NodeDetailResponse>("GET", `/nodes/${encodeURIComponent(nodeId)}`);
   }
 
   // -------------------------------------------------------------------------
@@ -373,7 +370,7 @@ export class LoomfloClient {
   async getSpecs(): Promise<string[]> {
     const data = await this.request<{
       artifacts: Array<{ name: string; path: string; size: number }>;
-    }>('GET', '/specs');
+    }>("GET", "/specs");
     return data.artifacts.map((a) => a.name);
   }
 
@@ -411,7 +408,7 @@ export class LoomfloClient {
    * @returns Cost breakdown by node and totals.
    */
   async getCosts(): Promise<CostsResponse> {
-    return this.request<CostsResponse>('GET', '/costs');
+    return this.request<CostsResponse>("GET", "/costs");
   }
 
   // -------------------------------------------------------------------------
@@ -424,7 +421,7 @@ export class LoomfloClient {
    * @returns The configuration key-value map.
    */
   async getConfig(): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>('GET', '/config');
+    return this.request<Record<string, unknown>>("GET", "/config");
   }
 
   /**
@@ -434,7 +431,7 @@ export class LoomfloClient {
    * @param updates - Key-value pairs to merge into the current config.
    */
   async setConfig(updates: Record<string, unknown>): Promise<void> {
-    await this.request<unknown>('PUT', '/config', updates);
+    await this.request<unknown>("PUT", "/config", updates);
   }
 
   // -------------------------------------------------------------------------
@@ -458,15 +455,14 @@ export class LoomfloClient {
     offset?: number;
   }): Promise<EventsResponse> {
     const search = new URLSearchParams();
-    if (params?.type !== undefined) search.set('type', params.type);
-    if (params?.nodeId !== undefined) search.set('nodeId', params.nodeId);
-    if (params?.limit !== undefined) search.set('limit', String(params.limit));
-    if (params?.offset !== undefined)
-      search.set('offset', String(params.offset));
+    if (params?.type !== undefined) search.set("type", params.type);
+    if (params?.nodeId !== undefined) search.set("nodeId", params.nodeId);
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
 
     const qs = search.toString();
-    const path = qs ? `/events?${qs}` : '/events';
-    return this.request<EventsResponse>('GET', path);
+    const path = qs ? `/events?${qs}` : "/events";
+    return this.request<EventsResponse>("GET", path);
   }
 
   // -------------------------------------------------------------------------
@@ -484,13 +480,11 @@ export class LoomfloClient {
    */
   async connect(): Promise<void> {
     if (this.ws) {
-      throw new Error('WebSocket is already connected');
+      throw new Error("WebSocket is already connected");
     }
 
-    if (typeof WebSocket === 'undefined') {
-      throw new Error(
-        'Global WebSocket API is not available. Node.js 22+ is required.',
-      );
+    if (typeof WebSocket === "undefined") {
+      throw new Error("Global WebSocket API is not available. Node.js 22+ is required.");
     }
 
     const url = `${this.wsUrl}/ws?token=${encodeURIComponent(this.token)}`;
@@ -498,41 +492,41 @@ export class LoomfloClient {
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);
 
-      ws.addEventListener('message', (event: MessageEvent) => {
+      ws.addEventListener("message", (event: MessageEvent) => {
         this.handleMessage(event);
       });
 
-      ws.addEventListener('error', () => {
-        reject(new Error('WebSocket connection failed'));
+      ws.addEventListener("error", () => {
+        reject(new Error("WebSocket connection failed"));
       });
 
       /** Resolve on the first message (the welcome `connected` event). */
       const onFirstMessage = (event: MessageEvent): void => {
-        ws.removeEventListener('message', onFirstMessage);
+        ws.removeEventListener("message", onFirstMessage);
         try {
           const data: unknown = JSON.parse(String(event.data));
           if (
-            typeof data === 'object' &&
+            typeof data === "object" &&
             data !== null &&
-            'type' in data &&
-            (data as Record<string, unknown>)['type'] === 'connected'
+            "type" in data &&
+            (data as Record<string, unknown>)["type"] === "connected"
           ) {
             this.ws = ws;
             resolve();
           } else {
             ws.close();
-            reject(new Error('Unexpected first WebSocket message'));
+            reject(new Error("Unexpected first WebSocket message"));
           }
         } catch {
           ws.close();
-          reject(new Error('Failed to parse WebSocket welcome message'));
+          reject(new Error("Failed to parse WebSocket welcome message"));
         }
       };
 
-      ws.addEventListener('message', onFirstMessage);
+      ws.addEventListener("message", onFirstMessage);
 
       ws.addEventListener(
-        'close',
+        "close",
         () => {
           if (this.ws === ws) {
             this.ws = null;
@@ -591,12 +585,12 @@ export class LoomfloClient {
       return;
     }
 
-    if (typeof data !== 'object' || data === null || !('type' in data)) {
+    if (typeof data !== "object" || data === null || !("type" in data)) {
       return;
     }
 
-    const eventType = (data as Record<string, unknown>)['type'];
-    if (typeof eventType !== 'string') {
+    const eventType = (data as Record<string, unknown>)["type"];
+    if (typeof eventType !== "string") {
       return;
     }
 
@@ -617,18 +611,14 @@ export class LoomfloClient {
    * @returns The parsed response body.
    * @throws {LoomfloApiError} On non-2xx responses.
    */
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
     };
 
     let reqBody: string | undefined;
     if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
+      headers["Content-Type"] = "application/json";
       reqBody = JSON.stringify(body);
     }
 

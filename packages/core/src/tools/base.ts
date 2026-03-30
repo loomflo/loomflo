@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { ToolDefinition } from '../types.js';
+import { z } from "zod";
+import type { ToolDefinition } from "../types.js";
 
 // ============================================================================
 // ToolContext
@@ -102,38 +102,38 @@ export function zodToJsonSchema(schema: z.ZodType<unknown>): Record<string, unkn
  */
 function processSchema(schema: z.ZodType<unknown>): JsonSchema {
   const def = schema._def as Record<string, unknown>;
-  const typeName = def['typeName'] as string | undefined;
+  const typeName = def["typeName"] as string | undefined;
 
   switch (typeName) {
-    case 'ZodString':
+    case "ZodString":
       return processString(def);
-    case 'ZodNumber':
+    case "ZodNumber":
       return processNumber(def);
-    case 'ZodBoolean':
-      return { type: 'boolean' };
-    case 'ZodObject':
+    case "ZodBoolean":
+      return { type: "boolean" };
+    case "ZodObject":
       return processObject(def);
-    case 'ZodArray':
+    case "ZodArray":
       return processArray(def);
-    case 'ZodEnum':
+    case "ZodEnum":
       return processEnum(def);
-    case 'ZodNativeEnum':
+    case "ZodNativeEnum":
       return processNativeEnum(def);
-    case 'ZodLiteral':
+    case "ZodLiteral":
       return processLiteral(def);
-    case 'ZodUnion':
-    case 'ZodDiscriminatedUnion':
+    case "ZodUnion":
+    case "ZodDiscriminatedUnion":
       return processUnion(def);
-    case 'ZodOptional':
-      return processSchema(def['innerType'] as z.ZodType<unknown>);
-    case 'ZodNullable':
-      return { ...processSchema(def['innerType'] as z.ZodType<unknown>), nullable: true };
-    case 'ZodDefault':
+    case "ZodOptional":
+      return processSchema(def["innerType"] as z.ZodType<unknown>);
+    case "ZodNullable":
+      return { ...processSchema(def["innerType"] as z.ZodType<unknown>), nullable: true };
+    case "ZodDefault":
       return processDefault(def);
-    case 'ZodRecord':
+    case "ZodRecord":
       return processRecord(def);
-    case 'ZodEffects':
-      return processSchema(def['schema'] as z.ZodType<unknown>);
+    case "ZodEffects":
+      return processSchema(def["schema"] as z.ZodType<unknown>);
     default:
       return {};
   }
@@ -146,13 +146,13 @@ function processSchema(schema: z.ZodType<unknown>): JsonSchema {
  * @returns JSON Schema for a string type.
  */
 function processString(def: Record<string, unknown>): JsonSchema {
-  const result: JsonSchema = { type: 'string' };
-  const checks = def['checks'] as Array<Record<string, unknown>> | undefined;
+  const result: JsonSchema = { type: "string" };
+  const checks = def["checks"] as Array<Record<string, unknown>> | undefined;
   if (checks) {
     for (const check of checks) {
-      if (check['kind'] === 'min') result['minLength'] = check['value'] as number;
-      if (check['kind'] === 'max') result['maxLength'] = check['value'] as number;
-      if (check['kind'] === 'regex') result['pattern'] = String(check['regex']);
+      if (check["kind"] === "min") result["minLength"] = check["value"] as number;
+      if (check["kind"] === "max") result["maxLength"] = check["value"] as number;
+      if (check["kind"] === "regex") result["pattern"] = String(check["regex"]);
     }
   }
   return result;
@@ -165,13 +165,13 @@ function processString(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema for a number type.
  */
 function processNumber(def: Record<string, unknown>): JsonSchema {
-  const checks = def['checks'] as Array<Record<string, unknown>> | undefined;
-  const result: JsonSchema = { type: 'number' };
+  const checks = def["checks"] as Array<Record<string, unknown>> | undefined;
+  const result: JsonSchema = { type: "number" };
   if (checks) {
     for (const check of checks) {
-      if (check['kind'] === 'int') result['type'] = 'integer';
-      if (check['kind'] === 'min') result['minimum'] = check['value'] as number;
-      if (check['kind'] === 'max') result['maximum'] = check['value'] as number;
+      if (check["kind"] === "int") result["type"] = "integer";
+      if (check["kind"] === "min") result["minimum"] = check["value"] as number;
+      if (check["kind"] === "max") result["maximum"] = check["value"] as number;
     }
   }
   return result;
@@ -184,8 +184,8 @@ function processNumber(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema for an object type with properties and required fields.
  */
 function processObject(def: Record<string, unknown>): JsonSchema {
-  const shape = def['shape'] as (() => Record<string, z.ZodType<unknown>>) | undefined;
-  if (!shape) return { type: 'object' };
+  const shape = def["shape"] as (() => Record<string, z.ZodType<unknown>>) | undefined;
+  if (!shape) return { type: "object" };
 
   const shapeObj = shape();
   const properties: Record<string, JsonSchema> = {};
@@ -198,9 +198,9 @@ function processObject(def: Record<string, unknown>): JsonSchema {
     }
   }
 
-  const result: JsonSchema = { type: 'object', properties, additionalProperties: false };
+  const result: JsonSchema = { type: "object", properties, additionalProperties: false };
   if (required.length > 0) {
-    result['required'] = required;
+    result["required"] = required;
   }
   return result;
 }
@@ -213,8 +213,8 @@ function processObject(def: Record<string, unknown>): JsonSchema {
  */
 function isOptional(schema: z.ZodType<unknown>): boolean {
   const def = schema._def as Record<string, unknown>;
-  const typeName = def['typeName'] as string | undefined;
-  if (typeName === 'ZodOptional' || typeName === 'ZodDefault') return true;
+  const typeName = def["typeName"] as string | undefined;
+  if (typeName === "ZodOptional" || typeName === "ZodDefault") return true;
   return false;
 }
 
@@ -225,10 +225,10 @@ function isOptional(schema: z.ZodType<unknown>): boolean {
  * @returns JSON Schema for an array type.
  */
 function processArray(def: Record<string, unknown>): JsonSchema {
-  const itemType = def['type'] as z.ZodType<unknown> | undefined;
-  const result: JsonSchema = { type: 'array' };
+  const itemType = def["type"] as z.ZodType<unknown> | undefined;
+  const result: JsonSchema = { type: "array" };
   if (itemType) {
-    result['items'] = processSchema(itemType);
+    result["items"] = processSchema(itemType);
   }
   return result;
 }
@@ -240,8 +240,8 @@ function processArray(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema with enum values.
  */
 function processEnum(def: Record<string, unknown>): JsonSchema {
-  const values = def['values'] as unknown[];
-  return { type: 'string', enum: values };
+  const values = def["values"] as unknown[];
+  return { type: "string", enum: values };
 }
 
 /**
@@ -251,9 +251,9 @@ function processEnum(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema with enum values from a TypeScript enum.
  */
 function processNativeEnum(def: Record<string, unknown>): JsonSchema {
-  const enumObj = def['values'] as Record<string, unknown>;
+  const enumObj = def["values"] as Record<string, unknown>;
   const values = Object.values(enumObj).filter(
-    (v) => typeof v === 'string' || typeof v === 'number',
+    (v) => typeof v === "string" || typeof v === "number",
   );
   return { enum: values };
 }
@@ -265,7 +265,7 @@ function processNativeEnum(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema with a const/enum value.
  */
 function processLiteral(def: Record<string, unknown>): JsonSchema {
-  const value = def['value'];
+  const value = def["value"];
   return { enum: [value] };
 }
 
@@ -276,7 +276,7 @@ function processLiteral(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema with oneOf variants.
  */
 function processUnion(def: Record<string, unknown>): JsonSchema {
-  const options = def['options'] as z.ZodType<unknown>[];
+  const options = def["options"] as z.ZodType<unknown>[];
   return { oneOf: options.map((opt) => processSchema(opt)) };
 }
 
@@ -287,10 +287,10 @@ function processUnion(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema with the default value applied.
  */
 function processDefault(def: Record<string, unknown>): JsonSchema {
-  const innerSchema = processSchema(def['innerType'] as z.ZodType<unknown>);
-  const defaultValueFn = def['defaultValue'] as (() => unknown) | undefined;
+  const innerSchema = processSchema(def["innerType"] as z.ZodType<unknown>);
+  const defaultValueFn = def["defaultValue"] as (() => unknown) | undefined;
   if (defaultValueFn) {
-    innerSchema['default'] = defaultValueFn();
+    innerSchema["default"] = defaultValueFn();
   }
   return innerSchema;
 }
@@ -302,10 +302,10 @@ function processDefault(def: Record<string, unknown>): JsonSchema {
  * @returns JSON Schema for an object with dynamic keys.
  */
 function processRecord(def: Record<string, unknown>): JsonSchema {
-  const valueType = def['valueType'] as z.ZodType<unknown> | undefined;
-  const result: JsonSchema = { type: 'object' };
+  const valueType = def["valueType"] as z.ZodType<unknown> | undefined;
+  const result: JsonSchema = { type: "object" };
   if (valueType) {
-    result['additionalProperties'] = processSchema(valueType);
+    result["additionalProperties"] = processSchema(valueType);
   }
   return result;
 }

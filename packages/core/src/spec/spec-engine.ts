@@ -1,12 +1,12 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-import type { ModelPricing } from '../costs/tracker.js';
-import { DEFAULT_PRICING } from '../costs/tracker.js';
-import type { LLMProvider } from '../providers/base.js';
-import type { Graph, LLMResponse, Node, Edge, TopologyType } from '../types.js';
-import type { WebSocketBroadcaster } from '../api/websocket.js';
-import { SPEC_PROMPTS } from './prompts.js';
+import type { ModelPricing } from "../costs/tracker.js";
+import { DEFAULT_PRICING } from "../costs/tracker.js";
+import type { LLMProvider } from "../providers/base.js";
+import type { Graph, LLMResponse, Node, Edge, TopologyType } from "../types.js";
+import type { WebSocketBroadcaster } from "../api/websocket.js";
+import { SPEC_PROMPTS } from "./prompts.js";
 
 // ============================================================================
 // Types
@@ -69,9 +69,7 @@ export interface ClarificationQuestion {
  * @param questions - Array of clarification questions (max 3).
  * @returns Promise resolving to an array of answer strings in corresponding order.
  */
-export type ClarificationCallback = (
-  questions: ClarificationQuestion[],
-) => Promise<string[]>;
+export type ClarificationCallback = (questions: ClarificationQuestion[]) => Promise<string[]>;
 
 /**
  * A single spec artifact produced by the pipeline.
@@ -104,12 +102,12 @@ export interface SpecPipelineResult {
 
 /** Events emitted during spec pipeline execution for progress tracking. */
 export type SpecStepEvent =
-  | { type: 'spec_step_started'; stepName: string; stepIndex: number }
-  | { type: 'spec_step_completed'; stepName: string; stepIndex: number; artifactPath: string }
-  | { type: 'spec_step_error'; stepName: string; stepIndex: number; error: Error }
-  | { type: 'spec_pipeline_completed'; artifacts: SpecArtifact[]; graph: Graph }
-  | { type: 'clarification_requested'; questions: ClarificationQuestion[]; stepName: string }
-  | { type: 'clarification_answered'; answers: string[]; stepName: string };
+  | { type: "spec_step_started"; stepName: string; stepIndex: number }
+  | { type: "spec_step_completed"; stepName: string; stepIndex: number; artifactPath: string }
+  | { type: "spec_step_error"; stepName: string; stepIndex: number; error: Error }
+  | { type: "spec_pipeline_completed"; artifacts: SpecArtifact[]; graph: Graph }
+  | { type: "clarification_requested"; questions: ClarificationQuestion[]; stepName: string }
+  | { type: "clarification_answered"; answers: string[]; stepName: string };
 
 /** Callback for receiving spec pipeline progress events. */
 export type SpecStepCallback = (event: SpecStepEvent) => void;
@@ -136,16 +134,14 @@ export class SpecPipelineError extends Error {
    * @param cause - The underlying error that caused the failure.
    */
   constructor(stepName: string, stepIndex: number, cause: Error) {
-    super(
-      `Spec pipeline failed at step ${String(stepIndex)} (${stepName}): ${cause.message}`,
-      { cause },
-    );
-    this.name = 'SpecPipelineError';
+    super(`Spec pipeline failed at step ${String(stepIndex)} (${stepName}): ${cause.message}`, {
+      cause,
+    });
+    this.name = "SpecPipelineError";
     this.stepName = stepName;
     this.stepIndex = stepIndex;
   }
 }
-
 
 // ============================================================================
 // GraphValidationError
@@ -162,12 +158,12 @@ export class SpecPipelineError extends Error {
  * - `empty_graph`: The graph contains zero nodes.
  */
 export type GraphValidationCode =
-  | 'cycle_detected'
-  | 'duplicate_node_id'
-  | 'invalid_edge_reference'
-  | 'no_root_node'
-  | 'orphan_nodes'
-  | 'empty_graph';
+  | "cycle_detected"
+  | "duplicate_node_id"
+  | "invalid_edge_reference"
+  | "no_root_node"
+  | "orphan_nodes"
+  | "empty_graph";
 
 /**
  * Error thrown when graph validation fails.
@@ -188,7 +184,7 @@ export class GraphValidationError extends Error {
    */
   constructor(code: GraphValidationCode, message: string, involvedNodes: string[] = []) {
     super(message);
-    this.name = 'GraphValidationError';
+    this.name = "GraphValidationError";
     this.code = code;
     this.involvedNodes = involvedNodes;
   }
@@ -226,7 +222,7 @@ export const DEFAULT_COST_ESTIMATION_CONFIG: CostEstimationConfig = {
   estimatedInputTokensPerTask: 4000,
   estimatedOutputTokensPerTask: 2000,
   modelPricing: DEFAULT_PRICING,
-  model: 'claude-sonnet-4-6',
+  model: "claude-sonnet-4-6",
 };
 
 /**
@@ -264,10 +260,10 @@ interface GraphDefinition {
 // ============================================================================
 
 /** Opening marker the LLM uses to signal ambiguity in its output. */
-const CLARIFICATION_MARKER_START = '[CLARIFICATION_NEEDED]';
+const CLARIFICATION_MARKER_START = "[CLARIFICATION_NEEDED]";
 
 /** Closing marker the LLM uses to end the ambiguity block. */
-const CLARIFICATION_MARKER_END = '[/CLARIFICATION_NEEDED]';
+const CLARIFICATION_MARKER_END = "[/CLARIFICATION_NEEDED]";
 
 /** Maximum number of clarification questions per step (FR-007). */
 const MAX_CLARIFICATION_QUESTIONS = 3;
@@ -290,14 +286,14 @@ function extractResponseText(response: LLMResponse): string {
   const parts: string[] = [];
 
   for (const block of response.content) {
-    if (block.type === 'text') {
+    if (block.type === "text") {
       parts.push(block.text);
     }
   }
 
-  const text = parts.join('\n');
+  const text = parts.join("\n");
   if (text.length === 0) {
-    throw new Error('LLM response contained no text content');
+    throw new Error("LLM response contained no text content");
   }
 
   return text;
@@ -340,36 +336,36 @@ function extractJson(text: string): unknown {
  * @throws If the value does not match the expected structure.
  */
 function validateGraphDefinition(value: unknown): GraphDefinition {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error('Graph definition must be an object');
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Graph definition must be an object");
   }
 
   const obj = value as Record<string, unknown>;
-  if (!Array.isArray(obj['nodes'])) {
+  if (!Array.isArray(obj["nodes"])) {
     throw new Error('Graph definition must have a "nodes" array');
   }
 
-  for (const node of obj['nodes'] as unknown[]) {
-    if (typeof node !== 'object' || node === null) {
-      throw new Error('Each graph node must be an object');
+  for (const node of obj["nodes"] as unknown[]) {
+    if (typeof node !== "object" || node === null) {
+      throw new Error("Each graph node must be an object");
     }
 
     const n = node as Record<string, unknown>;
-    if (typeof n['id'] !== 'string' || n['id'].length === 0) {
+    if (typeof n["id"] !== "string" || n["id"].length === 0) {
       throw new Error('Each graph node must have a non-empty string "id"');
     }
-    if (typeof n['title'] !== 'string' || n['title'].length === 0) {
-      throw new Error(`Graph node "${n['id']}" must have a non-empty string "title"`);
+    if (typeof n["title"] !== "string" || n["title"].length === 0) {
+      throw new Error(`Graph node "${n["id"]}" must have a non-empty string "title"`);
     }
-    if (typeof n['instructions'] !== 'string') {
-      throw new Error(`Graph node "${n['id']}" must have a string "instructions"`);
+    if (typeof n["instructions"] !== "string") {
+      throw new Error(`Graph node "${n["id"]}" must have a string "instructions"`);
     }
-    if (!Array.isArray(n['dependencies'])) {
-      throw new Error(`Graph node "${n['id']}" must have a "dependencies" array`);
+    if (!Array.isArray(n["dependencies"])) {
+      throw new Error(`Graph node "${n["id"]}" must have a "dependencies" array`);
     }
-    for (const dep of n['dependencies'] as unknown[]) {
-      if (typeof dep !== 'string') {
-        throw new Error(`Graph node "${n['id']}" dependencies must be strings`);
+    for (const dep of n["dependencies"] as unknown[]) {
+      if (typeof dep !== "string") {
+        throw new Error(`Graph node "${n["id"]}" dependencies must be strings`);
       }
     }
   }
@@ -393,7 +389,7 @@ function validateGraphDefinition(value: unknown): GraphDefinition {
  */
 function detectTopology(nodeIds: string[], edges: Edge[]): TopologyType {
   if (edges.length === 0) {
-    return 'linear';
+    return "linear";
   }
 
   const outDegree = new Map<string, number>();
@@ -419,12 +415,12 @@ function detectTopology(nodeIds: string[], edges: Edge[]): TopologyType {
     if (count > 1) convergentCount++;
   }
 
-  if (divergentCount === 0 && convergentCount === 0) return 'linear';
+  if (divergentCount === 0 && convergentCount === 0) return "linear";
   if (divergentCount > 0 && convergentCount === 0) {
-    return divergentCount === 1 ? 'divergent' : 'tree';
+    return divergentCount === 1 ? "divergent" : "tree";
   }
-  if (divergentCount === 0 && convergentCount > 0) return 'convergent';
-  return 'mixed';
+  if (divergentCount === 0 && convergentCount > 0) return "convergent";
+  return "mixed";
 }
 
 /**
@@ -508,12 +504,10 @@ export function validateDag(nodes: Record<string, Node>, edges: Edge[]): void {
   }
 
   if (visited !== nodeIds.length) {
-    const cycleNodes = [...inDegree.entries()]
-      .filter(([, degree]) => degree > 0)
-      .map(([id]) => id);
+    const cycleNodes = [...inDegree.entries()].filter(([, degree]) => degree > 0).map(([id]) => id);
     throw new GraphValidationError(
-      'cycle_detected',
-      `Graph contains a cycle involving nodes: ${cycleNodes.join(', ')}`,
+      "cycle_detected",
+      `Graph contains a cycle involving nodes: ${cycleNodes.join(", ")}`,
       cycleNodes,
     );
   }
@@ -536,23 +530,20 @@ export function validateGraphIntegrity(graph: Graph): void {
   const nodeIds = new Set(Object.keys(graph.nodes));
 
   if (nodeIds.size === 0) {
-    throw new GraphValidationError(
-      'empty_graph',
-      'Graph must contain at least one node',
-    );
+    throw new GraphValidationError("empty_graph", "Graph must contain at least one node");
   }
 
   for (const edge of graph.edges) {
     if (!nodeIds.has(edge.from)) {
       throw new GraphValidationError(
-        'invalid_edge_reference',
+        "invalid_edge_reference",
         `Edge references non-existent source node "${edge.from}"`,
         [edge.from],
       );
     }
     if (!nodeIds.has(edge.to)) {
       throw new GraphValidationError(
-        'invalid_edge_reference',
+        "invalid_edge_reference",
         `Edge references non-existent target node "${edge.to}"`,
         [edge.to],
       );
@@ -563,8 +554,8 @@ export function validateGraphIntegrity(graph: Graph): void {
   const rootNodes = [...nodeIds].filter((id) => !nodesWithIncoming.has(id));
   if (rootNodes.length === 0) {
     throw new GraphValidationError(
-      'no_root_node',
-      'Graph must have at least one root node (no incoming edges)',
+      "no_root_node",
+      "Graph must have at least one root node (no incoming edges)",
     );
   }
 
@@ -574,8 +565,8 @@ export function validateGraphIntegrity(graph: Graph): void {
     const orphanNodes = [...nodeIds].filter((id) => !connectedNodes.has(id));
     if (orphanNodes.length > 0) {
       throw new GraphValidationError(
-        'orphan_nodes',
-        `Graph contains orphan nodes with no edges: ${orphanNodes.join(', ')}`,
+        "orphan_nodes",
+        `Graph contains orphan nodes with no edges: ${orphanNodes.join(", ")}`,
         orphanNodes,
       );
     }
@@ -662,9 +653,9 @@ function createNodeFromDefinition(def: GraphNodeDefinition): Node {
   return {
     id: def.id,
     title: def.title,
-    status: 'pending',
+    status: "pending",
     instructions: def.instructions,
-    delay: '0',
+    delay: "0",
     resumeAt: null,
     agents: [],
     fileOwnership: {},
@@ -718,7 +709,7 @@ export class SpecEngine {
    */
   constructor(config: SpecEngineConfig) {
     this.config = config;
-    this.specsDir = join(config.projectPath, '.loomflo', 'specs');
+    this.specsDir = join(config.projectPath, ".loomflo", "specs");
     this.broadcaster = config.broadcaster;
   }
 
@@ -751,84 +742,97 @@ export class SpecEngine {
 
     // Step 0: Generate constitution (with clarification support)
     const constitution = await this.executeStep(
-      0, 'constitution',
+      0,
+      "constitution",
       async () => {
         const output = await this.generateConstitution(description);
         return this.handleClarification(
-          'constitution', description, output,
+          "constitution",
+          description,
+          output,
           (augmented) => this.generateConstitution(augmented),
           onProgress,
         );
       },
       onProgress,
     );
-    const constitutionArtifact = await this.writeArtifact('constitution.md', constitution);
+    const constitutionArtifact = await this.writeArtifact("constitution.md", constitution);
     artifacts.push(constitutionArtifact);
-    this.broadcaster?.emitSpecArtifactReady('constitution.md', '.loomflo/specs/constitution.md');
-    this.notifyStepCompleted(0, 'constitution', constitutionArtifact.path, onProgress);
+    this.broadcaster?.emitSpecArtifactReady("constitution.md", ".loomflo/specs/constitution.md");
+    this.notifyStepCompleted(0, "constitution", constitutionArtifact.path, onProgress);
 
     // Step 1: Generate spec (with clarification support)
     const spec = await this.executeStep(
-      1, 'spec',
+      1,
+      "spec",
       async () => {
         const output = await this.generateSpec(description, constitution);
         return this.handleClarification(
-          'spec', description, output,
+          "spec",
+          description,
+          output,
           (augmented) => this.generateSpec(augmented, constitution),
           onProgress,
         );
       },
       onProgress,
     );
-    const specArtifact = await this.writeArtifact('spec.md', spec);
+    const specArtifact = await this.writeArtifact("spec.md", spec);
     artifacts.push(specArtifact);
-    this.broadcaster?.emitSpecArtifactReady('spec.md', '.loomflo/specs/spec.md');
-    this.notifyStepCompleted(1, 'spec', specArtifact.path, onProgress);
+    this.broadcaster?.emitSpecArtifactReady("spec.md", ".loomflo/specs/spec.md");
+    this.notifyStepCompleted(1, "spec", specArtifact.path, onProgress);
 
     // Step 2: Generate plan
     const plan = await this.executeStep(
-      2, 'plan',
+      2,
+      "plan",
       () => this.generatePlan(description, constitution, spec),
       onProgress,
     );
-    const planArtifact = await this.writeArtifact('plan.md', plan);
+    const planArtifact = await this.writeArtifact("plan.md", plan);
     artifacts.push(planArtifact);
-    this.broadcaster?.emitSpecArtifactReady('plan.md', '.loomflo/specs/plan.md');
-    this.notifyStepCompleted(2, 'plan', planArtifact.path, onProgress);
+    this.broadcaster?.emitSpecArtifactReady("plan.md", ".loomflo/specs/plan.md");
+    this.notifyStepCompleted(2, "plan", planArtifact.path, onProgress);
 
     // Step 3: Generate tasks
     const tasks = await this.executeStep(
-      3, 'tasks',
+      3,
+      "tasks",
       () => this.generateTasks(description, constitution, spec, plan),
       onProgress,
     );
-    const tasksArtifact = await this.writeArtifact('tasks.md', tasks);
+    const tasksArtifact = await this.writeArtifact("tasks.md", tasks);
     artifacts.push(tasksArtifact);
-    this.broadcaster?.emitSpecArtifactReady('tasks.md', '.loomflo/specs/tasks.md');
-    this.notifyStepCompleted(3, 'tasks', tasksArtifact.path, onProgress);
+    this.broadcaster?.emitSpecArtifactReady("tasks.md", ".loomflo/specs/tasks.md");
+    this.notifyStepCompleted(3, "tasks", tasksArtifact.path, onProgress);
 
     // Step 4: Generate analysis
     const analysis = await this.executeStep(
-      4, 'analysis',
+      4,
+      "analysis",
       () => this.generateAnalysis(constitution, spec, plan, tasks),
       onProgress,
     );
-    const analysisArtifact = await this.writeArtifact('analysis-report.md', analysis);
+    const analysisArtifact = await this.writeArtifact("analysis-report.md", analysis);
     artifacts.push(analysisArtifact);
-    this.broadcaster?.emitSpecArtifactReady('analysis-report.md', '.loomflo/specs/analysis-report.md');
-    this.notifyStepCompleted(4, 'analysis', analysisArtifact.path, onProgress);
+    this.broadcaster?.emitSpecArtifactReady(
+      "analysis-report.md",
+      ".loomflo/specs/analysis-report.md",
+    );
+    this.notifyStepCompleted(4, "analysis", analysisArtifact.path, onProgress);
 
     // Step 5: Build graph
     const graph = await this.executeStep(
-      5, 'graph',
+      5,
+      "graph",
       () => this.buildGraph(tasks, plan),
       onProgress,
     );
-    this.notifyStepCompleted(5, 'graph', this.specsDir, onProgress);
+    this.notifyStepCompleted(5, "graph", this.specsDir, onProgress);
 
     // Pipeline complete
     onProgress?.({
-      type: 'spec_pipeline_completed',
+      type: "spec_pipeline_completed",
       artifacts,
       graph,
     });
@@ -855,13 +859,13 @@ export class SpecEngine {
     fn: () => Promise<T>,
     onProgress?: SpecStepCallback,
   ): Promise<T> {
-    onProgress?.({ type: 'spec_step_started', stepName, stepIndex });
+    onProgress?.({ type: "spec_step_started", stepName, stepIndex });
 
     try {
       return await fn();
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
-      onProgress?.({ type: 'spec_step_error', stepName, stepIndex, error });
+      onProgress?.({ type: "spec_step_error", stepName, stepIndex, error });
       throw new SpecPipelineError(stepName, stepIndex, error);
     }
   }
@@ -881,7 +885,7 @@ export class SpecEngine {
     onProgress?: SpecStepCallback,
   ): void {
     onProgress?.({
-      type: 'spec_step_completed',
+      type: "spec_step_completed",
       stepName,
       stepIndex,
       artifactPath,
@@ -900,7 +904,7 @@ export class SpecEngine {
    */
   private async callLLM(systemPrompt: string, userMessage: string): Promise<string> {
     const response = await this.config.provider.complete({
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [{ role: "user", content: userMessage }],
       system: systemPrompt,
       model: this.config.model,
       maxTokens: this.config.maxTokens,
@@ -918,7 +922,7 @@ export class SpecEngine {
    */
   private async writeArtifact(name: string, content: string): Promise<SpecArtifact> {
     const artifactPath = join(this.specsDir, name);
-    await writeFile(artifactPath, content, 'utf-8');
+    await writeFile(artifactPath, content, "utf-8");
     return { name, path: artifactPath, content };
   }
 
@@ -949,18 +953,19 @@ export class SpecEngine {
       return [];
     }
 
-    const block = text
-      .substring(startIdx + CLARIFICATION_MARKER_START.length, endIdx)
-      .trim();
+    const block = text.substring(startIdx + CLARIFICATION_MARKER_START.length, endIdx).trim();
 
     if (block.length === 0) {
       return [];
     }
 
-    const lines = block.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    const lines = block
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
     const questions: ClarificationQuestion[] = [];
     let currentQuestion: string | null = null;
-    let currentContext = '';
+    let currentContext = "";
 
     for (const line of lines) {
       const qMatch = /^Q\d+:\s*(.+)$/.exec(line);
@@ -972,7 +977,7 @@ export class SpecEngine {
           questions.push({ question: currentQuestion, context: currentContext });
         }
         currentQuestion = qMatch[1];
-        currentContext = '';
+        currentContext = "";
       } else if (cMatch?.[1] != null) {
         currentContext = cMatch[1];
       }
@@ -1054,7 +1059,7 @@ export class SpecEngine {
 
     // Emit clarification_requested event
     onProgress?.({
-      type: 'clarification_requested',
+      type: "clarification_requested",
       questions: limitedQuestions,
       stepName,
     });
@@ -1072,22 +1077,19 @@ export class SpecEngine {
 
     // Emit clarification_answered event
     onProgress?.({
-      type: 'clarification_answered',
+      type: "clarification_answered",
       answers,
       stepName,
     });
 
     // Build augmented description with Q&A pairs
     const clarificationLines = limitedQuestions
-      .map((q, i) => `Q: ${q.question}\nA: ${answers[i] ?? 'No answer provided'}`)
-      .join('\n\n');
+      .map((q, i) => `Q: ${q.question}\nA: ${answers[i] ?? "No answer provided"}`)
+      .join("\n\n");
 
-    const augmentedDescription = [
-      description,
-      '',
-      '## Clarifications',
-      clarificationLines,
-    ].join('\n');
+    const augmentedDescription = [description, "", "## Clarifications", clarificationLines].join(
+      "\n",
+    );
 
     // Re-run the step once with the augmented description
     return rerunFn(augmentedDescription);
@@ -1121,14 +1123,14 @@ export class SpecEngine {
    */
   private async generateSpec(description: string, constitution: string): Promise<string> {
     const userMessage = [
-      'Generate a functional specification for the following project.',
-      '',
-      '## Project Description',
+      "Generate a functional specification for the following project.",
+      "",
+      "## Project Description",
       description,
-      '',
-      '## Constitution',
+      "",
+      "## Constitution",
       constitution,
-    ].join('\n');
+    ].join("\n");
 
     return this.callLLM(SPEC_PROMPTS.spec, userMessage);
   }
@@ -1150,17 +1152,17 @@ export class SpecEngine {
     spec: string,
   ): Promise<string> {
     const userMessage = [
-      'Generate a technical implementation plan for the following project.',
-      '',
-      '## Project Description',
+      "Generate a technical implementation plan for the following project.",
+      "",
+      "## Project Description",
       description,
-      '',
-      '## Constitution',
+      "",
+      "## Constitution",
       constitution,
-      '',
-      '## Specification',
+      "",
+      "## Specification",
       spec,
-    ].join('\n');
+    ].join("\n");
 
     return this.callLLM(SPEC_PROMPTS.plan, userMessage);
   }
@@ -1184,20 +1186,20 @@ export class SpecEngine {
     plan: string,
   ): Promise<string> {
     const userMessage = [
-      'Generate an ordered task breakdown for the following project.',
-      '',
-      '## Project Description',
+      "Generate an ordered task breakdown for the following project.",
+      "",
+      "## Project Description",
       description,
-      '',
-      '## Constitution',
+      "",
+      "## Constitution",
       constitution,
-      '',
-      '## Specification',
+      "",
+      "## Specification",
       spec,
-      '',
-      '## Plan',
+      "",
+      "## Plan",
       plan,
-    ].join('\n');
+    ].join("\n");
 
     return this.callLLM(SPEC_PROMPTS.tasks, userMessage);
   }
@@ -1221,20 +1223,20 @@ export class SpecEngine {
     tasks: string,
   ): Promise<string> {
     const userMessage = [
-      'Analyze the coherence of the following specification artifacts.',
-      '',
-      '## Constitution',
+      "Analyze the coherence of the following specification artifacts.",
+      "",
+      "## Constitution",
       constitution,
-      '',
-      '## Specification',
+      "",
+      "## Specification",
       spec,
-      '',
-      '## Plan',
+      "",
+      "## Plan",
       plan,
-      '',
-      '## Tasks',
+      "",
+      "## Tasks",
       tasks,
-    ].join('\n');
+    ].join("\n");
 
     return this.callLLM(SPEC_PROMPTS.analysis, userMessage);
   }
@@ -1254,14 +1256,14 @@ export class SpecEngine {
    */
   private async buildGraph(tasks: string, plan: string): Promise<Graph> {
     const userMessage = [
-      'Build an execution workflow graph from the following tasks and plan.',
-      '',
-      '## Tasks',
+      "Build an execution workflow graph from the following tasks and plan.",
+      "",
+      "## Tasks",
       tasks,
-      '',
-      '## Plan',
+      "",
+      "## Plan",
       plan,
-    ].join('\n');
+    ].join("\n");
 
     const responseText = await this.callLLM(SPEC_PROMPTS.graph, userMessage);
 
@@ -1274,7 +1276,7 @@ export class SpecEngine {
     for (const def of graphDef.nodes) {
       if (seenIds.has(def.id)) {
         throw new GraphValidationError(
-          'duplicate_node_id',
+          "duplicate_node_id",
           `Duplicate node ID "${def.id}" in LLM graph output`,
           [def.id],
         );
@@ -1286,7 +1288,7 @@ export class SpecEngine {
     const nodes: Record<string, Node> = {};
     for (const def of graphDef.nodes) {
       nodes[def.id] = createNodeFromDefinition(def);
-      this.broadcaster?.emitGraphModified('node_added', def.id, {
+      this.broadcaster?.emitGraphModified("node_added", def.id, {
         title: def.title,
         instructionsSummary: def.instructions.slice(0, 120),
       });
@@ -1298,13 +1300,13 @@ export class SpecEngine {
       for (const depId of def.dependencies) {
         if (!seenIds.has(depId)) {
           throw new GraphValidationError(
-            'invalid_edge_reference',
+            "invalid_edge_reference",
             `Graph node "${def.id}" depends on unknown node "${depId}"`,
             [def.id, depId],
           );
         }
         edges.push({ from: depId, to: def.id });
-        this.broadcaster?.emitGraphModified('edge_added', def.id, {
+        this.broadcaster?.emitGraphModified("edge_added", def.id, {
           from: depId,
           to: def.id,
         });

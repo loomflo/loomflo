@@ -1,7 +1,7 @@
-import type { LLMProvider, CompletionParams, LLMMessage } from '../providers/base.js';
-import type { Tool, ToolContext } from '../tools/base.js';
-import { toToolDefinition } from '../tools/base.js';
-import type { ContentBlock, ToolDefinition } from '../types.js';
+import type { LLMProvider, CompletionParams, LLMMessage } from "../providers/base.js";
+import type { Tool, ToolContext } from "../tools/base.js";
+import { toToolDefinition } from "../tools/base.js";
+import type { ContentBlock, ToolDefinition } from "../types.js";
 
 // ============================================================================
 // AgentLoopConfig
@@ -43,7 +43,7 @@ export interface AgentLoopConfig {
 // ============================================================================
 
 /** Completion status of an agent loop execution. */
-export type AgentLoopStatus = 'completed' | 'failed' | 'timeout' | 'token_limit';
+export type AgentLoopStatus = "completed" | "failed" | "timeout" | "token_limit";
 
 /**
  * Result returned by {@link runAgentLoop} after execution completes.
@@ -115,7 +115,7 @@ export async function runAgentLoop(
       return {
         output: extractTextOutput(messages),
         tokenUsage,
-        status: 'timeout',
+        status: "timeout",
         error: `Agent exceeded wall-clock timeout of ${String(config.timeout)}ms (elapsed: ${String(elapsed)}ms)`,
       };
     }
@@ -126,7 +126,7 @@ export async function runAgentLoop(
       return {
         output: extractTextOutput(messages),
         tokenUsage,
-        status: 'token_limit',
+        status: "token_limit",
         error: `Agent exceeded token limit of ${String(config.tokenLimit)} (used: ${String(totalTokens)})`,
       };
     }
@@ -149,7 +149,7 @@ export async function runAgentLoop(
       return {
         output: extractTextOutput(messages),
         tokenUsage,
-        status: 'failed',
+        status: "failed",
         error: `LLM call failed: ${errorMessage}`,
       };
     }
@@ -159,20 +159,20 @@ export async function runAgentLoop(
     tokenUsage.output += response.usage.outputTokens;
 
     // Append the assistant response to conversation history
-    messages.push({ role: 'assistant', content: response.content });
+    messages.push({ role: "assistant", content: response.content });
 
     // If the LLM is done, extract final text and return
-    if (response.stopReason === 'end_turn') {
+    if (response.stopReason === "end_turn") {
       return {
         output: extractTextFromBlocks(response.content),
         tokenUsage,
-        status: 'completed',
+        status: "completed",
       };
     }
 
     // stopReason === 'tool_use': execute each tool_use block sequentially
     const toolUseBlocks = response.content.filter(
-      (block): block is ContentBlock & { type: 'tool_use' } => block.type === 'tool_use',
+      (block): block is ContentBlock & { type: "tool_use" } => block.type === "tool_use",
     );
 
     const toolResults: ContentBlock[] = [];
@@ -181,7 +181,7 @@ export async function runAgentLoop(
       let resultContent: string;
 
       if (!tool) {
-        resultContent = `Error: Unknown tool "${toolUse.name}". Available tools: ${config.tools.map((t) => t.name).join(', ')}`;
+        resultContent = `Error: Unknown tool "${toolUse.name}". Available tools: ${config.tools.map((t) => t.name).join(", ")}`;
       } else {
         // Validate input against the tool's schema
         const parseResult = tool.inputSchema.safeParse(toolUse.input);
@@ -194,21 +194,21 @@ export async function runAgentLoop(
       }
 
       toolResults.push({
-        type: 'tool_result',
+        type: "tool_result",
         toolUseId: toolUse.id,
         content: resultContent,
       });
     }
 
     // Append tool results as a user message for the next LLM call
-    messages.push({ role: 'user', content: toolResults });
+    messages.push({ role: "user", content: toolResults });
   }
 
   // Safety net: max iterations exceeded
   return {
     output: extractTextOutput(messages),
     tokenUsage,
-    status: 'failed',
+    status: "failed",
     error: `Agent exceeded maximum iteration limit of ${String(MAX_ITERATIONS)}`,
   };
 }
@@ -225,9 +225,9 @@ export async function runAgentLoop(
  */
 function extractTextFromBlocks(blocks: ContentBlock[]): string {
   return blocks
-    .filter((block): block is ContentBlock & { type: 'text' } => block.type === 'text')
+    .filter((block): block is ContentBlock & { type: "text" } => block.type === "text")
     .map((block) => block.text)
-    .join('\n');
+    .join("\n");
 }
 
 /**
@@ -243,12 +243,12 @@ function extractTextOutput(messages: LLMMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as LLMMessage | undefined;
     if (msg === undefined) continue;
-    if (msg.role === 'assistant') {
-      if (typeof msg.content === 'string') {
+    if (msg.role === "assistant") {
+      if (typeof msg.content === "string") {
         return msg.content;
       }
       return extractTextFromBlocks(msg.content);
     }
   }
-  return '';
+  return "";
 }

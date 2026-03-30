@@ -13,7 +13,7 @@ import type {
   ReviewReport,
   Workflow,
   WorkflowStatus,
-} from './types.js';
+} from "./types.js";
 
 // ============================================================================
 // Response Interfaces
@@ -175,7 +175,7 @@ export interface ChatResponse {
 /** A single message in chat history. */
 export interface ChatMessage {
   /** Message author: "user" or "assistant". */
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   /** Message text content. */
   content: string;
   /** ISO 8601 timestamp when the message was sent. */
@@ -260,11 +260,9 @@ export class ApiError extends Error {
    * @param message - Human-readable error summary.
    */
   constructor(status: number, body: ErrorBody | string, message?: string) {
-    const msg =
-      message ??
-      (typeof body === 'object' ? body.error : `API error ${String(status)}`);
+    const msg = message ?? (typeof body === "object" ? body.error : `API error ${String(status)}`);
     super(msg);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.body = body;
   }
@@ -289,7 +287,7 @@ export class ApiClient {
    * @param baseUrl - Base URL prepended to every request path.
    *                  Defaults to `""` (uses Vite proxy in development).
    */
-  constructor(baseUrl: string = '') {
+  constructor(baseUrl: string = "") {
     this.baseUrl = baseUrl;
   }
 
@@ -315,7 +313,7 @@ export class ApiClient {
   private buildHeaders(extra?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = { ...extra };
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
     return headers;
   }
@@ -331,8 +329,8 @@ export class ApiClient {
    */
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = this.buildHeaders({
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
       ...(options.headers as Record<string, string> | undefined),
     });
 
@@ -364,7 +362,7 @@ export class ApiClient {
    */
   private async requestText(path: string, options: RequestInit = {}): Promise<string> {
     const headers = this.buildHeaders({
-      Accept: 'text/markdown, text/plain',
+      Accept: "text/markdown, text/plain",
       ...(options.headers as Record<string, string> | undefined),
     });
 
@@ -398,7 +396,7 @@ export class ApiClient {
   async getHealth(): Promise<HealthResponse> {
     // Health endpoint does not require auth — bypass token injection.
     const response = await fetch(`${this.baseUrl}/api/health`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" },
     });
 
     if (!response.ok) {
@@ -425,7 +423,7 @@ export class ApiClient {
    * @throws {ApiError} 404 if no active workflow exists.
    */
   async getWorkflow(): Promise<Workflow> {
-    return this.request<Workflow>('/api/workflow');
+    return this.request<Workflow>("/api/workflow");
   }
 
   /**
@@ -442,8 +440,8 @@ export class ApiClient {
     projectPath: string,
     config?: Partial<Config>,
   ): Promise<WorkflowInitResponse> {
-    return this.request<WorkflowInitResponse>('/api/workflow/init', {
-      method: 'POST',
+    return this.request<WorkflowInitResponse>("/api/workflow/init", {
+      method: "POST",
       body: JSON.stringify({ description, projectPath, config }),
     });
   }
@@ -455,8 +453,8 @@ export class ApiClient {
    * @throws {ApiError} 400 if the workflow is not in the "building" state.
    */
   async startWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>('/api/workflow/start', {
-      method: 'POST',
+    return this.request<WorkflowActionResponse>("/api/workflow/start", {
+      method: "POST",
     });
   }
 
@@ -467,8 +465,8 @@ export class ApiClient {
    * @throws {ApiError} 400 if the workflow is not running.
    */
   async pauseWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>('/api/workflow/pause', {
-      method: 'POST',
+    return this.request<WorkflowActionResponse>("/api/workflow/pause", {
+      method: "POST",
     });
   }
 
@@ -479,8 +477,8 @@ export class ApiClient {
    * @throws {ApiError} 400 if there is nothing to resume.
    */
   async resumeWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>('/api/workflow/resume', {
-      method: 'POST',
+    return this.request<WorkflowActionResponse>("/api/workflow/resume", {
+      method: "POST",
     });
   }
 
@@ -494,7 +492,7 @@ export class ApiClient {
    * @returns Array of node summaries.
    */
   async getNodes(): Promise<NodesListResponse> {
-    return this.request<NodesListResponse>('/api/nodes');
+    return this.request<NodesListResponse>("/api/nodes");
   }
 
   /**
@@ -529,7 +527,7 @@ export class ApiClient {
    * @returns Array of spec artifact metadata.
    */
   async getSpecs(): Promise<SpecsListResponse> {
-    return this.request<SpecsListResponse>('/api/specs');
+    return this.request<SpecsListResponse>("/api/specs");
   }
 
   /**
@@ -553,7 +551,7 @@ export class ApiClient {
    * @returns Array of memory file metadata.
    */
   async getMemory(): Promise<MemoryListResponse> {
-    return this.request<MemoryListResponse>('/api/memory');
+    return this.request<MemoryListResponse>("/api/memory");
   }
 
   /**
@@ -578,8 +576,8 @@ export class ApiClient {
    * @returns Loom's response text and any action taken.
    */
   async chat(message: string): Promise<ChatResponse> {
-    return this.request<ChatResponse>('/api/chat', {
-      method: 'POST',
+    return this.request<ChatResponse>("/api/chat", {
+      method: "POST",
       body: JSON.stringify({ message }),
     });
   }
@@ -590,7 +588,7 @@ export class ApiClient {
    * @returns Ordered list of all chat messages.
    */
   async getChatHistory(): Promise<ChatHistoryResponse> {
-    return this.request<ChatHistoryResponse>('/api/chat/history');
+    return this.request<ChatHistoryResponse>("/api/chat/history");
   }
 
   // --------------------------------------------------------------------------
@@ -603,7 +601,7 @@ export class ApiClient {
    * @returns Full resolved configuration object.
    */
   async getConfig(): Promise<Config> {
-    return this.request<Config>('/api/config');
+    return this.request<Config>("/api/config");
   }
 
   /**
@@ -614,8 +612,8 @@ export class ApiClient {
    * @throws {ApiError} 400 if validation fails.
    */
   async updateConfig(config: Partial<Config>): Promise<Config> {
-    return this.request<Config>('/api/config', {
-      method: 'PUT',
+    return this.request<Config>("/api/config", {
+      method: "PUT",
       body: JSON.stringify(config),
     });
   }
@@ -630,7 +628,7 @@ export class ApiClient {
    * @returns Total cost, budget info, per-node breakdown, and Loom cost.
    */
   async getCosts(): Promise<CostsResponse> {
-    return this.request<CostsResponse>('/api/costs');
+    return this.request<CostsResponse>("/api/costs");
   }
 
   // --------------------------------------------------------------------------
@@ -645,13 +643,13 @@ export class ApiClient {
    */
   async getEvents(params?: EventsParams): Promise<EventsResponse> {
     const searchParams = new URLSearchParams();
-    if (params?.type) searchParams.set('type', params.type);
-    if (params?.nodeId) searchParams.set('nodeId', params.nodeId);
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.type) searchParams.set("type", params.type);
+    if (params?.nodeId) searchParams.set("nodeId", params.nodeId);
+    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
 
     const query = searchParams.toString();
-    const path = query ? `/api/events?${query}` : '/api/events';
+    const path = query ? `/api/events?${query}` : "/api/events";
     return this.request<EventsResponse>(path);
   }
 }

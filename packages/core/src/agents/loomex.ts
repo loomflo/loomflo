@@ -11,15 +11,15 @@
  * exec_command, write_memory, send_message, or report_complete.
  */
 
-import type { CostTracker } from '../costs/tracker.js';
-import { createEvent, appendEvent } from '../persistence/events.js';
-import type { LLMProvider } from '../providers/base.js';
-import type { Tool } from '../tools/base.js';
-import type { EventType, ReviewReport, TaskVerification } from '../types.js';
-import { ReviewReportSchema } from '../types.js';
-import type { AgentLoopResult } from './base-agent.js';
-import { runAgentLoop } from './base-agent.js';
-import { buildLoomexPrompt } from './prompts.js';
+import type { CostTracker } from "../costs/tracker.js";
+import { createEvent, appendEvent } from "../persistence/events.js";
+import type { LLMProvider } from "../providers/base.js";
+import type { Tool } from "../tools/base.js";
+import type { EventType, ReviewReport, TaskVerification } from "../types.js";
+import { ReviewReportSchema } from "../types.js";
+import type { AgentLoopResult } from "./base-agent.js";
+import { runAgentLoop } from "./base-agent.js";
+import { buildLoomexPrompt } from "./prompts.js";
 
 // ============================================================================
 // LoomexConfig
@@ -94,12 +94,12 @@ export interface LoomexResult {
 
 /** Tools that Loomex must never have access to (write/mutate tools). */
 const FORBIDDEN_TOOLS = new Set([
-  'write_file',
-  'edit_file',
-  'exec_command',
-  'write_memory',
-  'send_message',
-  'report_complete',
+  "write_file",
+  "edit_file",
+  "exec_command",
+  "write_memory",
+  "send_message",
+  "report_complete",
 ]);
 
 // ============================================================================
@@ -155,14 +155,14 @@ function createFailReport(
   tasksToVerify: Array<{ taskId: string; description: string }>,
 ): ReviewReport {
   return {
-    verdict: 'FAIL',
+    verdict: "FAIL",
     tasksVerified: tasksToVerify.map((t) => ({
       taskId: t.taskId,
-      status: 'fail' as const,
-      details: 'Review could not be completed.',
+      status: "fail" as const,
+      details: "Review could not be completed.",
     })),
     details: errorMessage,
-    recommendation: 'Re-run the reviewer after resolving the underlying issue.',
+    recommendation: "Re-run the reviewer after resolving the underlying issue.",
     createdAt: new Date().toISOString(),
   };
 }
@@ -200,8 +200,8 @@ function extractJson(text: string): unknown {
     }
   }
 
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     try {
       return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
@@ -226,15 +226,15 @@ function extractJson(text: string): unknown {
  * @param text - Raw text from the LLM response.
  * @returns The verdict string or null if none found.
  */
-function extractVerdict(text: string): 'PASS' | 'FAIL' | 'BLOCKED' | null {
+function extractVerdict(text: string): "PASS" | "FAIL" | "BLOCKED" | null {
   const verdictMatch = /\b(?:overall\s+)?verdict\s*:\s*(PASS|FAIL|BLOCKED)\b/i.exec(text);
   if (verdictMatch?.[1] !== undefined) {
-    return verdictMatch[1].toUpperCase() as 'PASS' | 'FAIL' | 'BLOCKED';
+    return verdictMatch[1].toUpperCase() as "PASS" | "FAIL" | "BLOCKED";
   }
 
   const standaloneMatch = /\*\*?(PASS|FAIL|BLOCKED)\*?\*?/i.exec(text);
   if (standaloneMatch?.[1] !== undefined) {
-    return standaloneMatch[1].toUpperCase() as 'PASS' | 'FAIL' | 'BLOCKED';
+    return standaloneMatch[1].toUpperCase() as "PASS" | "FAIL" | "BLOCKED";
   }
 
   return null;
@@ -257,20 +257,18 @@ function extractTaskStatuses(
   const results: TaskVerification[] = [];
 
   for (const task of tasksToVerify) {
-    const escapedId = task.taskId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedId = task.taskId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const taskPattern = new RegExp(
       `${escapedId}[^\\n]*?(?:status|verdict|result)?\\s*[:—\\-]\\s*(pass|fail|blocked)`,
-      'i',
+      "i",
     );
     const match = taskPattern.exec(text);
 
     if (match?.[1] !== undefined) {
-      const status = match[1].toLowerCase() as 'pass' | 'fail' | 'blocked';
+      const status = match[1].toLowerCase() as "pass" | "fail" | "blocked";
       const detailStart = text.indexOf(match[0]);
-      const detailEnd = text.indexOf('\n', detailStart + match[0].length);
-      const detail = detailEnd !== -1
-        ? text.slice(detailStart, detailEnd).trim()
-        : match[0].trim();
+      const detailEnd = text.indexOf("\n", detailStart + match[0].length);
+      const detail = detailEnd !== -1 ? text.slice(detailStart, detailEnd).trim() : match[0].trim();
 
       results.push({
         taskId: task.taskId,
@@ -280,8 +278,8 @@ function extractTaskStatuses(
     } else {
       results.push({
         taskId: task.taskId,
-        status: 'fail',
-        details: 'Could not determine task status from reviewer output.',
+        status: "fail",
+        details: "Could not determine task status from reviewer output.",
       });
     }
   }
@@ -303,11 +301,14 @@ function parseTextBased(
   text: string,
   tasksToVerify: Array<{ taskId: string; description: string }>,
 ): ReviewReport {
-  const verdict = extractVerdict(text) ?? 'FAIL';
+  const verdict = extractVerdict(text) ?? "FAIL";
   const tasksVerified = extractTaskStatuses(text, tasksToVerify);
 
-  const recommendationMatch = /(?:recommendation|suggested action|next steps?)\s*[:—]\s*([^\n]+(?:\n(?!##|\*\*)[^\n]+)*)/i.exec(text);
-  const recommendation = recommendationMatch?.[1]?.trim() ?? 'Review the detailed findings above.';
+  const recommendationMatch =
+    /(?:recommendation|suggested action|next steps?)\s*[:—]\s*([^\n]+(?:\n(?!##|\*\*)[^\n]+)*)/i.exec(
+      text,
+    );
+  const recommendation = recommendationMatch?.[1]?.trim() ?? "Review the detailed findings above.";
 
   return {
     verdict,
@@ -340,10 +341,7 @@ export function parseReviewReport(
   tasksToVerify: Array<{ taskId: string; description: string }>,
 ): ReviewReport {
   if (text.length === 0) {
-    return createFailReport(
-      'Reviewer produced no output.',
-      tasksToVerify,
-    );
+    return createFailReport("Reviewer produced no output.", tasksToVerify);
   }
 
   // Strategy 1: Try JSON extraction + Zod validation
@@ -356,26 +354,28 @@ export function parseReviewReport(
 
     // JSON was found but doesn't match schema — try to salvage fields
     const partial = json as Record<string, unknown>;
-    if (typeof partial['verdict'] === 'string') {
-      const verdictUpper = partial['verdict'].toUpperCase();
-      if (verdictUpper === 'PASS' || verdictUpper === 'FAIL' || verdictUpper === 'BLOCKED') {
-        const tasksVerified = Array.isArray(partial['tasksVerified'])
-          ? salvageTaskVerifications(partial['tasksVerified'], tasksToVerify)
+    if (typeof partial["verdict"] === "string") {
+      const verdictUpper = partial["verdict"].toUpperCase();
+      if (verdictUpper === "PASS" || verdictUpper === "FAIL" || verdictUpper === "BLOCKED") {
+        const tasksVerified = Array.isArray(partial["tasksVerified"])
+          ? salvageTaskVerifications(partial["tasksVerified"], tasksToVerify)
           : tasksToVerify.map((t) => ({
               taskId: t.taskId,
-              status: 'fail' as const,
-              details: 'Task verification data missing from report.',
+              status: "fail" as const,
+              details: "Task verification data missing from report.",
             }));
 
         return {
           verdict: verdictUpper,
           tasksVerified,
-          details: typeof partial['details'] === 'string'
-            ? partial['details']
-            : 'Details not provided in expected format.',
-          recommendation: typeof partial['recommendation'] === 'string'
-            ? partial['recommendation']
-            : 'Review the detailed findings.',
+          details:
+            typeof partial["details"] === "string"
+              ? partial["details"]
+              : "Details not provided in expected format.",
+          recommendation:
+            typeof partial["recommendation"] === "string"
+              ? partial["recommendation"]
+              : "Review the detailed findings.",
           createdAt: new Date().toISOString(),
         };
       }
@@ -416,30 +416,30 @@ function salvageTaskVerifications(
   const parsed = new Map<string, TaskVerification>();
 
   for (const raw of rawTasks) {
-    if (typeof raw !== 'object' || raw === null) continue;
+    if (typeof raw !== "object" || raw === null) continue;
     const entry = raw as Record<string, unknown>;
 
-    const taskId = typeof entry['taskId'] === 'string' ? entry['taskId'] : undefined;
+    const taskId = typeof entry["taskId"] === "string" ? entry["taskId"] : undefined;
     if (taskId === undefined) continue;
 
-    const rawStatus = typeof entry['status'] === 'string' ? entry['status'].toLowerCase() : 'fail';
-    const status = (rawStatus === 'pass' || rawStatus === 'fail' || rawStatus === 'blocked')
-      ? rawStatus
-      : 'fail';
+    const rawStatus = typeof entry["status"] === "string" ? entry["status"].toLowerCase() : "fail";
+    const status =
+      rawStatus === "pass" || rawStatus === "fail" || rawStatus === "blocked" ? rawStatus : "fail";
 
     parsed.set(taskId, {
       taskId,
       status,
-      details: typeof entry['details'] === 'string' ? entry['details'] : 'No details provided.',
+      details: typeof entry["details"] === "string" ? entry["details"] : "No details provided.",
     });
   }
 
-  return tasksToVerify.map((t) =>
-    parsed.get(t.taskId) ?? {
-      taskId: t.taskId,
-      status: 'fail' as const,
-      details: 'Task not found in reviewer response.',
-    },
+  return tasksToVerify.map(
+    (t) =>
+      parsed.get(t.taskId) ?? {
+        taskId: t.taskId,
+        status: "fail" as const,
+        details: "Task not found in reviewer response.",
+      },
   );
 }
 
@@ -480,7 +480,7 @@ export async function runLoomex(config: LoomexConfig): Promise<LoomexResult> {
     });
 
     // Log reviewer started
-    await logEvent(config, 'reviewer_started', {
+    await logEvent(config, "reviewer_started", {
       nodeTitle: config.nodeTitle,
       tasksToVerify: config.tasksToVerify.map((t) => t.taskId),
     });
@@ -503,8 +503,8 @@ export async function runLoomex(config: LoomexConfig): Promise<LoomexResult> {
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      await logEvent(config, 'reviewer_verdict', {
-        verdict: 'FAIL',
+      await logEvent(config, "reviewer_verdict", {
+        verdict: "FAIL",
         error: errorMessage,
       });
       const report = createFailReport(
@@ -531,7 +531,7 @@ export async function runLoomex(config: LoomexConfig): Promise<LoomexResult> {
     const report = parseReviewReport(loopResult.output, config.tasksToVerify);
 
     // Log verdict
-    await logEvent(config, 'reviewer_verdict', {
+    await logEvent(config, "reviewer_verdict", {
       verdict: report.verdict,
       tasksVerified: report.tasksVerified.length,
       loopStatus: loopResult.status,
@@ -543,7 +543,7 @@ export async function runLoomex(config: LoomexConfig): Promise<LoomexResult> {
       tokenUsage: loopResult.tokenUsage,
     };
 
-    if (loopResult.status !== 'completed') {
+    if (loopResult.status !== "completed") {
       result.error = loopResult.error ?? `Agent loop ended with status: ${loopResult.status}`;
     }
 

@@ -9,14 +9,14 @@
  * be replaced with mocks in tests.
  */
 
-import type { CostTracker } from '../costs/tracker.js';
-import { appendEvent, createEvent } from '../persistence/events.js';
-import { saveWorkflowState } from '../persistence/state.js';
-import type { NodeStatus } from '../types.js';
-import type { WorkflowGraph } from './graph.js';
-import type { WorkflowNode } from './node.js';
-import { Scheduler } from './scheduler.js';
-import type { WorkflowManager } from './workflow.js';
+import type { CostTracker } from "../costs/tracker.js";
+import { appendEvent, createEvent } from "../persistence/events.js";
+import { saveWorkflowState } from "../persistence/state.js";
+import type { NodeStatus } from "../types.js";
+import type { WorkflowGraph } from "./graph.js";
+import type { WorkflowNode } from "./node.js";
+import { Scheduler } from "./scheduler.js";
+import type { WorkflowManager } from "./workflow.js";
 
 // ============================================================================
 // Types
@@ -27,7 +27,7 @@ import type { WorkflowManager } from './workflow.js';
  *
  * Maps to the terminal states a node can reach after execution.
  */
-export type NodeExecutionStatus = 'done' | 'failed' | 'blocked';
+export type NodeExecutionStatus = "done" | "failed" | "blocked";
 
 /**
  * Result returned by a {@link NodeExecutor} after a node finishes execution.
@@ -91,7 +91,7 @@ export interface ExecutionEngineConfig {
  */
 export interface ExecutionResult {
   /** The workflow's terminal status after execution. */
-  status: 'done' | 'failed' | 'paused';
+  status: "done" | "failed" | "paused";
   /** IDs of nodes that completed successfully. */
   completedNodes: string[];
   /** IDs of nodes that ended in `failed` or `blocked`. */
@@ -163,27 +163,27 @@ export class WorkflowExecutionEngine {
    * @throws Error if the workflow is not in `running` status.
    */
   async run(): Promise<ExecutionResult> {
-    if (this.manager.status !== 'running') {
+    if (this.manager.status !== "running") {
       throw new Error(
         `Cannot start execution: workflow is in "${this.manager.status}" state, expected "running"`,
       );
     }
 
-    await this.logWorkflowEvent('workflow_started', {});
+    await this.logWorkflowEvent("workflow_started", {});
 
     this.activateReadyNodes();
 
     while (!this.isTerminal()) {
       if (this.stopped) {
-        return this.buildPausedResult('Engine stopped by external signal');
+        return this.buildPausedResult("Engine stopped by external signal");
       }
 
       if (this.costTracker.isBudgetExceeded()) {
-        return this.buildPausedResult('Budget limit reached');
+        return this.buildPausedResult("Budget limit reached");
       }
 
       if (this.activeNodes.size === 0 && !this.hasActivatableNodes()) {
-        return this.buildFailedResult('Deadlock detected: no active or activatable nodes remain');
+        return this.buildFailedResult("Deadlock detected: no active or activatable nodes remain");
       }
 
       await this.waitForAnyCompletion();
@@ -270,13 +270,13 @@ export class WorkflowExecutionEngine {
     const ready: string[] = [];
 
     for (const node of this.manager.getAllNodes()) {
-      if (node.status !== 'pending') continue;
+      if (node.status !== "pending") continue;
       if (this.activatedNodes.has(node.id)) continue;
 
       const predecessors = this.graph.getPredecessors(node.id);
       const allDone = predecessors.every((predId) => {
         const pred = this.manager.getNode(predId);
-        return pred !== undefined && pred.status === 'done';
+        return pred !== undefined && pred.status === "done";
       });
 
       if (allDone) {
@@ -298,13 +298,13 @@ export class WorkflowExecutionEngine {
    */
   private hasActivatableNodes(): boolean {
     for (const node of this.manager.getAllNodes()) {
-      if (node.status !== 'pending') continue;
+      if (node.status !== "pending") continue;
       if (this.activatedNodes.has(node.id)) continue;
 
       const predecessors = this.graph.getPredecessors(node.id);
       const blocked = predecessors.some((predId) => {
         const pred = this.manager.getNode(predId);
-        return pred !== undefined && (pred.status === 'failed' || pred.status === 'blocked');
+        return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
       });
 
       if (!blocked) {
@@ -325,9 +325,9 @@ export class WorkflowExecutionEngine {
     const node = this.manager.getNode(nodeId);
     if (!node) return;
 
-    node.transition('waiting');
+    node.transition("waiting");
 
-    const delay = this.graph.getNode(nodeId)?.delay ?? '0';
+    const delay = this.graph.getNode(nodeId)?.delay ?? "0";
 
     this.scheduler.scheduleNode(nodeId, delay, () => {
       this.startNodeExecution(nodeId);
@@ -351,7 +351,7 @@ export class WorkflowExecutionEngine {
     const node = this.manager.getNode(nodeId);
     if (!node) return;
 
-    node.transition('running');
+    node.transition("running");
 
     const promise = this.executeNode(nodeId, node);
     this.activeNodes.set(nodeId, promise);
@@ -370,18 +370,15 @@ export class WorkflowExecutionEngine {
    * @param node - The WorkflowNode instance.
    * @returns The node execution result.
    */
-  private async executeNode(
-    nodeId: string,
-    node: WorkflowNode,
-  ): Promise<NodeExecutionResult> {
-    await this.logNodeEvent(nodeId, 'node_started', { title: node.title });
+  private async executeNode(nodeId: string, node: WorkflowNode): Promise<NodeExecutionResult> {
+    await this.logNodeEvent(nodeId, "node_started", { title: node.title });
 
     let result: NodeExecutionResult;
     try {
       result = await this.executor(node, this.manager);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      result = { status: 'failed', cost: 0, error: message };
+      result = { status: "failed", cost: 0, error: message };
     }
 
     await this.applyNodeResult(nodeId, node, result);
@@ -420,16 +417,16 @@ export class WorkflowExecutionEngine {
       this.manager.updateTotalCost(result.cost);
     }
 
-    if (result.status === 'done') {
+    if (result.status === "done") {
       this.completedNodes.push(nodeId);
-      await this.logNodeEvent(nodeId, 'node_completed', {
+      await this.logNodeEvent(nodeId, "node_completed", {
         cost: result.cost,
       });
     } else {
       this.failedNodes.push(nodeId);
-      const eventType = result.status === 'blocked' ? 'node_blocked' : 'node_failed';
+      const eventType = result.status === "blocked" ? "node_blocked" : "node_failed";
       await this.logNodeEvent(nodeId, eventType, {
-        error: result.error ?? 'Unknown error',
+        error: result.error ?? "Unknown error",
         cost: result.cost,
       });
     }
@@ -455,9 +452,7 @@ export class WorkflowExecutionEngine {
       this.wakeUp = resolve;
     });
 
-    const activePromises = [...this.activeNodes.values()].map((p) =>
-      p.then(() => undefined),
-    );
+    const activePromises = [...this.activeNodes.values()].map((p) => p.then(() => undefined));
 
     await Promise.race([racePromise, ...activePromises]);
     this.wakeUp = null;
@@ -476,7 +471,7 @@ export class WorkflowExecutionEngine {
 
     for (const node of this.manager.getAllNodes()) {
       const status = node.status;
-      if (status !== 'done' && status !== 'failed' && status !== 'blocked') {
+      if (status !== "done" && status !== "failed" && status !== "blocked") {
         if (this.activatedNodes.has(node.id)) {
           return false;
         }
@@ -484,7 +479,7 @@ export class WorkflowExecutionEngine {
         const predecessors = this.graph.getPredecessors(node.id);
         const hasFailedPredecessor = predecessors.some((predId) => {
           const pred = this.manager.getNode(predId);
-          return pred !== undefined && (pred.status === 'failed' || pred.status === 'blocked');
+          return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
         });
 
         if (!hasFailedPredecessor) {
@@ -512,25 +507,25 @@ export class WorkflowExecutionEngine {
   private async buildTerminalResult(): Promise<ExecutionResult> {
     await this.markUnreachableNodesBlocked();
 
-    const allDone = this.manager.getAllNodes().every((n) => n.status === 'done');
+    const allDone = this.manager.getAllNodes().every((n) => n.status === "done");
 
     if (allDone) {
-      await this.manager.transition('done');
+      await this.manager.transition("done");
       return {
-        status: 'done',
+        status: "done",
         completedNodes: [...this.completedNodes],
         failedNodes: [...this.failedNodes],
         totalCost: this.costTracker.getTotalCost(),
       };
     }
 
-    await this.manager.transition('failed');
+    await this.manager.transition("failed");
     return {
-      status: 'failed',
+      status: "failed",
       completedNodes: [...this.completedNodes],
       failedNodes: [...this.failedNodes],
       totalCost: this.costTracker.getTotalCost(),
-      haltReason: 'One or more nodes failed or are blocked',
+      haltReason: "One or more nodes failed or are blocked",
     };
   }
 
@@ -544,10 +539,10 @@ export class WorkflowExecutionEngine {
    */
   private async buildPausedResult(reason: string): Promise<ExecutionResult> {
     await this.drainActiveNodes();
-    await this.manager.transition('paused');
+    await this.manager.transition("paused");
 
     return {
-      status: 'paused',
+      status: "paused",
       completedNodes: [...this.completedNodes],
       failedNodes: [...this.failedNodes],
       totalCost: this.costTracker.getTotalCost(),
@@ -563,10 +558,10 @@ export class WorkflowExecutionEngine {
    */
   private async buildFailedResult(reason: string): Promise<ExecutionResult> {
     await this.drainActiveNodes();
-    await this.manager.transition('failed');
+    await this.manager.transition("failed");
 
     return {
-      status: 'failed',
+      status: "failed",
       completedNodes: [...this.completedNodes],
       failedNodes: [...this.failedNodes],
       totalCost: this.costTracker.getTotalCost(),
@@ -586,21 +581,21 @@ export class WorkflowExecutionEngine {
       changed = false;
 
       for (const node of this.manager.getAllNodes()) {
-        if (node.status !== 'pending') continue;
+        if (node.status !== "pending") continue;
 
         const predecessors = this.graph.getPredecessors(node.id);
         const hasFailedPredecessor = predecessors.some((predId) => {
           const pred = this.manager.getNode(predId);
-          return pred !== undefined && (pred.status === 'failed' || pred.status === 'blocked');
+          return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
         });
 
         if (hasFailedPredecessor) {
-          node.transition('waiting');
-          node.transition('running');
-          node.transition('blocked');
+          node.transition("waiting");
+          node.transition("running");
+          node.transition("blocked");
           this.failedNodes.push(node.id);
-          await this.logNodeEvent(node.id, 'node_blocked', {
-            error: 'Predecessor node failed or is blocked',
+          await this.logNodeEvent(node.id, "node_blocked", {
+            error: "Predecessor node failed or is blocked",
           });
           changed = true;
         }
@@ -648,7 +643,7 @@ export class WorkflowExecutionEngine {
    * @param details - Event-specific payload.
    */
   private async logWorkflowEvent(
-    type: 'workflow_started' | 'workflow_completed' | 'workflow_paused',
+    type: "workflow_started" | "workflow_completed" | "workflow_paused",
     details: Record<string, unknown>,
   ): Promise<void> {
     const event = createEvent({
@@ -668,7 +663,7 @@ export class WorkflowExecutionEngine {
    */
   private async logNodeEvent(
     nodeId: string,
-    type: 'node_started' | 'node_completed' | 'node_failed' | 'node_blocked',
+    type: "node_started" | "node_completed" | "node_failed" | "node_blocked",
     details: Record<string, unknown>,
   ): Promise<void> {
     const event = createEvent({

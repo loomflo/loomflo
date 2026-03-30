@@ -5,8 +5,8 @@
 // node rendering, status-based styling, auto-layout, and real-time updates.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { MouseEvent, ReactElement } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import type { MouseEvent, ReactElement } from "react";
 import {
   ReactFlow,
   Background,
@@ -18,11 +18,11 @@ import {
   MarkerType,
   useNodesState,
   useEdgesState,
-} from '@xyflow/react';
-import type { Node as RFNode, Edge as RFEdge, NodeProps } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from "@xyflow/react";
+import type { Node as RFNode, Edge as RFEdge, NodeProps } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
-import type { Node, Edge, NodeStatus } from '../lib/types.js';
+import type { Node, Edge, NodeStatus } from "../lib/types.js";
 
 // ============================================================================
 // Constants
@@ -46,54 +46,54 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; dot: string; minimap: string }
 > = {
   pending: {
-    bg: 'bg-gray-500/20',
-    text: 'text-gray-400',
-    dot: 'bg-gray-400',
-    minimap: '#6b7280',
+    bg: "bg-gray-500/20",
+    text: "text-gray-400",
+    dot: "bg-gray-400",
+    minimap: "#6b7280",
   },
   waiting: {
-    bg: 'bg-amber-500/20',
-    text: 'text-amber-400',
-    dot: 'bg-amber-400',
-    minimap: '#f59e0b',
+    bg: "bg-amber-500/20",
+    text: "text-amber-400",
+    dot: "bg-amber-400",
+    minimap: "#f59e0b",
   },
   running: {
-    bg: 'bg-blue-500/20',
-    text: 'text-blue-400',
-    dot: 'bg-blue-400',
-    minimap: '#3b82f6',
+    bg: "bg-blue-500/20",
+    text: "text-blue-400",
+    dot: "bg-blue-400",
+    minimap: "#3b82f6",
   },
   review: {
-    bg: 'bg-purple-500/20',
-    text: 'text-purple-400',
-    dot: 'bg-purple-400',
-    minimap: '#a855f7',
+    bg: "bg-purple-500/20",
+    text: "text-purple-400",
+    dot: "bg-purple-400",
+    minimap: "#a855f7",
   },
   done: {
-    bg: 'bg-green-500/20',
-    text: 'text-green-400',
-    dot: 'bg-green-400',
-    minimap: '#22c55e',
+    bg: "bg-green-500/20",
+    text: "text-green-400",
+    dot: "bg-green-400",
+    minimap: "#22c55e",
   },
   failed: {
-    bg: 'bg-red-500/20',
-    text: 'text-red-400',
-    dot: 'bg-red-400',
-    minimap: '#ef4444',
+    bg: "bg-red-500/20",
+    text: "text-red-400",
+    dot: "bg-red-400",
+    minimap: "#ef4444",
   },
   blocked: {
-    bg: 'bg-orange-500/20',
-    text: 'text-orange-400',
-    dot: 'bg-orange-400',
-    minimap: '#f97316',
+    bg: "bg-orange-500/20",
+    text: "text-orange-400",
+    dot: "bg-orange-400",
+    minimap: "#f97316",
   },
 };
 
 /** Edge color for completed paths. */
-const EDGE_COLOR_DONE = '#22c55e';
+const EDGE_COLOR_DONE = "#22c55e";
 
 /** Edge color for pending/in-progress paths. */
-const EDGE_COLOR_PENDING = '#4b5563';
+const EDGE_COLOR_PENDING = "#4b5563";
 
 // ============================================================================
 // Types
@@ -135,7 +135,7 @@ interface WorkflowNodeData {
 }
 
 /** React Flow node type for workflow nodes. */
-type WorkflowFlowNode = RFNode<WorkflowNodeData, 'workflow'>;
+type WorkflowFlowNode = RFNode<WorkflowNodeData, "workflow">;
 
 /** Props for the GraphView component. */
 export interface GraphViewProps {
@@ -164,10 +164,7 @@ export interface GraphViewProps {
  * @param edges - Directed edges defining the graph topology.
  * @returns Map from node ID to pixel position.
  */
-function computeLayout(
-  nodes: Node[],
-  edges: Edge[],
-): Map<string, { x: number; y: number }> {
+function computeLayout(nodes: Node[], edges: Edge[]): Map<string, { x: number; y: number }> {
   if (nodes.length === 0) return new Map();
 
   const children = new Map<string, string[]>();
@@ -184,9 +181,7 @@ function computeLayout(
   }
 
   const layers: string[][] = [];
-  let queue = nodes
-    .filter((n) => (inDegree.get(n.id) ?? 0) === 0)
-    .map((n) => n.id);
+  let queue = nodes.filter((n) => (inDegree.get(n.id) ?? 0) === 0).map((n) => n.id);
 
   while (queue.length > 0) {
     layers.push([...queue]);
@@ -203,12 +198,10 @@ function computeLayout(
 
   const positions = new Map<string, { x: number; y: number }>();
   const maxLayerSize = Math.max(...layers.map((l) => l.length));
-  const totalMaxWidth =
-    maxLayerSize * NODE_WIDTH + (maxLayerSize - 1) * HORIZONTAL_GAP;
+  const totalMaxWidth = maxLayerSize * NODE_WIDTH + (maxLayerSize - 1) * HORIZONTAL_GAP;
 
   for (const [layerIdx, layer] of layers.entries()) {
-    const layerWidth =
-      layer.length * NODE_WIDTH + (layer.length - 1) * HORIZONTAL_GAP;
+    const layerWidth = layer.length * NODE_WIDTH + (layer.length - 1) * HORIZONTAL_GAP;
     const startX = (totalMaxWidth - layerWidth) / 2;
 
     for (const [nodeIdx, nodeId] of layer.entries()) {
@@ -238,27 +231,25 @@ const WorkflowNodeComponent = memo(function WorkflowNodeComponent({
 }: NodeProps<WorkflowFlowNode>): ReactElement {
   const { title, status, isNew } = data;
   const style = STATUS_STYLES[status];
-  const enterClass = isNew ? ' animate-node-enter' : '';
+  const enterClass = isNew ? " animate-node-enter" : "";
 
   return (
-    <div className={`min-w-[200px] rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 shadow-lg${enterClass}`}>
+    <div
+      className={`min-w-[200px] rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 shadow-lg${enterClass}`}
+    >
       <Handle
         type="target"
         position={Position.Top}
         className="!h-2 !w-2 !border-gray-500 !bg-gray-600"
       />
-      <div className="truncate text-sm font-medium text-gray-100">
-        {title}
-      </div>
+      <div className="truncate text-sm font-medium text-gray-100">{title}</div>
       <div className="mt-1.5 flex items-center gap-1.5">
         <span
           className={`inline-block h-2 w-2 rounded-full ${style.dot}${
-            status === 'running' ? ' animate-pulse' : ''
+            status === "running" ? " animate-pulse" : ""
           }`}
         />
-        <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}
-        >
+        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
           {status}
         </span>
       </div>
@@ -291,7 +282,7 @@ function toFlowNodes(nodes: Node[], edges: Edge[]): WorkflowFlowNode[] {
   return nodes.map(
     (node): WorkflowFlowNode => ({
       id: node.id,
-      type: 'workflow',
+      type: "workflow",
       position: positions.get(node.id) ?? { x: 0, y: 0 },
       data: { title: node.title, status: node.status },
     }),
@@ -308,19 +299,16 @@ function toFlowNodes(nodes: Node[], edges: Edge[]): WorkflowFlowNode[] {
  * @param nodeStatusMap - Map from node ID to its current execution status.
  * @returns Array of styled React Flow edge objects.
  */
-function toFlowEdges(
-  edges: Edge[],
-  nodeStatusMap: Map<string, NodeStatus>,
-): RFEdge[] {
+function toFlowEdges(edges: Edge[], nodeStatusMap: Map<string, NodeStatus>): RFEdge[] {
   return edges.map((edge): RFEdge => {
     const sourceStatus = nodeStatusMap.get(edge.from);
-    const isDone = sourceStatus === 'done';
+    const isDone = sourceStatus === "done";
 
     return {
       id: `${edge.from}->${edge.to}`,
       source: edge.from,
       target: edge.to,
-      animated: sourceStatus === 'running',
+      animated: sourceStatus === "running",
       style: {
         stroke: isDone ? EDGE_COLOR_DONE : EDGE_COLOR_PENDING,
         strokeWidth: 2,
@@ -350,7 +338,7 @@ function minimapNodeColor(node: RFNode): string {
   if (data?.status && data.status in STATUS_STYLES) {
     return STATUS_STYLES[data.status].minimap;
   }
-  return '#6b7280';
+  return "#6b7280";
 }
 
 // ============================================================================
@@ -394,10 +382,8 @@ export function GraphView({
     [edges, nodeStatusMap],
   );
 
-  const [rfNodes, setRfNodes, onNodesChange] =
-    useNodesState(initialFlowNodes);
-  const [rfEdges, setRfEdges, onEdgesChange] =
-    useEdgesState(initialFlowEdges);
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState(initialFlowNodes);
+  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(initialFlowEdges);
 
   useEffect(() => {
     const prevNodeIds = prevNodeIdsRef.current;
@@ -418,9 +404,7 @@ export function GraphView({
         const timer = setTimeout((): void => {
           setRfNodes((current) =>
             current.map((n) =>
-              newNodeIds.includes(n.id)
-                ? { ...n, data: { ...n.data, isNew: false } }
-                : n,
+              newNodeIds.includes(n.id) ? { ...n, data: { ...n.data, isNew: false } } : n,
             ),
           );
         }, NODE_ENTER_DURATION_MS);
@@ -459,14 +443,12 @@ export function GraphView({
             current.map((e) => {
               if (!newEdgeIds.includes(e.id)) return e;
               const sourceStatus = nodeStatusMap.get(e.source);
-              return { ...e, animated: sourceStatus === 'running' };
+              return { ...e, animated: sourceStatus === "running" };
             }),
           );
         }, EDGE_ENTER_DURATION_MS);
 
-        prevEdgeIdsRef.current = new Set(
-          flowEdges.map((e) => e.id),
-        );
+        prevEdgeIdsRef.current = new Set(flowEdges.map((e) => e.id));
 
         return (): void => {
           clearTimeout(timer);
@@ -501,7 +483,7 @@ export function GraphView({
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={2}
-        defaultEdgeOptions={{ type: 'smoothstep' }}
+        defaultEdgeOptions={{ type: "smoothstep" }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />

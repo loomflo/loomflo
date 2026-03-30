@@ -1,7 +1,7 @@
-import { Command } from 'commander';
+import { Command } from "commander";
 
-import { DaemonClient } from '../client.js';
-import type { ApiError } from '../client.js';
+import { DaemonClient } from "../client.js";
+import type { ApiError } from "../client.js";
 
 // ============================================================================
 // Types
@@ -34,11 +34,11 @@ interface ConfigUpdateResponse {
  * @returns The resolved value, or undefined if the path does not exist.
  */
 function resolveKeyPath(obj: Record<string, unknown>, keyPath: string): unknown {
-  const segments = keyPath.split('.');
+  const segments = keyPath.split(".");
   let current: unknown = obj;
 
   for (const segment of segments) {
-    if (typeof current !== 'object' || current === null) {
+    if (typeof current !== "object" || current === null) {
       return undefined;
     }
     current = (current as Record<string, unknown>)[segment];
@@ -58,7 +58,7 @@ function resolveKeyPath(obj: Record<string, unknown>, keyPath: string): unknown 
  * @returns A nested object with the value at the specified path.
  */
 function buildNestedObject(keyPath: string, value: unknown): Record<string, unknown> {
-  const segments = keyPath.split('.');
+  const segments = keyPath.split(".");
   const root: Record<string, unknown> = {};
   let current = root;
 
@@ -84,12 +84,12 @@ function buildNestedObject(keyPath: string, value: unknown): Record<string, unkn
  * @returns The parsed value as a boolean, number, null, or string.
  */
 function parseValue(raw: string): unknown {
-  if (raw === 'true') return true;
-  if (raw === 'false') return false;
-  if (raw === 'null') return null;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  if (raw === "null") return null;
 
   const num = Number(raw);
-  if (!Number.isNaN(num) && raw.trim() !== '') {
+  if (!Number.isNaN(num) && raw.trim() !== "") {
     return num;
   }
 
@@ -105,7 +105,7 @@ function parseValue(raw: string): unknown {
  * @returns A human-readable string representation.
  */
 function formatValue(value: unknown): string {
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     return JSON.stringify(value, null, 2);
   }
   return String(value);
@@ -128,8 +128,8 @@ function formatValue(value: unknown): string {
  * @returns A configured commander Command instance.
  */
 export function createConfigCommand(): Command {
-  const cmd = new Command('config')
-    .description('Get or set configuration')
+  const cmd = new Command("config")
+    .description("Get or set configuration")
     .action(async (): Promise<void> => {
       let client: DaemonClient;
       try {
@@ -141,7 +141,7 @@ export function createConfigCommand(): Command {
       }
 
       try {
-        const res = await client.get<ConfigResponse>('/config');
+        const res = await client.get<ConfigResponse>("/config");
 
         if (!res.ok) {
           const errData = res.data as unknown as ApiError;
@@ -158,9 +158,9 @@ export function createConfigCommand(): Command {
     });
 
   cmd
-    .command('get')
-    .description('Get a configuration value by key (supports dot notation)')
-    .argument('<key>', 'Configuration key (e.g. "models.loom")')
+    .command("get")
+    .description("Get a configuration value by key (supports dot notation)")
+    .argument("<key>", 'Configuration key (e.g. "models.loom")')
     .action(async (key: string): Promise<void> => {
       let client: DaemonClient;
       try {
@@ -172,7 +172,7 @@ export function createConfigCommand(): Command {
       }
 
       try {
-        const res = await client.get<ConfigResponse>('/config');
+        const res = await client.get<ConfigResponse>("/config");
 
         if (!res.ok) {
           const errData = res.data as unknown as ApiError;
@@ -196,10 +196,10 @@ export function createConfigCommand(): Command {
     });
 
   cmd
-    .command('set')
-    .description('Set a configuration value (auto-parses booleans and numbers)')
-    .argument('<key>', 'Configuration key (e.g. "models.loom")')
-    .argument('<value>', 'Value to set')
+    .command("set")
+    .description("Set a configuration value (auto-parses booleans and numbers)")
+    .argument("<key>", 'Configuration key (e.g. "models.loom")')
+    .argument("<value>", "Value to set")
     .action(async (key: string, rawValue: string): Promise<void> => {
       let client: DaemonClient;
       try {
@@ -213,7 +213,7 @@ export function createConfigCommand(): Command {
       try {
         const parsed = parseValue(rawValue);
         const body = buildNestedObject(key, parsed);
-        const res = await client.put<ConfigUpdateResponse>('/config', body);
+        const res = await client.put<ConfigUpdateResponse>("/config", body);
 
         if (!res.ok) {
           const errData = res.data as unknown as ApiError;

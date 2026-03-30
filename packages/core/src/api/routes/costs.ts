@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync } from 'fastify';
-import type { CostSummary } from '../../costs/tracker.js';
-import type { Workflow } from '../../types.js';
+import type { FastifyPluginAsync } from "fastify";
+import type { CostSummary } from "../../costs/tracker.js";
+import type { Workflow } from "../../types.js";
 
 // ============================================================================
 // Types
@@ -65,24 +65,22 @@ export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
      * including per-node costs, total cost, budget info, and Loom overhead.
      * Returns 404 if no workflow is active.
      */
-    fastify.get('/costs', async (_request, reply): Promise<void> => {
+    fastify.get("/costs", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
       const summary: CostSummary = getCostSummary();
 
-      const nodes: CostNodeEntry[] = Object.values(workflow.graph.nodes).map(
-        (node) => ({
-          id: node.id,
-          title: node.title,
-          cost: summary.perNode[node.id] ?? 0,
-          retries: node.retryCount,
-        }),
-      );
+      const nodes: CostNodeEntry[] = Object.values(workflow.graph.nodes).map((node) => ({
+        id: node.id,
+        title: node.title,
+        cost: summary.perNode[node.id] ?? 0,
+        retries: node.retryCount,
+      }));
 
       const response: CostsResponse = {
         total: summary.totalCost,

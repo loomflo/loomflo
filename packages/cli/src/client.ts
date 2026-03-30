@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 // ============================================================================
 // Types
@@ -17,7 +17,7 @@ export interface DaemonConfig {
 }
 
 /** Supported HTTP methods for daemon API requests. */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 /** Options for an HTTP request to the daemon. */
 export interface RequestOptions {
@@ -59,13 +59,13 @@ export interface ApiError {
 
 /** Payload for the 'connected' event sent on WebSocket connection. */
 export interface WsConnectedEvent {
-  type: 'connected';
+  type: "connected";
   version: string;
 }
 
 /** Payload for the 'node_status' event. */
 export interface WsNodeStatusEvent {
-  type: 'node_status';
+  type: "node_status";
   nodeId: string;
   status: string;
   title: string;
@@ -74,7 +74,7 @@ export interface WsNodeStatusEvent {
 
 /** Payload for the 'agent_status' event. */
 export interface WsAgentStatusEvent {
-  type: 'agent_status';
+  type: "agent_status";
   nodeId: string;
   agentId: string;
   role: string;
@@ -85,7 +85,7 @@ export interface WsAgentStatusEvent {
 
 /** Payload for the 'agent_message' event. */
 export interface WsAgentMessageEvent {
-  type: 'agent_message';
+  type: "agent_message";
   nodeId: string;
   from: string;
   to: string;
@@ -95,16 +95,16 @@ export interface WsAgentMessageEvent {
 
 /** Payload for the 'review_verdict' event. */
 export interface WsReviewVerdictEvent {
-  type: 'review_verdict';
+  type: "review_verdict";
   nodeId: string;
-  verdict: 'PASS' | 'FAIL' | 'BLOCKED';
+  verdict: "PASS" | "FAIL" | "BLOCKED";
   summary: string;
   timestamp: string;
 }
 
 /** Payload for the 'graph_modified' event. */
 export interface WsGraphModifiedEvent {
-  type: 'graph_modified';
+  type: "graph_modified";
   action: string;
   details: Record<string, unknown>;
   timestamp: string;
@@ -112,7 +112,7 @@ export interface WsGraphModifiedEvent {
 
 /** Payload for the 'cost_update' event. */
 export interface WsCostUpdateEvent {
-  type: 'cost_update';
+  type: "cost_update";
   nodeId: string;
   agentId: string;
   callCost: number;
@@ -124,7 +124,7 @@ export interface WsCostUpdateEvent {
 
 /** Payload for the 'memory_updated' event. */
 export interface WsMemoryUpdatedEvent {
-  type: 'memory_updated';
+  type: "memory_updated";
   file: string;
   agentId: string;
   summary: string;
@@ -133,7 +133,7 @@ export interface WsMemoryUpdatedEvent {
 
 /** Payload for the 'spec_artifact_ready' event. */
 export interface WsSpecArtifactReadyEvent {
-  type: 'spec_artifact_ready';
+  type: "spec_artifact_ready";
   name: string;
   path: string;
   timestamp: string;
@@ -141,7 +141,7 @@ export interface WsSpecArtifactReadyEvent {
 
 /** Payload for the 'chat_response' event. */
 export interface WsChatResponseEvent {
-  type: 'chat_response';
+  type: "chat_response";
   message: string;
   action: Record<string, unknown> | null;
   timestamp: string;
@@ -149,7 +149,7 @@ export interface WsChatResponseEvent {
 
 /** Payload for the 'workflow_status' event. */
 export interface WsWorkflowStatusEvent {
-  type: 'workflow_status';
+  type: "workflow_status";
   status: string;
   reason: string;
   timestamp: string;
@@ -181,7 +181,7 @@ export type WsEventHandler<K extends WsEventType> = (event: WsEventMap[K]) => vo
 // ============================================================================
 
 /** Path to daemon.json within the user's home directory. */
-const DAEMON_JSON_PATH = join(homedir(), '.loomflo', 'daemon.json');
+const DAEMON_JSON_PATH = join(homedir(), ".loomflo", "daemon.json");
 
 /** Initial delay in milliseconds for WebSocket reconnection backoff. */
 const RECONNECT_INITIAL_MS = 500;
@@ -208,10 +208,10 @@ const RECONNECT_MULTIPLIER = 2;
 export async function readDaemonConfig(): Promise<DaemonConfig> {
   let raw: string;
   try {
-    raw = await readFile(DAEMON_JSON_PATH, 'utf-8');
+    raw = await readFile(DAEMON_JSON_PATH, "utf-8");
   } catch {
     throw new Error(
-      'Daemon not running — ~/.loomflo/daemon.json not found. Start with: loomflo start',
+      "Daemon not running — ~/.loomflo/daemon.json not found. Start with: loomflo start",
     );
   }
 
@@ -220,18 +220,18 @@ export async function readDaemonConfig(): Promise<DaemonConfig> {
     parsed = JSON.parse(raw);
   } catch {
     throw new Error(
-      'Invalid daemon.json — file is not valid JSON. Re-start the daemon with: loomflo start',
+      "Invalid daemon.json — file is not valid JSON. Re-start the daemon with: loomflo start",
     );
   }
 
   if (
-    typeof parsed !== 'object' ||
+    typeof parsed !== "object" ||
     parsed === null ||
-    typeof (parsed as DaemonConfig).port !== 'number' ||
-    typeof (parsed as DaemonConfig).token !== 'string'
+    typeof (parsed as DaemonConfig).port !== "number" ||
+    typeof (parsed as DaemonConfig).token !== "string"
   ) {
     throw new Error(
-      'Invalid daemon.json — missing port or token. Re-start the daemon with: loomflo start',
+      "Invalid daemon.json — missing port or token. Re-start the daemon with: loomflo start",
     );
   }
 
@@ -239,7 +239,7 @@ export async function readDaemonConfig(): Promise<DaemonConfig> {
   return {
     port: config.port,
     token: config.token,
-    pid: typeof config.pid === 'number' ? config.pid : 0,
+    pid: typeof config.pid === "number" ? config.pid : 0,
   };
 }
 
@@ -348,16 +348,16 @@ export class DaemonClient {
 
     const init: RequestInit = { method, headers };
 
-    if (body !== undefined && (method === 'POST' || method === 'PUT')) {
-      headers['Content-Type'] = 'application/json';
+    if (body !== undefined && (method === "POST" || method === "PUT")) {
+      headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(body);
     }
 
     const response = await fetch(url, init);
-    const contentType = response.headers.get('content-type') ?? '';
+    const contentType = response.headers.get("content-type") ?? "";
 
     let data: T;
-    if (contentType.includes('application/json')) {
+    if (contentType.includes("application/json")) {
       data = (await response.json()) as T;
     } else {
       data = (await response.text()) as unknown as T;
@@ -378,7 +378,7 @@ export class DaemonClient {
    * @returns A typed API response.
    */
   async get<T = unknown>(path: string): Promise<ApiResponse<T>> {
-    return this.request<T>({ method: 'GET', path });
+    return this.request<T>({ method: "GET", path });
   }
 
   /**
@@ -390,7 +390,7 @@ export class DaemonClient {
    * @returns A typed API response.
    */
   async post<T = unknown>(path: string, body?: unknown): Promise<ApiResponse<T>> {
-    return this.request<T>({ method: 'POST', path, body });
+    return this.request<T>({ method: "POST", path, body });
   }
 
   /**
@@ -402,7 +402,7 @@ export class DaemonClient {
    * @returns A typed API response.
    */
   async put<T = unknown>(path: string, body?: unknown): Promise<ApiResponse<T>> {
-    return this.request<T>({ method: 'PUT', path, body });
+    return this.request<T>({ method: "PUT", path, body });
   }
 
   /**
@@ -413,7 +413,7 @@ export class DaemonClient {
    * @returns A typed API response.
    */
   async delete<T = unknown>(path: string): Promise<ApiResponse<T>> {
-    return this.request<T>({ method: 'DELETE', path });
+    return this.request<T>({ method: "DELETE", path });
   }
 
   // --------------------------------------------------------------------------
@@ -433,25 +433,25 @@ export class DaemonClient {
       return;
     }
 
-    const wsUrl = this.baseUrl.replace(/^http/, 'ws') + `/ws?token=${this.token}`;
+    const wsUrl = this.baseUrl.replace(/^http/, "ws") + `/ws?token=${this.token}`;
     const socket = new WebSocket(wsUrl);
 
-    socket.addEventListener('open', (): void => {
+    socket.addEventListener("open", (): void => {
       this.reconnectDelay = RECONNECT_INITIAL_MS;
     });
 
-    socket.addEventListener('message', (event: MessageEvent): void => {
+    socket.addEventListener("message", (event: MessageEvent): void => {
       this.handleMessage(event);
     });
 
-    socket.addEventListener('close', (): void => {
+    socket.addEventListener("close", (): void => {
       this.ws = null;
       if (!this.closed) {
         this.scheduleReconnect();
       }
     });
 
-    socket.addEventListener('error', (): void => {
+    socket.addEventListener("error", (): void => {
       /* Close event will follow — reconnect is handled there. */
     });
 
@@ -553,8 +553,8 @@ export class DaemonClient {
       return;
     }
 
-    const eventType = payload['type'];
-    if (typeof eventType !== 'string') {
+    const eventType = payload["type"];
+    if (typeof eventType !== "string") {
       return;
     }
 
@@ -588,9 +588,6 @@ export class DaemonClient {
       this.connectWebSocket();
     }, this.reconnectDelay);
 
-    this.reconnectDelay = Math.min(
-      this.reconnectDelay * RECONNECT_MULTIPLIER,
-      RECONNECT_MAX_MS,
-    );
+    this.reconnectDelay = Math.min(this.reconnectDelay * RECONNECT_MULTIPLIER, RECONNECT_MAX_MS);
   }
 }

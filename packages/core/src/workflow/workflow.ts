@@ -6,12 +6,12 @@
  * underlying {@link WorkflowGraph} and {@link WorkflowNode} instances.
  */
 
-import { randomUUID } from 'node:crypto';
-import type { Config, EventType, Graph, Node, Workflow, WorkflowStatus } from '../types.js';
-import { loadWorkflowState, saveWorkflowState } from '../persistence/state.js';
-import { appendEvent, createEvent } from '../persistence/events.js';
-import { WorkflowGraph } from './graph.js';
-import { WorkflowNode } from './node.js';
+import { randomUUID } from "node:crypto";
+import type { Config, EventType, Graph, Node, Workflow, WorkflowStatus } from "../types.js";
+import { loadWorkflowState, saveWorkflowState } from "../persistence/state.js";
+import { appendEvent, createEvent } from "../persistence/events.js";
+import { WorkflowGraph } from "./graph.js";
+import { WorkflowNode } from "./node.js";
 
 /**
  * Valid state transitions for the workflow lifecycle.
@@ -20,11 +20,11 @@ import { WorkflowNode } from './node.js';
  * it may transition to.
  */
 const TRANSITIONS: Readonly<Record<WorkflowStatus, readonly WorkflowStatus[]>> = {
-  init: ['spec'],
-  spec: ['building'],
-  building: ['running'],
-  running: ['paused', 'done', 'failed'],
-  paused: ['running'],
+  init: ["spec"],
+  spec: ["building"],
+  building: ["running"],
+  running: ["paused", "done", "failed"],
+  paused: ["running"],
   done: [],
   failed: [],
 } as const;
@@ -35,9 +35,9 @@ const TRANSITIONS: Readonly<Record<WorkflowStatus, readonly WorkflowStatus[]>> =
  * Keyed by target state. Only states that emit workflow-level events are included.
  */
 const TRANSITION_EVENTS: Readonly<Partial<Record<WorkflowStatus, EventType>>> = {
-  running: 'workflow_started',
-  paused: 'workflow_paused',
-  done: 'workflow_completed',
+  running: "workflow_started",
+  paused: "workflow_paused",
+  done: "workflow_completed",
 } as const;
 
 /**
@@ -140,11 +140,11 @@ export class WorkflowManager {
     config: Config,
   ): Promise<WorkflowManager> {
     const now = new Date().toISOString();
-    const emptyGraph: Graph = { nodes: {}, edges: [], topology: 'linear' };
+    const emptyGraph: Graph = { nodes: {}, edges: [], topology: "linear" };
 
     const workflow: Workflow = {
       id: randomUUID(),
-      status: 'init',
+      status: "init",
       description,
       projectPath,
       graph: emptyGraph,
@@ -159,7 +159,7 @@ export class WorkflowManager {
     await saveWorkflowState(projectPath, manager.toJSON());
 
     const event = createEvent({
-      type: 'workflow_created',
+      type: "workflow_created",
       workflowId: workflow.id,
       details: { description, projectPath },
     });
@@ -188,7 +188,7 @@ export class WorkflowManager {
       return null;
     }
 
-    if (state.status !== 'running' && state.status !== 'paused') {
+    if (state.status !== "running" && state.status !== "paused") {
       throw new Error(
         `Cannot resume workflow in "${state.status}" status. ` +
           'Only "running" or "paused" workflows can be resumed.',
@@ -201,14 +201,14 @@ export class WorkflowManager {
     let resumedFrom: string | null = null;
 
     for (const node of Object.values(state.graph.nodes)) {
-      if (node.status === 'done') {
+      if (node.status === "done") {
         completedNodeIds.push(node.id);
-      } else if (node.status === 'running' || node.status === 'review') {
+      } else if (node.status === "running" || node.status === "review") {
         if (resumedFrom === null) {
           resumedFrom = node.id;
         }
         resetNodeIds.push(node.id);
-        node.status = 'pending';
+        node.status = "pending";
         node.agents = [];
         node.retryCount = 0;
         node.reviewReport = null;
@@ -216,20 +216,20 @@ export class WorkflowManager {
         node.startedAt = null;
         node.completedAt = null;
         node.resumeAt = null;
-      } else if (node.status === 'waiting') {
+      } else if (node.status === "waiting") {
         if (node.resumeAt !== null) {
           rescheduledNodeIds.push(node.id);
         } else {
           // Waiting node with no resumeAt is inconsistent — reset to pending
           // so the engine re-evaluates it on the next scheduling pass.
           resetNodeIds.push(node.id);
-          node.status = 'pending';
+          node.status = "pending";
         }
       }
     }
 
-    if (state.status === 'paused') {
-      state.status = 'running';
+    if (state.status === "paused") {
+      state.status = "running";
     }
     state.updatedAt = new Date().toISOString();
 
@@ -237,7 +237,7 @@ export class WorkflowManager {
     await saveWorkflowState(projectPath, manager.toJSON());
 
     const event = createEvent({
-      type: 'workflow_resumed',
+      type: "workflow_resumed",
       workflowId: state.id,
       details: { resumedFrom, completedNodeIds, resetNodeIds, rescheduledNodeIds },
     });
@@ -274,7 +274,7 @@ export class WorkflowManager {
     if (!this.canTransition(to)) {
       throw new Error(
         `Invalid workflow transition: "${this.data.status}" → "${to}". ` +
-          `Valid transitions: ${TRANSITIONS[this.data.status].join(', ') || 'none'}`,
+          `Valid transitions: ${TRANSITIONS[this.data.status].join(", ") || "none"}`,
       );
     }
 
@@ -304,7 +304,7 @@ export class WorkflowManager {
    * @throws Error if the workflow is not in `running` status.
    */
   async pause(): Promise<void> {
-    await this.transition('paused');
+    await this.transition("paused");
   }
 
   /**
@@ -405,8 +405,8 @@ export class WorkflowManager {
    * @returns The event type to log, or undefined if no event applies.
    */
   private resolveEventType(from: WorkflowStatus, to: WorkflowStatus): EventType | undefined {
-    if (from === 'paused' && to === 'running') {
-      return 'workflow_resumed';
+    if (from === "paused" && to === "running") {
+      return "workflow_resumed";
     }
     return TRANSITION_EVENTS[to];
   }

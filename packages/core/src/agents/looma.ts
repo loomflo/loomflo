@@ -11,18 +11,18 @@
  * Looma is the builder — it does the actual implementation work.
  */
 
-import type { CostTracker } from '../costs/tracker.js';
-import { createEvent, appendEvent } from '../persistence/events.js';
-import type { LLMProvider } from '../providers/base.js';
-import type { Tool } from '../tools/base.js';
-import type { CompletionHandlerLike, CompletionReport } from '../tools/report-complete.js';
-import { createReportCompleteTool } from '../tools/report-complete.js';
-import { createSendMessageTool } from '../tools/send-message.js';
-import type { EventType } from '../types.js';
-import type { AgentLoopResult } from './base-agent.js';
-import { runAgentLoop } from './base-agent.js';
-import type { MessageBus } from './message-bus.js';
-import { buildLoomaPrompt } from './prompts.js';
+import type { CostTracker } from "../costs/tracker.js";
+import { createEvent, appendEvent } from "../persistence/events.js";
+import type { LLMProvider } from "../providers/base.js";
+import type { Tool } from "../tools/base.js";
+import type { CompletionHandlerLike, CompletionReport } from "../tools/report-complete.js";
+import { createReportCompleteTool } from "../tools/report-complete.js";
+import { createSendMessageTool } from "../tools/send-message.js";
+import type { EventType } from "../types.js";
+import type { AgentLoopResult } from "./base-agent.js";
+import { runAgentLoop } from "./base-agent.js";
+import type { MessageBus } from "./message-bus.js";
+import { buildLoomaPrompt } from "./prompts.js";
 
 // ============================================================================
 // LoomaConfig
@@ -92,7 +92,7 @@ export interface LoomaConfig {
  */
 export interface LoomaResult {
   /** How the worker terminated. */
-  status: 'completed' | 'failed' | 'timeout' | 'token_limit';
+  status: "completed" | "failed" | "timeout" | "token_limit";
   /** Final text output from the agent. */
   output: string;
   /** Cumulative token usage across all LLM calls. */
@@ -169,14 +169,10 @@ function buildToolSet(
   messageBus: MessageBus,
   capture: CompletionCapture,
 ): Tool[] {
-  const dynamicNames = new Set(['send_message', 'report_complete']);
+  const dynamicNames = new Set(["send_message", "report_complete"]);
   const filtered = baseTools.filter((t) => !dynamicNames.has(t.name));
 
-  return [
-    ...filtered,
-    createSendMessageTool(messageBus),
-    createReportCompleteTool(capture),
-  ];
+  return [...filtered, createSendMessageTool(messageBus), createReportCompleteTool(capture)];
 }
 
 /**
@@ -245,8 +241,8 @@ export async function runLooma(config: LoomaConfig): Promise<LoomaResult> {
     });
 
     // Log agent creation
-    await logEvent(config, 'agent_created', {
-      role: 'looma',
+    await logEvent(config, "agent_created", {
+      role: "looma",
       taskDescription: config.taskDescription,
       writeScope: config.writeScope,
     });
@@ -269,10 +265,10 @@ export async function runLooma(config: LoomaConfig): Promise<LoomaResult> {
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      await logEvent(config, 'agent_failed', { error: errorMessage });
+      await logEvent(config, "agent_failed", { error: errorMessage });
       return {
-        status: 'failed',
-        output: '',
+        status: "failed",
+        output: "",
         tokenUsage: { input: 0, output: 0 },
         error: `Agent loop threw unexpectedly: ${errorMessage}`,
       };
@@ -289,7 +285,7 @@ export async function runLooma(config: LoomaConfig): Promise<LoomaResult> {
 
     // Log outcome
     const eventType: EventType =
-      loopResult.status === 'completed' ? 'agent_completed' : 'agent_failed';
+      loopResult.status === "completed" ? "agent_completed" : "agent_failed";
     await logEvent(config, eventType, {
       loopStatus: loopResult.status,
       tokenUsage: loopResult.tokenUsage,

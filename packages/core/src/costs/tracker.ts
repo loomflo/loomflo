@@ -18,8 +18,8 @@ export interface ModelPricing {
 
 /** Default pricing table for known models. */
 export const DEFAULT_PRICING: Record<string, ModelPricing> = {
-  'claude-opus-4-6': { inputPricePerMToken: 15, outputPricePerMToken: 75 },
-  'claude-sonnet-4-6': { inputPricePerMToken: 3, outputPricePerMToken: 15 },
+  "claude-opus-4-6": { inputPricePerMToken: 15, outputPricePerMToken: 75 },
+  "claude-sonnet-4-6": { inputPricePerMToken: 3, outputPricePerMToken: 15 },
 };
 
 /** Fallback pricing used for models not present in the pricing table. */
@@ -99,10 +99,7 @@ export class CostTracker {
    * @param budgetLimit - Maximum allowed cost in USD, or null/undefined for no limit.
    * @param customPricing - Optional custom pricing table to merge with defaults.
    */
-  constructor(
-    budgetLimit?: number | null,
-    customPricing?: Record<string, ModelPricing>,
-  ) {
+  constructor(budgetLimit?: number | null, customPricing?: Record<string, ModelPricing>) {
     this.budgetLimit = budgetLimit ?? null;
     this.pricing = { ...DEFAULT_PRICING, ...customPricing };
   }
@@ -126,8 +123,7 @@ export class CostTracker {
   ): CostEntry {
     const pricing = this.pricing[model] ?? FALLBACK_PRICING;
     const cost =
-      (inputTokens * pricing.inputPricePerMToken +
-        outputTokens * pricing.outputPricePerMToken) /
+      (inputTokens * pricing.inputPricePerMToken + outputTokens * pricing.outputPricePerMToken) /
       1_000_000;
 
     const entry: CostEntry = {
@@ -148,9 +144,7 @@ export class CostTracker {
     if (this.onRecordCallback) {
       const nodeCost = this.perNode.get(nodeId) ?? 0;
       const budgetRemaining =
-        this.budgetLimit !== null
-          ? Math.max(0, this.budgetLimit - this.totalCost)
-          : null;
+        this.budgetLimit !== null ? Math.max(0, this.budgetLimit - this.totalCost) : null;
       this.onRecordCallback(entry, nodeCost, this.totalCost, budgetRemaining);
     }
 
@@ -181,9 +175,7 @@ export class CostTracker {
       perAgent: Object.fromEntries(this.perAgent),
       budgetLimit: this.budgetLimit,
       budgetRemaining:
-        this.budgetLimit !== null
-          ? Math.max(0, this.budgetLimit - this.totalCost)
-          : null,
+        this.budgetLimit !== null ? Math.max(0, this.budgetLimit - this.totalCost) : null,
       entries: [...this.entries],
     };
   }

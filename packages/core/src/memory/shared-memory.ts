@@ -6,30 +6,30 @@
  * using async-mutex to prevent race conditions (Constitution Principles III, V).
  */
 
-import { appendFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { Mutex } from 'async-mutex';
-import type { SharedMemoryFile } from '../types.js';
+import { appendFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { Mutex } from "async-mutex";
+import type { SharedMemoryFile } from "../types.js";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 /** Directory within the workspace where shared memory files are stored. */
-const SHARED_MEMORY_DIR = '.loomflo/shared-memory';
+const SHARED_MEMORY_DIR = ".loomflo/shared-memory";
 
 /** Regex to extract timestamp and agent ID from entry headers. */
 const ENTRY_HEADER_REGEX = /_\[(.+?)\] written by (.+?)_/g;
 
 /** The 7 standard shared memory files managed by the daemon. */
 export const STANDARD_MEMORY_FILES: readonly string[] = [
-  'DECISIONS.md',
-  'ERRORS.md',
-  'PROGRESS.md',
-  'PREFERENCES.md',
-  'ISSUES.md',
-  'INSIGHTS.md',
-  'ARCHITECTURE_CHANGES.md',
+  "DECISIONS.md",
+  "ERRORS.md",
+  "PROGRESS.md",
+  "PREFERENCES.md",
+  "ISSUES.md",
+  "INSIGHTS.md",
+  "ARCHITECTURE_CHANGES.md",
 ];
 
 // ============================================================================
@@ -44,13 +44,13 @@ export const STANDARD_MEMORY_FILES: readonly string[] = [
  *   not end in `.md`.
  */
 function validateFileName(name: string): void {
-  if (!name.endsWith('.md')) {
+  if (!name.endsWith(".md")) {
     throw new Error(`Invalid memory file name "${name}" — must end in .md`);
   }
-  if (name.includes('/') || name.includes('\\')) {
+  if (name.includes("/") || name.includes("\\")) {
     throw new Error(`Invalid memory file name "${name}" — must not contain path separators`);
   }
-  if (name.includes('..')) {
+  if (name.includes("..")) {
     throw new Error(`Invalid memory file name "${name}" — must not contain ".." segments`);
   }
 }
@@ -96,8 +96,8 @@ export class SharedMemoryManager {
       try {
         await stat(filePath);
       } catch {
-        const title = fileName.replace('.md', '');
-        await writeFile(filePath, `# ${title}\n\n`, 'utf-8');
+        const title = fileName.replace(".md", "");
+        await writeFile(filePath, `# ${title}\n\n`, "utf-8");
       }
     }
   }
@@ -121,10 +121,7 @@ export class SharedMemoryManager {
     let content: string;
     let fileStat: Awaited<ReturnType<typeof stat>>;
     try {
-      [content, fileStat] = await Promise.all([
-        readFile(filePath, 'utf-8'),
-        stat(filePath),
-      ]);
+      [content, fileStat] = await Promise.all([readFile(filePath, "utf-8"), stat(filePath)]);
     } catch {
       throw new Error(`Shared memory file not found: ${name}`);
     }
@@ -160,7 +157,7 @@ export class SharedMemoryManager {
     await mutex.runExclusive(async () => {
       const timestamp = new Date().toISOString();
       const entry = `\n---\n_[${timestamp}] written by ${agentId}_\n\n${content}\n`;
-      await appendFile(filePath, entry, 'utf-8');
+      await appendFile(filePath, entry, "utf-8");
     });
   }
 
@@ -181,7 +178,7 @@ export class SharedMemoryManager {
       return [];
     }
 
-    const mdFiles = entries.filter((e) => e.endsWith('.md'));
+    const mdFiles = entries.filter((e) => e.endsWith(".md"));
     const results: SharedMemoryFile[] = [];
 
     for (const fileName of mdFiles) {
@@ -236,12 +233,12 @@ export class SharedMemoryManager {
     if (lastMatch !== undefined) {
       return {
         lastModifiedAt: lastMatch[1] ?? mtime.toISOString(),
-        lastModifiedBy: lastMatch[2] ?? 'system',
+        lastModifiedBy: lastMatch[2] ?? "system",
       };
     }
 
     return {
-      lastModifiedBy: 'system',
+      lastModifiedBy: "system",
       lastModifiedAt: mtime.toISOString(),
     };
   }

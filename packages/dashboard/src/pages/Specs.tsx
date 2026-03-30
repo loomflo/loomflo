@@ -7,14 +7,14 @@
 // are generated during Phase 1.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { memo, useCallback, useEffect, useState } from "react";
+import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import type { SpecArtifact } from '../lib/api.js';
-import { apiClient } from '../lib/api.js';
-import { MarkdownViewer } from '../components/MarkdownViewer.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
+import type { SpecArtifact } from "../lib/api.js";
+import { apiClient } from "../lib/api.js";
+import { MarkdownViewer } from "../components/MarkdownViewer.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
 
 // ============================================================================
 // Helpers
@@ -52,7 +52,7 @@ function formatFileSize(bytes: number): string {
  */
 export const SpecsPage = memo(function SpecsPage(): ReactElement {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
   const { subscribe } = useWebSocket(token);
 
   const [artifacts, setArtifacts] = useState<SpecArtifact[]>([]);
@@ -80,7 +80,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
       setArtifacts(data.artifacts);
       return data.artifacts;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load spec artifacts';
+      const msg = err instanceof Error ? err.message : "Failed to load spec artifacts";
       setListError(msg);
       return null;
     } finally {
@@ -100,7 +100,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
       const md = await apiClient.getSpec(name);
       setContent(md);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load artifact content';
+      const msg = err instanceof Error ? err.message : "Failed to load artifact content";
       setContentError(msg);
       setContent(null);
     } finally {
@@ -145,7 +145,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
   // --------------------------------------------------------------------------
 
   useEffect((): (() => void) => {
-    const unsub = subscribe('spec_artifact_ready', (): void => {
+    const unsub = subscribe("spec_artifact_ready", (): void => {
       void (async (): Promise<void> => {
         const fetched = await fetchArtifacts();
         const first = fetched?.[0];
@@ -193,12 +193,9 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-300">
-            No spec artifacts available
-          </p>
+          <p className="text-lg font-medium text-gray-300">No spec artifacts available</p>
           <p className="mt-2 text-sm text-gray-500">
-            Spec artifacts will appear here once a workflow enters the spec
-            phase.
+            Spec artifacts will appear here once a workflow enters the spec phase.
           </p>
         </div>
       </div>
@@ -221,17 +218,17 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
             <li key={artifact.name}>
               <button
                 type="button"
-                onClick={() => { handleSelect(artifact.name); }}
+                onClick={() => {
+                  handleSelect(artifact.name);
+                }}
                 className={`w-full px-4 py-3 text-left transition-colors ${
                   selectedName === artifact.name
-                    ? 'bg-gray-800 text-white'
-                    : 'text-gray-300 hover:bg-gray-800/50 hover:text-gray-100'
+                    ? "bg-gray-800 text-white"
+                    : "text-gray-300 hover:bg-gray-800/50 hover:text-gray-100"
                 }`}
               >
                 <p className="truncate text-sm font-medium">{artifact.name}</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {formatFileSize(artifact.size)}
-                </p>
+                <p className="mt-0.5 text-xs text-gray-500">{formatFileSize(artifact.size)}</p>
               </button>
             </li>
           ))}
@@ -261,9 +258,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
 
         {content === null && !contentLoading && !contentError && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-gray-500">
-              Select an artifact to view its content.
-            </p>
+            <p className="text-sm text-gray-500">Select an artifact to view its content.</p>
           </div>
         )}
       </div>

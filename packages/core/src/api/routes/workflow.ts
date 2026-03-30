@@ -1,15 +1,15 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
-import { LoomAgent } from '../../agents/loom.js';
-import { loadConfig, PartialConfigSchema } from '../../config.js';
-import type { CostTracker } from '../../costs/tracker.js';
-import type { SharedMemoryManager } from '../../memory/shared-memory.js';
-import type { EventQueryFilters } from '../../persistence/events.js';
-import { saveWorkflowState } from '../../persistence/state.js';
-import type { LLMProvider } from '../../providers/base.js';
-import type { Event, Workflow } from '../../types.js';
-import { WorkflowManager, type ResumeInfo } from '../../workflow/workflow.js';
+import type { FastifyPluginAsync } from "fastify";
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { LoomAgent } from "../../agents/loom.js";
+import { loadConfig, PartialConfigSchema } from "../../config.js";
+import type { CostTracker } from "../../costs/tracker.js";
+import type { SharedMemoryManager } from "../../memory/shared-memory.js";
+import type { EventQueryFilters } from "../../persistence/events.js";
+import { saveWorkflowState } from "../../persistence/state.js";
+import type { LLMProvider } from "../../providers/base.js";
+import type { Event, Workflow } from "../../types.js";
+import { WorkflowManager, type ResumeInfo } from "../../workflow/workflow.js";
 
 // ============================================================================
 // Types
@@ -82,7 +82,7 @@ interface GetWorkflowResponse {
   totalCost: number;
   createdAt: string;
   updatedAt: string;
-  graph: Workflow['graph'];
+  graph: Workflow["graph"];
 }
 
 // ============================================================================
@@ -109,11 +109,11 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Returns the current workflow state including the execution graph.
      * Returns 404 if no workflow is active.
      */
-    fastify.get('/workflow', async (_request, reply): Promise<void> => {
+    fastify.get("/workflow", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
@@ -136,11 +136,11 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Creates a workflow, launches LoomAgent spec generation in the background,
      * and returns immediately with the workflow ID.
      */
-    fastify.post('/workflow/init', async (request, reply): Promise<void> => {
+    fastify.post("/workflow/init", async (request, reply): Promise<void> => {
       const parseResult = InitRequestSchema.safeParse(request.body);
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid request body',
+          error: "Invalid request body",
           details: parseResult.error.issues,
         });
         return;
@@ -149,7 +149,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       const body = parseResult.data;
 
       if (getWorkflow() !== null) {
-        await reply.code(409).send({ error: 'A workflow is already active' });
+        await reply.code(409).send({ error: "A workflow is already active" });
         return;
       }
 
@@ -169,10 +169,10 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       const id = randomUUID();
       const workflow: Workflow = {
         id,
-        status: 'spec',
+        status: "spec",
         description: body.description,
         projectPath: body.projectPath,
-        graph: { nodes: {}, edges: [], topology: 'linear' },
+        graph: { nodes: {}, edges: [], topology: "linear" },
         config: mergedConfig,
         createdAt: now,
         updatedAt: now,
@@ -196,29 +196,29 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Confirm the spec and transition the workflow from 'building' to 'running',
      * beginning Phase 2 (execution).
      */
-    fastify.post('/workflow/start', async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/start", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
-      if (workflow.status !== 'building') {
-        await reply.code(400).send({ error: 'Workflow not in building state' });
+      if (workflow.status !== "building") {
+        await reply.code(400).send({ error: "Workflow not in building state" });
         return;
       }
 
       const updated: Workflow = {
         ...workflow,
-        status: 'running',
+        status: "running",
         updatedAt: new Date().toISOString(),
       };
 
       setWorkflow(updated);
       await saveWorkflowState(updated.projectPath, updated);
 
-      await reply.code(200).send({ status: 'running' } satisfies StartResponse);
+      await reply.code(200).send({ status: "running" } satisfies StartResponse);
     });
 
     /**
@@ -227,15 +227,15 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Pause a running workflow. In-progress nodes continue until their current
      * agent calls complete, but no new nodes are dispatched.
      */
-    fastify.post('/workflow/pause', async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/pause", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No active workflow' });
+        await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
-      if (workflow.status !== 'running') {
+      if (workflow.status !== "running") {
         await reply.code(400).send({
           error: `Cannot pause workflow in "${workflow.status}" state. Only running workflows can be paused.`,
         });
@@ -244,14 +244,14 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
 
       const updated: Workflow = {
         ...workflow,
-        status: 'paused',
+        status: "paused",
         updatedAt: new Date().toISOString(),
       };
 
       setWorkflow(updated);
       await saveWorkflowState(updated.projectPath, updated);
 
-      await reply.code(200).send({ status: 'paused' } satisfies PauseResponse);
+      await reply.code(200).send({ status: "paused" } satisfies PauseResponse);
     });
 
     /**
@@ -262,15 +262,15 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * to pending, recalculates scheduler delays, and transitions the
      * workflow back to running.
      */
-    fastify.post('/workflow/resume', async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/resume", async (_request, reply): Promise<void> => {
       const workflow = getWorkflow();
 
       if (workflow === null) {
-        await reply.code(404).send({ error: 'No workflow to resume' });
+        await reply.code(404).send({ error: "No workflow to resume" });
         return;
       }
 
-      if (workflow.status !== 'paused' && workflow.status !== 'running') {
+      if (workflow.status !== "paused" && workflow.status !== "running") {
         await reply.code(400).send({
           error: `Cannot resume workflow in "${workflow.status}" state. Only paused or running workflows can be resumed.`,
         });
@@ -281,7 +281,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
         const result = await WorkflowManager.resume(workflow.projectPath);
 
         if (result === null) {
-          await reply.code(404).send({ error: 'No persisted workflow state found' });
+          await reply.code(404).send({ error: "No persisted workflow state found" });
           return;
         }
 
@@ -335,7 +335,7 @@ async function runSpecGenerationBackground(
 
     const updated: Workflow = {
       ...workflow,
-      status: 'building',
+      status: "building",
       graph: result.graph,
       updatedAt: new Date().toISOString(),
     };
@@ -348,7 +348,7 @@ async function runSpecGenerationBackground(
 
     const updated: Workflow = {
       ...workflow,
-      status: 'failed',
+      status: "failed",
       updatedAt: new Date().toISOString(),
     };
 

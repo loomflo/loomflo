@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
-import type { ChatResult, ChatMessageCategory } from '../../agents/loom.js';
+import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
+import type { ChatResult, ChatMessageCategory } from "../../agents/loom.js";
 
 // ============================================================================
 // Types
@@ -9,7 +9,7 @@ import type { ChatResult, ChatMessageCategory } from '../../agents/loom.js';
 /** A single entry in the chat history. */
 export interface ChatHistoryEntry {
   /** Who sent the message. */
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   /** The message content. */
   content: string;
   /** ISO-8601 timestamp of the message. */
@@ -75,12 +75,12 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
      * user and assistant messages in history, and returns the response with
      * an optional action and category.
      */
-    fastify.post('/chat', async (request, reply): Promise<void> => {
+    fastify.post("/chat", async (request, reply): Promise<void> => {
       const parseResult = ChatMessageSchema.safeParse(request.body);
 
       if (!parseResult.success) {
         await reply.code(400).send({
-          error: 'Invalid request body',
+          error: "Invalid request body",
           details: parseResult.error.issues,
         });
         return;
@@ -89,7 +89,7 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
       const { message } = parseResult.data;
 
       addToHistory({
-        role: 'user',
+        role: "user",
         content: message,
         timestamp: new Date().toISOString(),
       });
@@ -97,15 +97,15 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
       const result: ChatResult = await handleChat(message);
 
       addToHistory({
-        role: 'assistant',
+        role: "assistant",
         content: result.response,
         timestamp: new Date().toISOString(),
       });
 
-      const action: ChatResponse['action'] =
-        result.modification !== null && result.modification.action !== 'no_action'
+      const action: ChatResponse["action"] =
+        result.modification !== null && result.modification.action !== "no_action"
           ? {
-              type: 'graph_modified',
+              type: "graph_modified",
               details: result.modification as unknown as Record<string, unknown>,
             }
           : null;
@@ -124,7 +124,7 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
      *
      * Returns the full chat history in chronological order.
      */
-    fastify.get('/chat/history', async (_request, reply): Promise<void> => {
+    fastify.get("/chat/history", async (_request, reply): Promise<void> => {
       const response: ChatHistoryResponse = { messages: getChatHistory() };
       await reply.code(200).send(response);
     });

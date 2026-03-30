@@ -7,13 +7,13 @@
 // action confirmation badges.
 // ============================================================================
 
-import { memo } from 'react';
-import type { ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { memo } from "react";
+import type { ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import { ChatInterface } from '../components/ChatInterface.js';
-import { useChat } from '../hooks/useChat.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
+import { ChatInterface } from "../components/ChatInterface.js";
+import { useChat } from "../hooks/useChat.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
 
 // ============================================================================
 // ChatPage Component
@@ -34,7 +34,7 @@ import { useWebSocket } from '../hooks/useWebSocket.js';
  */
 export const ChatPage = memo(function ChatPage(): ReactElement {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
   const { subscribe } = useWebSocket(token);
   const { messages, sendMessage, isLoading, error } = useChat(subscribe);
 
@@ -46,11 +46,7 @@ export const ChatPage = memo(function ChatPage(): ReactElement {
         </div>
       )}
       <div className="min-h-0 flex-1">
-        <ChatInterface
-          messages={messages}
-          onSend={sendMessage}
-          isLoading={isLoading}
-        />
+        <ChatInterface messages={messages} onSend={sendMessage} isLoading={isLoading} />
       </div>
     </div>
   );

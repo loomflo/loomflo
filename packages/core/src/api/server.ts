@@ -1,27 +1,23 @@
-import { existsSync } from 'node:fs';
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyRequest,
-} from 'fastify';
-import fastifyWebsocket from '@fastify/websocket';
-import fastifyCors from '@fastify/cors';
-import fastifyStatic from '@fastify/static';
-import { healthRoutes, type HealthRoutesOptions } from './routes/health.js';
-import { memoryRoutes, type MemoryRoutesOptions } from './routes/memory.js';
-import { eventsRoutes, type EventsRoutesOptions } from './routes/events.js';
-import { nodesRoutes, type NodesRoutesOptions } from './routes/nodes.js';
-import { workflowRoutes, type WorkflowRoutesOptions } from './routes/workflow.js';
-import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
-import { configRoutes, type ConfigRoutesOptions } from './routes/config.js';
-import { costsRoutes, type CostsRoutesOptions } from './routes/costs.js';
+import { existsSync } from "node:fs";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import fastifyWebsocket from "@fastify/websocket";
+import fastifyCors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
+import { healthRoutes, type HealthRoutesOptions } from "./routes/health.js";
+import { memoryRoutes, type MemoryRoutesOptions } from "./routes/memory.js";
+import { eventsRoutes, type EventsRoutesOptions } from "./routes/events.js";
+import { nodesRoutes, type NodesRoutesOptions } from "./routes/nodes.js";
+import { workflowRoutes, type WorkflowRoutesOptions } from "./routes/workflow.js";
+import { chatRoutes, type ChatRoutesOptions } from "./routes/chat.js";
+import { configRoutes, type ConfigRoutesOptions } from "./routes/config.js";
+import { costsRoutes, type CostsRoutesOptions } from "./routes/costs.js";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 /** Version string sent in the WebSocket welcome message. */
-const VERSION = '0.1.0';
+const VERSION = "0.1.0";
 
 /** WebSocket close code for unauthorized connections. */
 const WS_CLOSE_UNAUTHORIZED = 4001;
@@ -30,7 +26,7 @@ const WS_CLOSE_UNAUTHORIZED = 4001;
 const WS_OPEN = 1;
 
 /** Prefix for the Authorization header value. */
-const BEARER_PREFIX = 'Bearer ';
+const BEARER_PREFIX = "Bearer ";
 
 /**
  * URL prefixes for authenticated API routes.
@@ -40,14 +36,14 @@ const BEARER_PREFIX = 'Bearer ';
  * and SPA client-side routes to load without a Bearer token.
  */
 const API_ROUTE_PREFIXES = [
-  '/workflow',
-  '/nodes',
-  '/memory',
-  '/events',
-  '/specs',
-  '/chat',
-  '/config',
-  '/costs',
+  "/workflow",
+  "/nodes",
+  "/memory",
+  "/events",
+  "/specs",
+  "/chat",
+  "/config",
+  "/costs",
 ];
 
 // ============================================================================
@@ -130,8 +126,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   const server = Fastify({ logger: false });
 
   /** Resolved dashboard build directory when it exists on disk, otherwise null. */
-  const dashboardRoot =
-    dashboardPath && existsSync(dashboardPath) ? dashboardPath : null;
+  const dashboardRoot = dashboardPath && existsSync(dashboardPath) ? dashboardPath : null;
 
   // ---------------------------------------------------------------------------
   // Plugins
@@ -143,7 +138,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   if (dashboardRoot) {
     await server.register(fastifyStatic, {
       root: dashboardRoot,
-      prefix: '/',
+      prefix: "/",
     });
   }
 
@@ -154,25 +149,23 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // ---------------------------------------------------------------------------
 
   server.addHook(
-    'onRequest',
+    "onRequest",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      if (request.method === 'GET' && request.url === '/health') {
+      if (request.method === "GET" && request.url === "/health") {
         return;
       }
 
-      if (request.url === '/ws' || request.url.startsWith('/ws?')) {
+      if (request.url === "/ws" || request.url.startsWith("/ws?")) {
         return;
       }
 
       // When the dashboard is active, skip auth for GET requests to non-API
       // paths. Static assets and SPA client-side routes do not carry a Bearer
       // token; the dashboard includes it only in its API fetch/XHR calls.
-      if (dashboardRoot && request.method === 'GET') {
+      if (dashboardRoot && request.method === "GET") {
         const isApiRoute = API_ROUTE_PREFIXES.some(
           (p) =>
-            request.url === p ||
-            request.url.startsWith(p + '/') ||
-            request.url.startsWith(p + '?'),
+            request.url === p || request.url.startsWith(p + "/") || request.url.startsWith(p + "?"),
         );
         if (!isApiRoute) return;
       }
@@ -180,12 +173,12 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       const header = request.headers.authorization;
 
       if (!header || !header.startsWith(BEARER_PREFIX)) {
-        await reply.code(401).send({ error: 'Unauthorized' });
+        await reply.code(401).send({ error: "Unauthorized" });
         return;
       }
 
       if (header.slice(BEARER_PREFIX.length) !== token) {
-        await reply.code(401).send({ error: 'Unauthorized' });
+        await reply.code(401).send({ error: "Unauthorized" });
         return;
       }
     },
@@ -253,30 +246,23 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   const clients = new Set<SocketClient>();
 
-  server.get(
-    '/ws',
-    { websocket: true },
-    (socket: SocketClient, _request: FastifyRequest): void => {
-      const url = new URL(
-        _request.url,
-        `http://${_request.headers.host ?? 'localhost'}`,
-      );
-      const queryToken = url.searchParams.get('token');
+  server.get("/ws", { websocket: true }, (socket: SocketClient, _request: FastifyRequest): void => {
+    const url = new URL(_request.url, `http://${_request.headers.host ?? "localhost"}`);
+    const queryToken = url.searchParams.get("token");
 
-      if (queryToken !== token) {
-        socket.close(WS_CLOSE_UNAUTHORIZED, 'Unauthorized');
-        return;
-      }
+    if (queryToken !== token) {
+      socket.close(WS_CLOSE_UNAUTHORIZED, "Unauthorized");
+      return;
+    }
 
-      clients.add(socket);
+    clients.add(socket);
 
-      socket.send(JSON.stringify({ type: 'connected', version: VERSION }));
+    socket.send(JSON.stringify({ type: "connected", version: VERSION }));
 
-      socket.on('close', (): void => {
-        clients.delete(socket);
-      });
-    },
-  );
+    socket.on("close", (): void => {
+      clients.delete(socket);
+    });
+  });
 
   // ---------------------------------------------------------------------------
   // Not-found handler — SPA fallback for the dashboard.
@@ -291,19 +277,17 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // receive a structured JSON 404 response.
   // ---------------------------------------------------------------------------
 
-  server.setNotFoundHandler(
-    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      if (
-        dashboardRoot &&
-        request.method === 'GET' &&
-        request.headers.accept?.includes('text/html')
-      ) {
-        reply.sendFile('index.html');
-        return;
-      }
-      await reply.code(404).send({ error: 'Not found' });
-    },
-  );
+  server.setNotFoundHandler(async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (
+      dashboardRoot &&
+      request.method === "GET" &&
+      request.headers.accept?.includes("text/html")
+    ) {
+      reply.sendFile("index.html");
+      return;
+    }
+    await reply.code(404).send({ error: "Not found" });
+  });
 
   // ---------------------------------------------------------------------------
   // Broadcast

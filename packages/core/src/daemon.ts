@@ -1,11 +1,11 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import Fastify, { type FastifyInstance } from 'fastify';
-import { appendEvent, createEvent } from './persistence/events.js';
-import { flushPendingWrites, saveWorkflowStateImmediate } from './persistence/state.js';
-import type { Workflow } from './types.js';
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import Fastify, { type FastifyInstance } from "fastify";
+import { appendEvent, createEvent } from "./persistence/events.js";
+import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
+import type { Workflow } from "./types.js";
 
 // ============================================================================
 // Interfaces
@@ -65,13 +65,13 @@ export interface DaemonInfo {
 // ============================================================================
 
 /** Directory name for global Loomflo config/state. */
-const LOOMFLO_HOME_DIR = '.loomflo';
+const LOOMFLO_HOME_DIR = ".loomflo";
 
 /** Filename for daemon runtime info. */
-const DAEMON_FILE = 'daemon.json';
+const DAEMON_FILE = "daemon.json";
 
 /** Default host — loopback only for security. */
-const DEFAULT_HOST = '127.0.0.1';
+const DEFAULT_HOST = "127.0.0.1";
 
 /** Default port. */
 const DEFAULT_PORT = 3000;
@@ -109,12 +109,12 @@ export class Daemon {
     this.host = config.host ?? DEFAULT_HOST;
     this.projectPath = config.projectPath;
 
-    const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0']);
+    const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost", "0.0.0.0"]);
 
     if (!ALLOWED_HOSTS.has(this.host)) {
       throw new Error(
-        `Daemon host must be one of ${[...ALLOWED_HOSTS].join(', ')}, got '${this.host}'. ` +
-          'Use 0.0.0.0 only inside containers where network isolation is provided by the runtime.',
+        `Daemon host must be one of ${[...ALLOWED_HOSTS].join(", ")}, got '${this.host}'. ` +
+          "Use 0.0.0.0 only inside containers where network isolation is provided by the runtime.",
       );
     }
   }
@@ -153,10 +153,10 @@ export class Daemon {
    */
   async start(): Promise<DaemonInfo> {
     if (this.server) {
-      throw new Error('Daemon is already running');
+      throw new Error("Daemon is already running");
     }
 
-    const token = randomBytes(TOKEN_BYTES).toString('hex');
+    const token = randomBytes(TOKEN_BYTES).toString("hex");
 
     this.server = Fastify({ logger: false });
 
@@ -249,10 +249,10 @@ export class Daemon {
       // Log interruption events for each interrupted node.
       for (const nodeId of interruptedNodeIds) {
         const event = createEvent({
-          type: 'node_failed',
+          type: "node_failed",
           workflowId: workflow.id,
           nodeId,
-          details: { reason: 'daemon_shutdown', interrupted: true },
+          details: { reason: "daemon_shutdown", interrupted: true },
         });
         await appendEvent(this.projectPath, event);
       }
@@ -320,7 +320,7 @@ async function writeDaemonFile(info: DaemonInfo): Promise<void> {
   const dir = join(homedir(), LOOMFLO_HOME_DIR);
   await mkdir(dir, { recursive: true });
   await writeFile(getDaemonFilePath(), JSON.stringify(info, null, 2), {
-    encoding: 'utf-8',
+    encoding: "utf-8",
     mode: 0o600,
   });
 }
@@ -335,7 +335,7 @@ async function removeDaemonFile(): Promise<void> {
     await unlink(getDaemonFilePath());
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
-    if (code !== 'ENOENT') {
+    if (code !== "ENOENT") {
       throw error;
     }
   }
@@ -358,10 +358,10 @@ export async function loadDaemonInfo(): Promise<DaemonInfo | null> {
 
   let content: string;
   try {
-    content = await readFile(filePath, 'utf-8');
+    content = await readFile(filePath, "utf-8");
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       return null;
     }
     throw new Error(

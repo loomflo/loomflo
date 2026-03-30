@@ -7,16 +7,16 @@
 // artifact status indicators.
 // ============================================================================
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactElement } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import type { Edge, Node, NodeStatus } from '../lib/types.js';
-import type { NodeSummary } from '../lib/api.js';
-import { GraphView } from '../components/GraphView.js';
-import { useWebSocket } from '../hooks/useWebSocket.js';
-import { useWorkflow } from '../hooks/useWorkflow.js';
-import type { Subscribe } from '../hooks/useWorkflow.js';
+import type { Edge, Node, NodeStatus } from "../lib/types.js";
+import type { NodeSummary } from "../lib/api.js";
+import { GraphView } from "../components/GraphView.js";
+import { useWebSocket } from "../hooks/useWebSocket.js";
+import { useWorkflow } from "../hooks/useWorkflow.js";
+import type { Subscribe } from "../hooks/useWorkflow.js";
 
 // ============================================================================
 // Constants
@@ -28,18 +28,18 @@ const TRACKED_STATUSES: readonly {
   label: string;
   color: string;
 }[] = [
-  { key: 'done', label: 'Done', color: 'text-green-400' },
-  { key: 'running', label: 'Running', color: 'text-blue-400' },
-  { key: 'failed', label: 'Failed', color: 'text-red-400' },
+  { key: "done", label: "Done", color: "text-green-400" },
+  { key: "running", label: "Running", color: "text-blue-400" },
+  { key: "failed", label: "Failed", color: "text-red-400" },
 ] as const;
 
 /** Ordered list of spec artifacts generated during Phase 1. */
 const SPEC_ARTIFACT_NAMES: readonly string[] = [
-  'constitution.md',
-  'spec.md',
-  'plan.md',
-  'tasks.md',
-  'analysis-report.md',
+  "constitution.md",
+  "spec.md",
+  "plan.md",
+  "tasks.md",
+  "analysis-report.md",
 ] as const;
 
 // ============================================================================
@@ -47,7 +47,7 @@ const SPEC_ARTIFACT_NAMES: readonly string[] = [
 // ============================================================================
 
 /** Display state for a single spec artifact during Phase 1. */
-type SpecArtifactStatus = 'pending' | 'generating' | 'ready';
+type SpecArtifactStatus = "pending" | "generating" | "ready";
 
 /** A spec artifact with its current display status. */
 interface SpecArtifactInfo {
@@ -68,14 +68,14 @@ interface SpecArtifactInfo {
  * @returns A Node if the details contain valid node data, or null otherwise.
  */
 function parseInsertedNode(details: Record<string, unknown>): Node | null {
-  const raw = (details['node'] ?? details) as Record<string, unknown>;
-  if (typeof raw['id'] !== 'string') return null;
+  const raw = (details["node"] ?? details) as Record<string, unknown>;
+  if (typeof raw["id"] !== "string") return null;
 
-  const id = raw['id'];
-  const title = typeof raw['title'] === 'string' ? raw['title'] : id;
-  const status = typeof raw['status'] === 'string' ? (raw['status'] as NodeStatus) : 'pending';
-  const instructions = typeof raw['instructions'] === 'string' ? raw['instructions'] : '';
-  const delay = typeof raw['delay'] === 'string' ? raw['delay'] : '0';
+  const id = raw["id"];
+  const title = typeof raw["title"] === "string" ? raw["title"] : id;
+  const status = typeof raw["status"] === "string" ? (raw["status"] as NodeStatus) : "pending";
+  const instructions = typeof raw["instructions"] === "string" ? raw["instructions"] : "";
+  const delay = typeof raw["delay"] === "string" ? raw["delay"] : "0";
 
   return {
     id,
@@ -102,9 +102,9 @@ function parseInsertedNode(details: Record<string, unknown>): Node | null {
  * @returns An Edge if the details contain valid edge data, or null otherwise.
  */
 function parseAddedEdge(details: Record<string, unknown>): Edge | null {
-  const raw = (details['edge'] ?? details) as Record<string, unknown>;
-  if (typeof raw['from'] === 'string' && typeof raw['to'] === 'string') {
-    return { from: raw['from'], to: raw['to'] };
+  const raw = (details["edge"] ?? details) as Record<string, unknown>;
+  if (typeof raw["from"] === "string" && typeof raw["to"] === "string") {
+    return { from: raw["from"], to: raw["to"] };
   }
   return null;
 }
@@ -123,12 +123,8 @@ const PlanningHeader = memo(function PlanningHeader(): ReactElement {
   return (
     <div className="flex items-center gap-3 border-b border-blue-900/50 bg-blue-950/40 px-6 py-3">
       <div className="h-2 w-2 animate-pulse rounded-full bg-blue-400" />
-      <span className="text-sm font-medium text-blue-300">
-        Planning Phase
-      </span>
-      <span className="text-sm text-blue-400/70">
-        &mdash; Building execution graph&hellip;
-      </span>
+      <span className="text-sm font-medium text-blue-300">Planning Phase</span>
+      <span className="text-sm text-blue-400/70">&mdash; Building execution graph&hellip;</span>
     </div>
   );
 });
@@ -156,23 +152,18 @@ const SpecArtifactPanel = memo(function SpecArtifactPanel({
 }: SpecArtifactPanelProps): ReactElement {
   return (
     <div className="flex items-center gap-4 border-b border-gray-800 bg-gray-900/60 px-6 py-2.5">
-      <span className="text-xs uppercase tracking-wider text-gray-500">
-        Artifacts
-      </span>
+      <span className="text-xs uppercase tracking-wider text-gray-500">Artifacts</span>
       <div className="flex items-center gap-3">
         {artifacts.map((artifact) => (
-          <div
-            key={artifact.name}
-            className="flex items-center gap-1.5"
-          >
+          <div key={artifact.name} className="flex items-center gap-1.5">
             <ArtifactStatusIcon status={artifact.status} />
             <span
               className={`text-xs font-medium ${
-                artifact.status === 'ready'
-                  ? 'text-green-400'
-                  : artifact.status === 'generating'
-                    ? 'text-blue-400'
-                    : 'text-gray-500'
+                artifact.status === "ready"
+                  ? "text-green-400"
+                  : artifact.status === "generating"
+                    ? "text-blue-400"
+                    : "text-gray-500"
               }`}
             >
               {artifact.name}
@@ -204,7 +195,7 @@ interface ArtifactStatusIconProps {
 const ArtifactStatusIcon = memo(function ArtifactStatusIcon({
   status,
 }: ArtifactStatusIconProps): ReactElement {
-  if (status === 'ready') {
+  if (status === "ready") {
     return (
       <svg
         className="h-3.5 w-3.5 text-green-400"
@@ -213,24 +204,16 @@ const ArtifactStatusIcon = memo(function ArtifactStatusIcon({
         stroke="currentColor"
         strokeWidth={3}
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M5 13l4 4L19 7"
-        />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     );
   }
 
-  if (status === 'generating') {
-    return (
-      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
-    );
+  if (status === "generating") {
+    return <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />;
   }
 
-  return (
-    <span className="inline-block h-2 w-2 rounded-full bg-gray-600" />
-  );
+  return <span className="inline-block h-2 w-2 rounded-full bg-gray-600" />;
 });
 
 // ============================================================================
@@ -270,39 +253,27 @@ const StatusBar = memo(function StatusBar({
   return (
     <div className="flex items-center gap-6 border-b border-gray-800 bg-gray-900 px-6 py-3">
       <div className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-gray-500">
-          Status
-        </span>
+        <span className="text-xs uppercase tracking-wider text-gray-500">Status</span>
         <span className="rounded bg-gray-800 px-2 py-0.5 text-sm font-medium text-gray-200">
           {workflowStatus}
         </span>
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-gray-500">
-          Nodes
-        </span>
+        <span className="text-xs uppercase tracking-wider text-gray-500">Nodes</span>
         <span className="text-sm font-medium text-gray-200">{nodes.length}</span>
       </div>
 
       {TRACKED_STATUSES.map(({ key, label, color }) => (
         <div key={key} className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-gray-500">
-            {label}
-          </span>
-          <span className={`text-sm font-medium ${color}`}>
-            {counts.get(key) ?? 0}
-          </span>
+          <span className="text-xs uppercase tracking-wider text-gray-500">{label}</span>
+          <span className={`text-sm font-medium ${color}`}>{counts.get(key) ?? 0}</span>
         </div>
       ))}
 
       <div className="ml-auto flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-gray-500">
-          Cost
-        </span>
-        <span className="text-sm font-medium text-gray-200">
-          ${totalCost.toFixed(4)}
-        </span>
+        <span className="text-xs uppercase tracking-wider text-gray-500">Cost</span>
+        <span className="text-sm font-medium text-gray-200">${totalCost.toFixed(4)}</span>
       </div>
     </div>
   );
@@ -348,7 +319,7 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
   useEffect((): (() => void) => {
     if (!isSpecPhase) return (): void => {};
 
-    return subscribe('spec_artifact_ready', (event): void => {
+    return subscribe("spec_artifact_ready", (event): void => {
       setReadyArtifacts((prev) => {
         if (prev.has(event.name)) return prev;
         const next = new Set(prev);
@@ -362,8 +333,8 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
   useEffect((): (() => void) => {
     if (!isSpecPhase) return (): void => {};
 
-    return subscribe('graph_modified', (event): void => {
-      if (event.action === 'insert_node') {
+    return subscribe("graph_modified", (event): void => {
+      if (event.action === "insert_node") {
         const node = parseInsertedNode(event.details);
         if (node) {
           setWsNodes((prev) => {
@@ -371,7 +342,7 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
             return [...prev, node];
           });
         }
-      } else if (event.action === 'add_edge') {
+      } else if (event.action === "add_edge") {
         const edge = parseAddedEdge(event.details);
         if (edge) {
           setWsEdges((prev) => {
@@ -388,13 +359,13 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
     let foundGenerating = false;
     return SPEC_ARTIFACT_NAMES.map((name): SpecArtifactInfo => {
       if (readyArtifacts.has(name)) {
-        return { name, status: 'ready' };
+        return { name, status: "ready" };
       }
       if (!foundGenerating) {
         foundGenerating = true;
-        return { name, status: 'generating' };
+        return { name, status: "generating" };
       }
-      return { name, status: 'pending' };
+      return { name, status: "pending" };
     });
   }, [readyArtifacts]);
 
@@ -423,12 +394,12 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
 export const GraphPage = memo(function GraphPage(): ReactElement {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
 
   const { subscribe } = useWebSocket(token);
   const { workflow, nodes, loading, error } = useWorkflow(subscribe);
 
-  const isSpecPhase = workflow?.status === 'spec';
+  const isSpecPhase = workflow?.status === "spec";
 
   const { artifacts, wsNodes, wsEdges } = useSpecPhase(subscribe, isSpecPhase);
 
@@ -447,9 +418,7 @@ export const GraphPage = memo(function GraphPage(): ReactElement {
    */
   const graphNodes = useMemo((): Node[] => {
     if (!workflow) return [];
-    const statusMap = new Map<string, NodeStatus>(
-      nodes.map((n) => [n.id, n.status]),
-    );
+    const statusMap = new Map<string, NodeStatus>(nodes.map((n) => [n.id, n.status]));
     const restNodes = Object.values(workflow.graph.nodes).map(
       (node): Node => ({
         ...node,
@@ -473,12 +442,8 @@ export const GraphPage = memo(function GraphPage(): ReactElement {
 
     if (!isSpecPhase || wsEdges.length === 0) return restEdges;
 
-    const existingKeys = new Set(
-      restEdges.map((e) => `${e.from}->${e.to}`),
-    );
-    const newEdges = wsEdges.filter(
-      (e) => !existingKeys.has(`${e.from}->${e.to}`),
-    );
+    const existingKeys = new Set(restEdges.map((e) => `${e.from}->${e.to}`));
+    const newEdges = wsEdges.filter((e) => !existingKeys.has(`${e.from}->${e.to}`));
     return [...restEdges, ...newEdges];
   }, [workflow, isSpecPhase, wsEdges]);
 
@@ -517,9 +482,7 @@ export const GraphPage = memo(function GraphPage(): ReactElement {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-300">
-            No active workflow
-          </p>
+          <p className="text-lg font-medium text-gray-300">No active workflow</p>
           <p className="mt-1 text-sm text-gray-500">
             Initialize a workflow to see the execution graph.
           </p>
@@ -540,11 +503,7 @@ export const GraphPage = memo(function GraphPage(): ReactElement {
           <SpecArtifactPanel artifacts={artifacts} />
         </>
       ) : (
-        <StatusBar
-          workflowStatus={workflow.status}
-          nodes={nodes}
-          totalCost={workflow.totalCost}
-        />
+        <StatusBar workflowStatus={workflow.status} nodes={nodes} totalCost={workflow.totalCost} />
       )}
       <div className="min-h-0 flex-1">
         <GraphView

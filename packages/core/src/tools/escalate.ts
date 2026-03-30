@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { Tool, ToolContext } from './base.js';
+import { z } from "zod";
+import type { Tool, ToolContext } from "./base.js";
 
 // ============================================================================
 // EscalationRequest
@@ -20,7 +20,7 @@ export interface EscalationRequest {
   /** ID of the agent requesting the escalation. */
   agentId: string;
   /** Optional suggestion for how Loom might resolve the issue. */
-  suggestedAction?: 'add_node' | 'modify_node' | 'remove_node' | 'skip_node';
+  suggestedAction?: "add_node" | "modify_node" | "remove_node" | "skip_node";
   /** Additional context about the failure. */
   details?: string;
 }
@@ -53,20 +53,17 @@ export interface EscalationHandlerLike {
 /** Zod schema for escalate tool input. */
 const EscalateInputSchema = z.object({
   /** Reason why the escalation is needed. */
-  reason: z.string().describe('Why the escalation is needed'),
+  reason: z.string().describe("Why the escalation is needed"),
   /** Optional suggestion for how Loom might resolve the issue. */
   suggestedAction: z
-    .enum(['add_node', 'modify_node', 'remove_node', 'skip_node'])
+    .enum(["add_node", "modify_node", "remove_node", "skip_node"])
     .optional()
     .describe(
-      'Optional suggestion for how the architect should handle it: ' +
+      "Optional suggestion for how the architect should handle it: " +
         '"add_node", "modify_node", "remove_node", or "skip_node"',
     ),
   /** Additional context about the failure. */
-  details: z
-    .string()
-    .optional()
-    .describe('Additional context about the failure or blockage'),
+  details: z.string().optional().describe("Additional context about the failure or blockage"),
 });
 
 // ============================================================================
@@ -89,13 +86,13 @@ const EscalateInputSchema = z.object({
  */
 export function createEscalateTool(handler: EscalationHandlerLike): Tool {
   return {
-    name: 'escalate',
+    name: "escalate",
     description:
-      'Request graph modifications from the architect (Loom) when a node is ' +
-      'BLOCKED or has exhausted all retries. Provide a reason explaining why ' +
-      'escalation is needed, an optional suggested action, and optional details ' +
-      'about the failure. This tool should be called when the orchestrator ' +
-      'cannot resolve the issue on its own.',
+      "Request graph modifications from the architect (Loom) when a node is " +
+      "BLOCKED or has exhausted all retries. Provide a reason explaining why " +
+      "escalation is needed, an optional suggested action, and optional details " +
+      "about the failure. This tool should be called when the orchestrator " +
+      "cannot resolve the issue on its own.",
     inputSchema: EscalateInputSchema,
 
     async execute(input: unknown, context: ToolContext): Promise<string> {
@@ -115,14 +112,14 @@ export function createEscalateTool(handler: EscalationHandlerLike): Tool {
         } catch {
           return (
             `Error: failed to escalate for node "${context.nodeId}" — ` +
-            'the handler rejected the escalation request'
+            "the handler rejected the escalation request"
           );
         }
 
         return (
           `Escalation submitted — agent: ${context.agentId}, ` +
           `node: ${context.nodeId}, reason: ${parsed.reason}` +
-          (parsed.suggestedAction ? `, suggested: ${parsed.suggestedAction}` : '')
+          (parsed.suggestedAction ? `, suggested: ${parsed.suggestedAction}` : "")
         );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);

@@ -1,0 +1,18 @@
+
+> @loomflo/core@0.0.0 build /tmp/loomflo-fix/packages/core
+> tsup src/index.ts src/daemon-entry.ts --format esm --dts --clean
+
+CLI Building entry: src/daemon-entry.ts, src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Target: es2022
+CLI Cleaning output folder
+ESM Build start
+ESM dist/daemon-entry.js   926.00 B
+ESM dist/chunk-7M4TNMD3.js 38.05 KB
+ESM dist/index.js          294.48 KB
+ESM ⚡️ Build success in 225ms
+DTS Build start
+DTS ⚡️ Build success in 7633ms
+DTS dist/daemon-entry.d.ts 20.00 B
+DTS dist/index.d.ts        316.10 KB

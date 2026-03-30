@@ -5,18 +5,18 @@
 // WebSocket cost_update events from the Loomflo daemon.
 // ============================================================================
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { apiClient, ApiError } from '../lib/api.js';
-import type { CostsResponse, NodeCostEntry } from '../lib/api.js';
-import type { UseWebSocketReturn } from './useWebSocket.js';
+import { apiClient, ApiError } from "../lib/api.js";
+import type { CostsResponse, NodeCostEntry } from "../lib/api.js";
+import type { UseWebSocketReturn } from "./useWebSocket.js";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /** The subscribe function signature extracted from useWebSocket. */
-export type Subscribe = UseWebSocketReturn['subscribe'];
+export type Subscribe = UseWebSocketReturn["subscribe"];
 
 /** Return value of the useCosts hook. */
 export interface UseCostsReturn {
@@ -85,9 +85,7 @@ export function useCosts(subscribe: Subscribe): UseCostsReturn {
         setNodes([]);
         setLoomCost(0);
       } else {
-        setError(
-          err instanceof Error ? err.message : 'Failed to fetch cost data',
-        );
+        setError(err instanceof Error ? err.message : "Failed to fetch cost data");
       }
     } finally {
       setLoading(false);
@@ -101,15 +99,13 @@ export function useCosts(subscribe: Subscribe): UseCostsReturn {
 
   /** Subscribe to WebSocket cost_update events and update state. */
   useEffect((): (() => void) => {
-    const unsub = subscribe('cost_update', (event): void => {
+    const unsub = subscribe("cost_update", (event): void => {
       setTotal(event.totalCost);
 
       setBudgetRemaining(event.budgetRemaining);
 
       setNodes((prev) =>
-        prev.map((node) =>
-          node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node,
-        ),
+        prev.map((node) => (node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node)),
       );
     });
 
