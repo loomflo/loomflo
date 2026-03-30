@@ -1,3 +1,27 @@
 .specify
 specs/
 speckit.*.md
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+
+# Turbo cache
+.turbo/
+
+# Vite cache
+.vite/
+
+# Coverage
+coverage/
+
+# Env files
+.env
+.env.local
+
+# OS
+.DS_Store
