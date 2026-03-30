@@ -67,7 +67,7 @@ const ChatMessageSchema = z.object({
 export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
   const { handleChat, getChatHistory, addToHistory } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * POST /chat
      *
@@ -128,6 +128,7 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
       const response: ChatHistoryResponse = { messages: getChatHistory() };
       await reply.code(200).send(response);
     });
+    return Promise.resolve();
   };
 
   return plugin;

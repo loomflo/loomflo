@@ -101,7 +101,7 @@ export const listFilesTool: Tool = {
 
       let result = matched.join('\n');
       if (totalMatches > maxResults) {
-        result += `\n\n(Showing ${maxResults} of ${totalMatches} matching files)`;
+        result += `\n\n(Showing ${String(maxResults)} of ${String(totalMatches)} matching files)`;
       }
 
       return result;

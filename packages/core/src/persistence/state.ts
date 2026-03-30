@@ -71,7 +71,7 @@ export async function loadWorkflowState(projectPath: string): Promise<Workflow |
   try {
     content = await readFile(filePath, 'utf-8');
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === 'ENOENT') {
+    if ((error as { code?: string }).code === 'ENOENT') {
       return null;
     }
     throw new Error(

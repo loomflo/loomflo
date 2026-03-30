@@ -160,8 +160,9 @@ export const searchFilesTool: Tool = {
         for (let i = 0; i < lines.length; i++) {
           // Reset regex state for each line (global flag carries lastIndex).
           regex.lastIndex = 0;
-          if (regex.test(lines[i]!)) {
-            results.push(`${rel}:${i + 1}:${lines[i]}`);
+          const currentLine = lines[i] ?? '';
+          if (regex.test(currentLine)) {
+            results.push(`${rel}:${String(i + 1)}:${currentLine}`);
             if (results.length >= maxResults) {
               break;
             }

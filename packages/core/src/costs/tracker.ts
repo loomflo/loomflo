@@ -146,7 +146,7 @@ export class CostTracker {
     this.perAgent.set(agentId, (this.perAgent.get(agentId) ?? 0) + cost);
 
     if (this.onRecordCallback) {
-      const nodeCost = this.perNode.get(nodeId)!;
+      const nodeCost = this.perNode.get(nodeId) ?? 0;
       const budgetRemaining =
         this.budgetLimit !== null
           ? Math.max(0, this.budgetLimit - this.totalCost)

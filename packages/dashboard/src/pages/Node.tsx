@@ -98,7 +98,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
   const [node, setNode] = useState<NodeDetailResponse | null>(null);
   const [review, setReview] = useState<ReviewReportData | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // --------------------------------------------------------------------------

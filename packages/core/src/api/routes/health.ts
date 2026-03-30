@@ -61,8 +61,8 @@ const VERSION = '0.1.0';
 export function healthRoutes(options: HealthRoutesOptions): FastifyPluginAsync {
   const { getUptime, getWorkflow } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
-    fastify.get('/health', async (): Promise<HealthResponse> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
+    fastify.get('/health', (): HealthResponse => {
       return {
         status: 'ok',
         uptime: getUptime(),
@@ -70,6 +70,7 @@ export function healthRoutes(options: HealthRoutesOptions): FastifyPluginAsync {
         workflow: getWorkflow(),
       };
     });
+    return Promise.resolve();
   };
 
   return plugin;

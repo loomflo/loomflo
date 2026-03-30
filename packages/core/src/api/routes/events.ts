@@ -50,7 +50,7 @@ const EventsQuerySchema = z.object({
 export function eventsRoutes(options: EventsRoutesOptions): FastifyPluginAsync {
   const { getProjectPath } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /events
      *
@@ -88,6 +88,7 @@ export function eventsRoutes(options: EventsRoutesOptions): FastifyPluginAsync {
       const response: EventsListResponse = { events: paginated, total };
       await reply.code(200).send(response);
     });
+    return Promise.resolve();
   };
 
   return plugin;

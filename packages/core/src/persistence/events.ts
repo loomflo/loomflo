@@ -111,20 +111,20 @@ export async function queryEvents(
   let events: Event[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!.trim();
+    const line = (lines[i] ?? '').trim();
     if (line === '') continue;
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
     } catch {
-      console.warn(`events.jsonl line ${i + 1}: invalid JSON, skipping`);
+      console.warn(`events.jsonl line ${String(i + 1)}: invalid JSON, skipping`);
       continue;
     }
 
     const result = EventSchema.safeParse(parsed);
     if (!result.success) {
-      console.warn(`events.jsonl line ${i + 1}: schema validation failed, skipping`);
+      console.warn(`events.jsonl line ${String(i + 1)}: schema validation failed, skipping`);
       continue;
     }
 

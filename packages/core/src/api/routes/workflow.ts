@@ -102,7 +102,7 @@ interface GetWorkflowResponse {
 export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsync {
   const { getWorkflow, setWorkflow } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /workflow
      *
@@ -297,6 +297,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
         await reply.code(400).send({ error: `Resume failed: ${message}` });
       }
     });
+    return Promise.resolve();
   };
 
   return plugin;

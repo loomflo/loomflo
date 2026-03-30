@@ -231,7 +231,7 @@ export async function loadConfigFile(filePath: string): Promise<PartialConfig> {
   try {
     content = await readFile(filePath, 'utf-8');
   } catch (error: unknown) {
-    if ((error as { code?: string })?.code === 'ENOENT') {
+    if ((error as { code?: string }).code === 'ENOENT') {
       return {};
     }
     throw new Error(
@@ -362,19 +362,6 @@ export interface ConfigManagerOptions {
   projectPath?: string;
   /** CLI or programmatic overrides applied with highest precedence. */
   overrides?: PartialConfig;
-}
-
-/**
- * Typed event overloads for {@link ConfigManager}.
- *
- * The `'configChanged'` event fires with the new {@link Config} whenever
- * the resolved configuration changes.
- */
-export interface ConfigManager {
-  /** Register a listener for the `'configChanged'` event. */
-  on(event: 'configChanged', listener: (config: Config) => void): this;
-  /** Emit the `'configChanged'` event with the updated config. */
-  emit(event: 'configChanged', config: Config): boolean;
 }
 
 /**

@@ -43,7 +43,7 @@ export interface MemoryRoutesOptions {
 export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
   const { getSharedMemory } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /memory
      *
@@ -101,6 +101,7 @@ export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
         }
       },
     );
+    return Promise.resolve();
   };
 
   return plugin;

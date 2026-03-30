@@ -78,7 +78,7 @@ export const editFileTool: Tool = {
       // Count occurrences to inform the caller.
       let occurrences = 0;
       let searchFrom = 0;
-      while (true) {
+      for (;;) {
         const idx = content.indexOf(oldText, searchFrom);
         if (idx === -1) break;
         occurrences++;
@@ -94,7 +94,7 @@ export const editFileTool: Tool = {
       await writeFile(real, modified, 'utf-8');
 
       if (occurrences > 1) {
-        return `Successfully edited ${filePath} (replaced first of ${occurrences} occurrences)`;
+        return `Successfully edited ${filePath} (replaced first of ${String(occurrences)} occurrences)`;
       }
       return `Successfully edited ${filePath}`;
     } catch (err: unknown) {

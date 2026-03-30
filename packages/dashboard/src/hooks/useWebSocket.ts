@@ -206,15 +206,15 @@ export function useWebSocket(
 ): UseWebSocketReturn {
   const { autoConnect = true, reconnectMaxRetries = Infinity } = options;
 
-  const [connected, setConnected] = useState<boolean>(false);
+  const [connected, setConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const subscribersRef = useRef<
-    Map<WsEventType, Set<WsEventCallback<WsEventType>>>
-  >(new Map());
-  const retryCountRef = useRef<number>(0);
+  const subscribersRef = useRef(
+    new Map<WsEventType, Set<WsEventCallback<WsEventType>>>(),
+  );
+  const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const intentionalCloseRef = useRef<boolean>(false);
+  const intentionalCloseRef = useRef(false);
 
   /** Clear any pending reconnection timer. */
   const clearRetryTimer = useCallback((): void => {
@@ -310,7 +310,7 @@ export function useWebSocket(
       if (!subs.has(type)) {
         subs.set(type, new Set());
       }
-      const set = subs.get(type)!;
+      const set = subs.get(type) ?? new Set<WsEventCallback<WsEventType>>();
       const cb = callback as WsEventCallback<WsEventType>;
       set.add(cb);
 

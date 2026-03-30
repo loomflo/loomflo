@@ -435,7 +435,7 @@ export const GraphPage = memo(function GraphPage(): ReactElement {
   /** Navigate to the node detail page when a graph node is clicked. */
   const handleNodeClick = useCallback(
     (nodeId: string): void => {
-      navigate(`/node/${encodeURIComponent(nodeId)}`);
+      void navigate(`/node/${encodeURIComponent(nodeId)}`);
     },
     [navigate],
   );

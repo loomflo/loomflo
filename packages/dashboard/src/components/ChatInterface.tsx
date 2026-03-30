@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent, ReactElement } from 'react';
+import type { KeyboardEvent, ReactElement, SyntheticEvent } from 'react';
 
 // ============================================================================
 // Types
@@ -177,8 +177,8 @@ export const ChatInterface = memo(function ChatInterface({
   isLoading,
 }: ChatInterfaceProps): ReactElement {
   // ---- State ----
-  const [input, setInput] = useState<string>('');
-  const [autoScroll, setAutoScroll] = useState<boolean>(true);
+  const [input, setInput] = useState('');
+  const [autoScroll, setAutoScroll] = useState(true);
 
   // ---- Refs ----
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +203,7 @@ export const ChatInterface = memo(function ChatInterface({
   }, []);
 
   const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>): void => {
+    (e: SyntheticEvent<HTMLFormElement>): void => {
       e.preventDefault();
       const trimmed = input.trim();
       if (trimmed === '' || isLoading) {
@@ -255,7 +255,7 @@ export const ChatInterface = memo(function ChatInterface({
           </div>
         ) : (
           messages.map((msg, idx) => (
-            <MessageBubble key={`${msg.timestamp}-${idx}`} message={msg} />
+            <MessageBubble key={`${msg.timestamp}-${String(idx)}`} message={msg} />
           ))
         )}
 
@@ -270,7 +270,7 @@ export const ChatInterface = memo(function ChatInterface({
         <textarea
           ref={inputRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); }}
           onKeyDown={handleKeyDown}
           placeholder="Message Loom..."
           disabled={isLoading}

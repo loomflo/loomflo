@@ -140,8 +140,8 @@ export class WorkflowNode {
   incrementRetry(): void {
     if (this.data.retryCount >= this.data.maxRetries) {
       throw new Error(
-        `Cannot increment retry: count (${this.data.retryCount}) ` +
-          `already at or above max (${this.data.maxRetries})`,
+        `Cannot increment retry: count (${String(this.data.retryCount)}) ` +
+          `already at or above max (${String(this.data.maxRetries)})`,
       );
     }
     this.data.retryCount += 1;
@@ -170,7 +170,10 @@ export class WorkflowNode {
     if (index === -1) {
       throw new Error(`Agent "${agentId}" not found in node "${this.data.id}"`);
     }
-    const existing = this.data.agents[index]!;
+    const existing = this.data.agents[index];
+    if (!existing) {
+      throw new Error(`Agent "${agentId}" not found in node "${this.data.id}"`);
+    }
     this.data.agents[index] = { ...existing, ...updates, id: agentId };
   }
 
@@ -255,10 +258,12 @@ export class WorkflowNode {
 
     for (let i = 0; i < agentIds.length; i++) {
       for (let j = i + 1; j < agentIds.length; j++) {
-        const idA = agentIds[i]!;
-        const idB = agentIds[j]!;
-        const patternsA = this.data.fileOwnership[idA]!;
-        const patternsB = this.data.fileOwnership[idB]!;
+        const idA = agentIds[i];
+        const idB = agentIds[j];
+        if (!idA || !idB) continue;
+        const patternsA = this.data.fileOwnership[idA];
+        const patternsB = this.data.fileOwnership[idB];
+        if (!patternsA || !patternsB) continue;
 
         const matcherA = picomatch(patternsA);
         const matcherB = picomatch(patternsB);

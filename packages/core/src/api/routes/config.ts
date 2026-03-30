@@ -42,7 +42,7 @@ export interface ConfigUpdateResponse {
 export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
   const { getConfig, updateConfig } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /config
      *
@@ -76,6 +76,7 @@ export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
       const response: ConfigUpdateResponse = { config: updated };
       await reply.code(200).send(response);
     });
+    return Promise.resolve();
   };
 
   return plugin;

@@ -57,7 +57,7 @@ interface CostsResponse {
 export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
   const { getCostSummary, getWorkflow, getLoomCost } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /costs
      *
@@ -94,6 +94,7 @@ export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
 
       await reply.code(200).send(response);
     });
+    return Promise.resolve();
   };
 
   return plugin;

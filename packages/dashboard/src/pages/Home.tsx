@@ -370,7 +370,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
                         ? 'bg-amber-500'
                         : 'bg-blue-500'
                   }`}
-                  style={{ width: `${budgetUsedPercent}%` }}
+                  style={{ width: `${String(budgetUsedPercent)}%` }}
                 />
               </div>
             </div>

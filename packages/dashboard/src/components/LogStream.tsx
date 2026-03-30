@@ -167,7 +167,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
   // ---- State ----
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<EventType | null>(null);
-  const [autoScroll, setAutoScroll] = useState<boolean>(true);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   // ---- Refs ----
   const containerRef = useRef<HTMLDivElement>(null);
@@ -261,7 +261,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
         {!autoScroll && (
           <button
             type="button"
-            onClick={() => setAutoScroll(true)}
+            onClick={() => { setAutoScroll(true); }}
             className="ml-auto rounded bg-blue-800 px-2 py-0.5 text-xs text-blue-200 transition-colors hover:bg-blue-700"
           >
             Resume auto-scroll
@@ -292,7 +292,7 @@ export const LogStream = memo(function LogStream({ events }: LogStreamProps): Re
 
                 return (
                   <tr
-                    key={`${event.ts}-${idx}`}
+                    key={`${event.ts}-${String(idx)}`}
                     className="border-b border-gray-800 hover:bg-gray-900"
                   >
                     {/* Timestamp */}

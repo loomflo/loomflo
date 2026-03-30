@@ -414,11 +414,13 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
 
     feedbackTimers.current[field] = setTimeout(() => {
       setFeedback((prev) => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
+        const { [field]: _removed, ...rest } = prev;
+        void _removed;
+        return rest;
       });
-      delete feedbackTimers.current[field];
+      const { [field]: _expired, ...remainingTimers } = feedbackTimers.current;
+      void _expired;
+      feedbackTimers.current = remainingTimers;
     }, FEEDBACK_TIMEOUT_MS);
   }, []);
 

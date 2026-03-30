@@ -235,7 +235,7 @@ export class AnthropicProvider implements LLMProvider {
     } catch (error: unknown) {
       if (error instanceof Anthropic.APIError) {
         throw new Error(
-          `Anthropic API error (${error.status}): ${error.message}`,
+          `Anthropic API error (${String(error.status)}): ${error.message}`,
         );
       }
       throw error;

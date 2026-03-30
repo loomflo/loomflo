@@ -138,7 +138,7 @@ function toNodeDetail(node: Node): NodeDetail {
 export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
   const { getWorkflow } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /nodes
      *
@@ -228,6 +228,7 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
 
       await reply.code(200).send(node.reviewReport);
     });
+    return Promise.resolve();
   };
 
   return plugin;

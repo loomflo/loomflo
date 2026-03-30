@@ -52,7 +52,7 @@ const SPECS_DIR = '.loomflo/specs';
 export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
   const { getWorkflow } = options;
 
-  const plugin: FastifyPluginAsync = async (fastify): Promise<void> => {
+  const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /specs
      *
@@ -114,6 +114,7 @@ export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
         await reply.type('text/markdown').code(200).send(content);
       },
     );
+    return Promise.resolve();
   };
 
   return plugin;

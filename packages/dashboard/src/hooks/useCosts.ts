@@ -54,12 +54,12 @@ export interface UseCostsReturn {
  * @returns Cost state including totals, budget info, per-node breakdown, and controls.
  */
 export function useCosts(subscribe: Subscribe): UseCostsReturn {
-  const [total, setTotal] = useState<number>(0);
+  const [total, setTotal] = useState(0);
   const [budgetLimit, setBudgetLimit] = useState<number | null>(null);
   const [budgetRemaining, setBudgetRemaining] = useState<number | null>(null);
   const [nodes, setNodes] = useState<NodeCostEntry[]>([]);
-  const [loomCost, setLoomCost] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loomCost, setLoomCost] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -104,9 +104,7 @@ export function useCosts(subscribe: Subscribe): UseCostsReturn {
     const unsub = subscribe('cost_update', (event): void => {
       setTotal(event.totalCost);
 
-      if (event.budgetRemaining !== undefined && event.budgetRemaining !== null) {
-        setBudgetRemaining(event.budgetRemaining);
-      }
+      setBudgetRemaining(event.budgetRemaining);
 
       setNodes((prev) =>
         prev.map((node) =>

@@ -73,7 +73,7 @@ export const writeFileTool: Tool = {
       const bytes = Buffer.byteLength(content, 'utf-8');
       await writeFile(resolved, content, 'utf-8');
 
-      return `Successfully wrote ${bytes} bytes to ${filePath}`;
+      return `Successfully wrote ${String(bytes)} bytes to ${filePath}`;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return `Error: ${message}`;

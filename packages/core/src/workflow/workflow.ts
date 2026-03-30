@@ -343,7 +343,7 @@ export class WorkflowManager {
    */
   updateTotalCost(amount: number): void {
     if (amount < 0) {
-      throw new Error(`Cost amount must be non-negative, got ${amount}`);
+      throw new Error(`Cost amount must be non-negative, got ${String(amount)}`);
     }
     this.data.totalCost += amount;
   }

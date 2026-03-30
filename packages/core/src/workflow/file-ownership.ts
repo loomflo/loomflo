@@ -368,8 +368,11 @@ export class FileOwnershipManager {
 
     for (let i = 0; i < entries.length; i++) {
       for (let j = i + 1; j < entries.length; j++) {
-        const [idA, patternsA] = entries[i]!;
-        const [idB, patternsB] = entries[j]!;
+        const entryA = entries[i];
+        const entryB = entries[j];
+        if (!entryA || !entryB) continue;
+        const [idA, patternsA] = entryA;
+        const [idB, patternsB] = entryB;
 
         if (patternsA.length === 0 || patternsB.length === 0) continue;
 

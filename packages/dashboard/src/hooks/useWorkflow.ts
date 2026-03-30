@@ -47,7 +47,7 @@ export interface UseWorkflowReturn {
 export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [nodes, setNodes] = useState<NodeSummary[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**

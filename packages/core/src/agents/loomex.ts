@@ -182,7 +182,7 @@ function createFailReport(
  * @param text - Raw text from the LLM response.
  * @returns Parsed JSON value, or null if no valid JSON can be extracted.
  */
-function extractJson(text: string): unknown | null {
+function extractJson(text: string): unknown {
   const trimmed = text.trim();
 
   try {
@@ -368,7 +368,7 @@ export function parseReviewReport(
             }));
 
         return {
-          verdict: verdictUpper as 'PASS' | 'FAIL' | 'BLOCKED',
+          verdict: verdictUpper,
           tasksVerified,
           details: typeof partial['details'] === 'string'
             ? partial['details']
