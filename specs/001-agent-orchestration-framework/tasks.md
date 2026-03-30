@@ -335,7 +335,7 @@
 - [x] T150 [US-Quality] [P] Write unit tests for packages/core/src/config.ts (loadConfig, mergeConfig, validateConfig — edge cases: missing fields, invalid types, env var overrides) in packages/core/tests/unit/config-extended.test.ts
 - [x] T151 [US-Quality] Write unit tests for packages/core/src/workflow/ WorkflowEngine (execute, pause, resume, cancel — success and failure paths) using mock agents in packages/core/tests/unit/workflow-engine.test.ts
 - [x] T152 [US-Quality] [P] Write unit tests for packages/core/src/costs/ CostTracker (track, summarize, per-model pricing) in packages/core/tests/unit/costs-extended.test.ts
-- [ ] T153 [US-Quality] After all test files added: run `pnpm test -- -- --coverage` and verify packages/core coverage lines >= 80%. Adjust or add tests if needed until threshold is met. Update vitest.config.ts threshold from 50 to 75.
+- [x] T153 [US-Quality] After all test files added: run `pnpm test -- -- --coverage` and verify packages/core coverage lines >= 80%. Adjust or add tests if needed until threshold is met. Update vitest.config.ts threshold from 50 to 75.
 
 **Checkpoint**: `pnpm test` passes with coverage >= 75% on packages/core. CI green on branch.
 
@@ -345,7 +345,7 @@
 
 **Purpose**: Add meaningful unit tests for packages/cli and packages/sdk — currently at 0% coverage. Focus on the most critical paths: daemon connection, command execution, and SDK client.
 
-- [ ] T154 [US-Quality] [P] Write unit tests for packages/cli/src/client.ts (DaemonClient: get, post, delete, connectWebSocket — mock fetch and WebSocket) in packages/cli/tests/unit/client.test.ts
+- [x] T154 [US-Quality] [P] Write unit tests for packages/cli/src/client.ts (DaemonClient: get, post, delete, connectWebSocket — mock fetch and WebSocket) in packages/cli/tests/unit/client.test.ts
 - [ ] T155 [US-Quality] Write unit tests for packages/cli/src/commands/init.ts (init command: happy path creates config file, error if already initialized, spinner behavior) using vi.mock for fs and DaemonClient in packages/cli/tests/unit/init.test.ts
 - [ ] T156 [US-Quality] [P] Write unit tests for packages/cli/src/commands/status.ts (status command: displays running nodes, handles daemon unreachable gracefully) in packages/cli/tests/unit/status.test.ts
 - [ ] T157 [US-Quality] [P] Write unit tests for packages/sdk/src/client.ts (LoomFloClient: connect, disconnect, get, post, onEvent, chat — mock WebSocket and fetch) in packages/sdk/tests/unit/client.test.ts. Replace the trivial placeholder test.
