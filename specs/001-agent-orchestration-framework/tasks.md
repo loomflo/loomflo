@@ -355,6 +355,25 @@
 
 ---
 
+## Phase 14: Daemon Wiring & Dashboard Integration
+
+**Purpose**: Fix the critical bug where `Daemon.start()` creates a bare Fastify server without registering any routes. Connect `createServer()` from `api/server.ts` into the daemon lifecycle so `/health`, `/nodes`, `/workflow`, `/events`, and all other API routes actually respond. Also wire up the dashboard static files so the SPA is served correctly.
+
+### Bug 1 — Daemon has no routes (critical)
+
+- [ ] T159 Fix `packages/core/src/daemon.ts`: import `createServer` from `./api/server.js` and call it inside `Daemon.start()` instead of using bare `Fastify()`. Pass the generated auth token, all workflow/node/memory/event/chat callbacks, and `dashboardPath` (resolved from `packages/dashboard/dist` relative to the daemon binary or a `LOOMFLO_DASHBOARD_PATH` env var). The `ServerResult.server` should be stored as `this.server`. Remove the bare `Fastify` import and the direct `this.server.listen()` call — `createServer()` handles listening internally.
+- [ ] T160 Update `packages/core/src/daemon-entry.ts`: read `LOOMFLO_DASHBOARD_PATH` env var (default: resolve `../../packages/dashboard/dist` relative to `daemon-entry.js`) and pass it to `Daemon` constructor. Add `dashboardPath` field to `DaemonConfig` interface.
+- [ ] T161 Smoke test: after T159-T160, add an integration test in `packages/core/tests/integration/daemon-routes.test.ts` that starts a `Daemon` instance on a random port, hits `/health` with `fetch`, and asserts `200 OK` with `{ status: "ok" }`. Tears down the daemon after.
+
+### Bug 2 — Dashboard not served outside Docker
+
+- [ ] T162 Add a `dev:full` script to the root `package.json` that runs the daemon + dashboard Vite dev server in parallel using `concurrently`. Dashboard should proxy `/api/*` requests to the daemon. Add `VITE_API_URL` env var support in `packages/dashboard/vite.config.ts` so the dashboard knows where the daemon is.
+- [ ] T163 Verify the Dockerfile passes `LOOMFLO_DASHBOARD_PATH=/app/packages/dashboard/dist` as an ENV so the production image correctly serves the SPA. Update the CMD line if needed.
+
+**Checkpoint**: `curl http://localhost:3000/health` returns `{"status":"ok"}`. Dashboard SPA loads at `http://localhost:3000`. CI green.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
