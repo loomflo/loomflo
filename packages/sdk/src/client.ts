@@ -232,8 +232,8 @@ export class LoomfloClient {
     const host = options.host ?? '127.0.0.1';
     const port = options.port ?? 3000;
     this.token = options.token;
-    this.baseUrl = `http://${host}:${port}`;
-    this.wsUrl = `ws://${host}:${port}`;
+    this.baseUrl = `http://${host}:${String(port)}`;
+    this.wsUrl = `ws://${host}:${String(port)}`;
   }
 
   // -------------------------------------------------------------------------
