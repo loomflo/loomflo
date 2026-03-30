@@ -347,7 +347,7 @@
 
 - [x] T154 [US-Quality] [P] Write unit tests for packages/cli/src/client.ts (DaemonClient: get, post, delete, connectWebSocket — mock fetch and WebSocket) in packages/cli/tests/unit/client.test.ts
 - [x] T155 [US-Quality] Write unit tests for packages/cli/src/commands/init.ts (init command: happy path creates config file, error if already initialized, spinner behavior) using vi.mock for fs and DaemonClient in packages/cli/tests/unit/init.test.ts
-- [ ] T156 [US-Quality] [P] Write unit tests for packages/cli/src/commands/status.ts (status command: displays running nodes, handles daemon unreachable gracefully) in packages/cli/tests/unit/status.test.ts
+- [x] T156 [US-Quality] [P] Write unit tests for packages/cli/src/commands/status.ts (status command: displays running nodes, handles daemon unreachable gracefully) in packages/cli/tests/unit/status.test.ts
 - [ ] T157 [US-Quality] [P] Write unit tests for packages/sdk/src/client.ts (LoomFloClient: connect, disconnect, get, post, onEvent, chat — mock WebSocket and fetch) in packages/sdk/tests/unit/client.test.ts. Replace the trivial placeholder test.
 - [ ] T158 [US-Quality] After T154-T157: run `pnpm test -- -- --coverage` and verify packages/cli >= 50% lines and packages/sdk >= 60% lines. Add vitest.config.ts to cli with appropriate thresholds.
 
