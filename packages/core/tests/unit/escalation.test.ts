@@ -49,15 +49,13 @@ function makeMockSharedMemory(): {
 } {
   return {
     write: vi.fn().mockResolvedValue(undefined),
-    read: vi
-      .fn()
-      .mockResolvedValue({
-        content: "",
-        name: "",
-        path: "",
-        lastModifiedBy: "system",
-        lastModifiedAt: new Date().toISOString(),
-      }),
+    read: vi.fn().mockResolvedValue({
+      content: "",
+      name: "",
+      path: "",
+      lastModifiedBy: "system",
+      lastModifiedAt: new Date().toISOString(),
+    }),
   };
 }
 
