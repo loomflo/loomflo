@@ -113,6 +113,7 @@ EXPOSE 3000
 ENV LOOMFLO_HOST=0.0.0.0
 ENV LOOMFLO_PORT=3000
 ENV LOOMFLO_PROJECT_PATH=/workspace
+ENV LOOMFLO_DASHBOARD_PATH=/app/packages/dashboard/dist
 ENV NODE_ENV=production
 
 # Run the daemon directly via the core entry point
