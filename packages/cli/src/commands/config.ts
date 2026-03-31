@@ -1,27 +1,77 @@
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 import { Command } from "commander";
 
-import { DaemonClient } from "../client.js";
-import type { ApiError } from "../client.js";
-
 // ============================================================================
-// Types
+// Constants
 // ============================================================================
 
-/** Shape of the GET /config JSON response from the daemon. */
-interface ConfigResponse {
-  /** The full merged configuration object. */
-  config: Record<string, unknown>;
-}
+/** Directory name for global Loomflo config/state. */
+const LOOMFLO_HOME_DIR = ".loomflo";
 
-/** Shape of the PUT /config JSON response from the daemon. */
-interface ConfigUpdateResponse {
-  /** The full merged configuration after applying the update. */
-  config: Record<string, unknown>;
-}
+/** Filename for the global configuration. */
+const CONFIG_FILE = "config.json";
 
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Return the path to the global Loomflo config file (~/.loomflo/config.json).
+ *
+ * @returns Absolute path to the configuration file.
+ */
+function globalConfigPath(): string {
+  return join(homedir(), LOOMFLO_HOME_DIR, CONFIG_FILE);
+}
+
+/**
+ * Return the path to the project-level config file (.loomflo/config.json).
+ *
+ * If CWD contains a `.loomflo/` directory, the project config path is
+ * returned; otherwise only the global config path is used.
+ *
+ * @returns Absolute path to the project-level config file.
+ */
+function projectConfigPath(): string {
+  return join(process.cwd(), ".loomflo", CONFIG_FILE);
+}
+
+/**
+ * Read a JSON config file from disk.
+ *
+ * Returns an empty object if the file does not exist.
+ *
+ * @param filePath - Absolute path to the config file.
+ * @returns Parsed JSON object, or an empty object if the file is absent.
+ */
+async function readConfigFile(filePath: string): Promise<Record<string, unknown>> {
+  try {
+    const raw = await readFile(filePath, "utf-8");
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/**
+ * Write a JSON config object to disk.
+ *
+ * Creates the parent directory if it does not exist.
+ *
+ * @param filePath - Absolute path to the config file.
+ * @param config - The configuration object to persist.
+ */
+async function writeConfigFile(filePath: string, config: Record<string, unknown>): Promise<void> {
+  const dir = filePath.slice(0, filePath.lastIndexOf("/"));
+  await mkdir(dir, { recursive: true });
+  await writeFile(filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+}
 
 /**
  * Resolve a dot-notation key path against a nested object.
@@ -48,30 +98,62 @@ function resolveKeyPath(obj: Record<string, unknown>, keyPath: string): unknown 
 }
 
 /**
- * Build a nested object from a dot-notation key path and a value.
+ * Set a value at a dot-notation key path within a nested object.
  *
- * For example, `buildNestedObject("models.loom", "claude-sonnet-4-6")`
- * returns `{ models: { loom: "claude-sonnet-4-6" } }`.
+ * Mutates `obj` in place, creating intermediate objects as needed.
  *
- * @param keyPath - Dot-notation key path.
+ * @param obj - The object to mutate.
+ * @param keyPath - Dot-notation key path (e.g. "models.loom").
  * @param value - The value to set at the leaf.
- * @returns A nested object with the value at the specified path.
  */
-function buildNestedObject(keyPath: string, value: unknown): Record<string, unknown> {
+function setKeyPath(obj: Record<string, unknown>, keyPath: string, value: unknown): void {
   const segments = keyPath.split(".");
-  const root: Record<string, unknown> = {};
-  let current = root;
+  let current: Record<string, unknown> = obj;
 
   for (let i = 0; i < segments.length - 1; i++) {
     const segment = segments[i] as string;
-    const next: Record<string, unknown> = {};
-    current[segment] = next;
-    current = next;
+    if (typeof current[segment] !== "object" || current[segment] === null) {
+      current[segment] = {};
+    }
+    current = current[segment] as Record<string, unknown>;
   }
 
   const leaf = segments[segments.length - 1] as string;
   current[leaf] = value;
-  return root;
+}
+
+/**
+ * Deep merge two objects. Values from `overrides` win.
+ *
+ * @param base - The base object.
+ * @param overrides - The overriding object.
+ * @returns A new merged object.
+ */
+function deepMerge(
+  base: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      typeof result[key] === "object" &&
+      result[key] !== null &&
+      !Array.isArray(result[key])
+    ) {
+      result[key] = deepMerge(
+        result[key] as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -118,41 +200,35 @@ function formatValue(value: unknown): string {
 /**
  * Create the `config` command for the loomflo CLI.
  *
+ * Reads from and writes to `~/.loomflo/config.json` (global) and
+ * `.loomflo/config.json` (project-level) directly on disk. No daemon
+ * connection is required — config works even when the daemon is stopped.
+ *
+ * The displayed config is the merged view (global merged with project).
+ * `config set` writes to the project-level config when run inside a project
+ * directory (where `.loomflo/` exists), otherwise falls back to global.
+ *
  * Provides three modes of operation:
- * - `loomflo config` — display the full configuration as pretty-printed JSON.
+ * - `loomflo config` — display the merged configuration as pretty-printed JSON.
  * - `loomflo config get <key>` — display the value of a specific config key
  *   (supports dot notation for nested keys, e.g. "models.loom").
- * - `loomflo config set <key> <value>` — update a config key via PUT /config
- *   (auto-parses booleans, numbers, and null from string arguments).
+ * - `loomflo config set <key> <value>` — set a config key in the active config
+ *   file (auto-parses booleans, numbers, and null from string arguments).
  *
  * @returns A configured commander Command instance.
  */
 export function createConfigCommand(): Command {
   const cmd = new Command("config")
-    .description("Get or set configuration")
+    .description("Get or set configuration (reads/writes local config files, no daemon required)")
     .action(async (): Promise<void> => {
-      let client: DaemonClient;
       try {
-        client = await DaemonClient.connect();
+        const global = await readConfigFile(globalConfigPath());
+        const project = await readConfigFile(projectConfigPath());
+        const merged = deepMerge(global, project);
+        console.log(JSON.stringify(merged, null, 2));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${msg}`);
-        process.exit(1);
-      }
-
-      try {
-        const res = await client.get<ConfigResponse>("/config");
-
-        if (!res.ok) {
-          const errData = res.data as unknown as ApiError;
-          console.error(`Error: ${errData.error}`);
-          process.exit(1);
-        }
-
-        console.log(JSON.stringify(res.data.config, null, 2));
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to connect to daemon: ${msg}`);
+        console.error(`Error reading config: ${msg}`);
         process.exit(1);
       }
     });
@@ -162,25 +238,12 @@ export function createConfigCommand(): Command {
     .description("Get a configuration value by key (supports dot notation)")
     .argument("<key>", 'Configuration key (e.g. "models.loom")')
     .action(async (key: string): Promise<void> => {
-      let client: DaemonClient;
       try {
-        client = await DaemonClient.connect();
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${msg}`);
-        process.exit(1);
-      }
+        const global = await readConfigFile(globalConfigPath());
+        const project = await readConfigFile(projectConfigPath());
+        const merged = deepMerge(global, project);
 
-      try {
-        const res = await client.get<ConfigResponse>("/config");
-
-        if (!res.ok) {
-          const errData = res.data as unknown as ApiError;
-          console.error(`Error: ${errData.error}`);
-          process.exit(1);
-        }
-
-        const value = resolveKeyPath(res.data.config, key);
+        const value = resolveKeyPath(merged, key);
 
         if (value === undefined) {
           console.error(`Error: unknown config key "${key}"`);
@@ -190,45 +253,40 @@ export function createConfigCommand(): Command {
         console.log(formatValue(value));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to connect to daemon: ${msg}`);
+        console.error(`Error reading config: ${msg}`);
         process.exit(1);
       }
     });
 
   cmd
     .command("set")
-    .description("Set a configuration value (auto-parses booleans and numbers)")
+    .description(
+      "Set a configuration value (writes to project config if in a project, else global config)",
+    )
     .argument("<key>", 'Configuration key (e.g. "models.loom")')
-    .argument("<value>", "Value to set")
-    .action(async (key: string, rawValue: string): Promise<void> => {
-      let client: DaemonClient;
+    .argument("<value>", "Value to set (booleans, numbers, and null are auto-parsed)")
+    .option("--global", "Force writing to global config (~/.loomflo/config.json)")
+    .action(async (key: string, rawValue: string, options: { global?: boolean }): Promise<void> => {
       try {
-        client = await DaemonClient.connect();
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${msg}`);
-        process.exit(1);
-      }
+        // Determine which config file to write to
+        const useGlobal = options.global === true;
+        const targetPath = useGlobal ? globalConfigPath() : projectConfigPath();
 
-      try {
+        // Read the existing config from the target file
+        const existing = await readConfigFile(targetPath);
+
+        // Apply the new value
         const parsed = parseValue(rawValue);
-        const body = buildNestedObject(key, parsed);
-        const res = await client.put<ConfigUpdateResponse>("/config", body);
+        setKeyPath(existing, key, parsed);
 
-        if (!res.ok) {
-          const errData = res.data as unknown as ApiError;
-          console.error(`Error: ${errData.error}`);
-          if (errData.details) {
-            console.error(`Details: ${JSON.stringify(errData.details, null, 2)}`);
-          }
-          process.exit(1);
-        }
+        // Write back
+        await writeConfigFile(targetPath, existing);
 
-        const updated = resolveKeyPath(res.data.config, key);
-        console.log(`${key} = ${formatValue(updated)}`);
+        const scope = useGlobal ? "global" : "project";
+        console.log(`${key} = ${formatValue(parsed)} (saved to ${scope} config)`);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to connect to daemon: ${msg}`);
+        console.error(`Error writing config: ${msg}`);
         process.exit(1);
       }
     });
