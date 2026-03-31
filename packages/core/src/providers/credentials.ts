@@ -84,7 +84,7 @@ export async function readClaudeCodeCredentials(
   }
 
   const credentials = parsed as ClaudeCodeCredentials;
-  const oauth = credentials?.claudeAiOauth;
+  const oauth = credentials.claudeAiOauth;
 
   if (!oauth || typeof oauth.accessToken !== "string" || oauth.accessToken.length === 0) {
     return null;

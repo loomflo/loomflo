@@ -19,6 +19,16 @@ const DEFAULT_MAX_TOKENS = 8192;
 /** Default model when not specified in config. */
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 
+/** Claude Code version string used in OAuth user-agent header (must match deployed CLI). */
+const CLAUDE_CODE_VERSION = "2.1.75";
+
+/**
+ * System prompt identity block required by Anthropic for OAuth token auth.
+ * Must be the first system block — the API rejects requests without it.
+ * Source: reverse-engineered from @mariozechner/pi-ai (OpenClaw's LLM engine).
+ */
+const CLAUDE_CODE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
+
 /**
  * Translates our ToolDefinition[] to the Anthropic tool format.
  *
@@ -162,6 +172,8 @@ export class AnthropicProvider implements LLMProvider {
   private readonly client: Anthropic;
   private readonly defaultModel: string;
   private readonly defaultMaxTokens: number;
+  /** True when using OAuth token auth — requires Claude Code identity headers + system block. */
+  private readonly isOAuthMode: boolean;
 
   /** HTTP status codes eligible for exponential backoff retry. */
   private readonly RETRYABLE_STATUSES: readonly number[] = [429, 529];
@@ -183,18 +195,31 @@ export class AnthropicProvider implements LLMProvider {
    */
   constructor(config: ProviderConfig) {
     if (config.oauthToken) {
-      // OAuth mode: pass token as apiKey via x-api-key header (Anthropic differentiates
-      // by prefix sk-ant-o... server-side). Add the oauth-2025-04-20 beta header.
+      // OAuth mode: authToken → Authorization: Bearer (NOT x-api-key).
+      // Anthropic requires the claude-code-20250219 beta, CLI user-agent, and x-app: cli.
+      // Without these headers + the Claude Code system identity, the API rejects the request.
+      // Source: reverse-engineered from @mariozechner/pi-ai (OpenClaw's LLM engine).
       this.client = new Anthropic({
-        apiKey: config.oauthToken,
-        defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+        apiKey: null,
+        authToken: config.oauthToken,
+        dangerouslyAllowBrowser: true,
+        defaultHeaders: {
+          "accept": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "anthropic-beta":
+            "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14",
+          "user-agent": `claude-cli/${CLAUDE_CODE_VERSION}`,
+          "x-app": "cli",
+        },
         ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
       });
+      this.isOAuthMode = true;
     } else {
       this.client = new Anthropic({
         apiKey: config.apiKey,
         ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
       });
+      this.isOAuthMode = false;
     }
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultMaxTokens = config.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
@@ -240,10 +265,20 @@ export class AnthropicProvider implements LLMProvider {
     const maxTokens = params.maxTokens ?? this.defaultMaxTokens;
     const maxRetries = 5;
 
+    // OAuth mode requires the Claude Code identity as the first system block.
+    // Without it, Anthropic returns invalid_request_error even with a valid token.
+    const systemParam: Anthropic.Messages.MessageCreateParamsNonStreaming["system"] =
+      this.isOAuthMode
+        ? [
+            { type: "text", text: CLAUDE_CODE_IDENTITY },
+            { type: "text", text: params.system },
+          ]
+        : params.system;
+
     const requestParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: maxTokens,
-      system: params.system,
+      system: systemParam,
       messages: toAnthropicMessages(params.messages),
       ...(params.tools?.length ? { tools: toAnthropicTools(params.tools) } : {}),
     };
