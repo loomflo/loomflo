@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import Fastify, { type FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
+import { createServer } from "./api/server.js";
 import { appendEvent, createEvent } from "./persistence/events.js";
 import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
 import type { Workflow } from "./types.js";
@@ -19,6 +20,8 @@ export interface DaemonConfig {
   host?: string;
   /** Absolute path to the project workspace. */
   projectPath?: string;
+  /** Absolute path to the dashboard static files directory. */
+  dashboardPath?: string;
 }
 
 /**
@@ -94,7 +97,9 @@ export class Daemon {
   private readonly port: number;
   private readonly host: string;
   private readonly projectPath: string | undefined;
+  private readonly dashboardPath: string | undefined;
   private server: FastifyInstance | null = null;
+  private broadcast: ((event: Record<string, unknown>) => void) | null = null;
   private info: DaemonInfo | null = null;
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
@@ -108,6 +113,7 @@ export class Daemon {
     this.port = config.port ?? DEFAULT_PORT;
     this.host = config.host ?? DEFAULT_HOST;
     this.projectPath = config.projectPath;
+    this.dashboardPath = config.dashboardPath;
 
     const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost", "0.0.0.0"]);
 
@@ -158,9 +164,35 @@ export class Daemon {
 
     const token = randomBytes(TOKEN_BYTES).toString("hex");
 
-    this.server = Fastify({ logger: false });
+    const { server, broadcast } = await createServer({
+      token,
+      projectPath: this.projectPath ?? process.cwd(),
+      dashboardPath: this.dashboardPath ?? null,
+      health: {
+        getUptime: (): number => Math.floor(process.uptime()),
+        getWorkflow: (): null => null,
+      },
+    });
 
-    await this.server.listen({ port: this.port, host: this.host });
+    this.server = server;
+    this.broadcast = broadcast;
+
+    this.server.post("/shutdown", async (_request, reply): Promise<void> => {
+      void this.gracefulShutdown();
+      await reply.code(200).send({ ok: true });
+    });
+
+    try {
+      await this.server.listen({ port: this.port, host: this.host });
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code;
+      if (code === "EADDRINUSE") {
+        throw new Error(
+          `Port ${String(this.port)} is already in use. Use --port to specify a different port or stop the existing process.`,
+        );
+      }
+      throw error;
+    }
 
     this.info = {
       port: this.port,
@@ -292,6 +324,17 @@ export class Daemon {
    */
   isRunning(): boolean {
     return this.server !== null;
+  }
+
+  /**
+   * Get the WebSocket broadcast function.
+   *
+   * Returns a no-op function if the server has not been started yet.
+   *
+   * @returns A function that broadcasts a JSON event to all connected WebSocket clients.
+   */
+  getBroadcast(): (event: Record<string, unknown>) => void {
+    return this.broadcast ?? ((_event: Record<string, unknown>): void => { /* no-op */ });
   }
 }
 
