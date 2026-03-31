@@ -250,19 +250,19 @@ describe("status command — happy path", () => {
 
     await runStatus();
 
-    // Workflow summary
-    expect(mockConsoleLog).toHaveBeenCalledWith("Workflow");
+    // Workflow summary (sectionHeader adds bold+underline ANSI codes)
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mWorkflow\x1b[0m");
     expect(mockConsoleLog).toHaveBeenCalledWith("  ID:          wf-abc123");
-    expect(mockConsoleLog).toHaveBeenCalledWith("  Status:      running");
+    expect(mockConsoleLog).toHaveBeenCalledWith("  Status:      \x1b[32mrunning\x1b[0m");
     expect(mockConsoleLog).toHaveBeenCalledWith("  Description: Build a todo app");
 
-    // Active nodes (both running and review)
-    expect(mockConsoleLog).toHaveBeenCalledWith("Active Nodes");
-    expect(mockConsoleLog).toHaveBeenCalledWith("  - Planning [running] (2 agents)");
-    expect(mockConsoleLog).toHaveBeenCalledWith("  - Implementation [review] (3 agents)");
+    // Active nodes (both running and review) with colored statuses
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mActive Nodes\x1b[0m");
+    expect(mockConsoleLog).toHaveBeenCalledWith("  - Planning [\x1b[32mrunning\x1b[0m] (2 agents)");
+    expect(mockConsoleLog).toHaveBeenCalledWith("  - Implementation [\x1b[35mreview\x1b[0m] (3 agents)");
 
     // Cost table
-    expect(mockConsoleLog).toHaveBeenCalledWith("Node Costs");
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mNode Costs\x1b[0m");
     const lines = logLines();
     const planningRow = lines.find(
       (l) => l.includes("Planning") && l.includes("running") && l.includes("$0.80"),
@@ -274,7 +274,7 @@ describe("status command — happy path", () => {
     expect(implRow).toBeDefined();
 
     // Cost summary
-    expect(mockConsoleLog).toHaveBeenCalledWith("Cost Summary");
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mCost Summary\x1b[0m");
     expect(mockConsoleLog).toHaveBeenCalledWith("  Total Cost:       $2.50");
     expect(mockConsoleLog).toHaveBeenCalledWith("  Budget Limit:     $10.00");
     expect(mockConsoleLog).toHaveBeenCalledWith("  Budget Remaining: $7.50");
@@ -388,15 +388,15 @@ describe("status command — no active nodes", () => {
 
     await runStatus();
 
-    // Workflow summary should still appear
-    expect(mockConsoleLog).toHaveBeenCalledWith("Workflow");
+    // Workflow summary should still appear (with ANSI styling)
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mWorkflow\x1b[0m");
 
     // Active Nodes section must NOT appear
     const lines = logLines();
-    expect(lines).not.toContain("Active Nodes");
+    expect(lines).not.toContain("\x1b[1m\x1b[4mActive Nodes\x1b[0m");
 
     // Node Costs table should still appear (nodes exist, just not active)
-    expect(mockConsoleLog).toHaveBeenCalledWith("Node Costs");
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mNode Costs\x1b[0m");
 
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
@@ -417,13 +417,13 @@ describe("status command — no cost data", () => {
 
     await runStatus();
 
-    // Workflow summary should still display
-    expect(mockConsoleLog).toHaveBeenCalledWith("Workflow");
+    // Workflow summary should still display (with ANSI styling)
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mWorkflow\x1b[0m");
     expect(mockConsoleLog).toHaveBeenCalledWith("  ID:          wf-abc123");
 
     // Cost Summary section must NOT appear
     const lines = logLines();
-    expect(lines).not.toContain("Cost Summary");
+    expect(lines).not.toContain("\x1b[1m\x1b[4mCost Summary\x1b[0m");
 
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
@@ -437,10 +437,10 @@ describe("status command — no cost data", () => {
 
     await runStatus();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("Workflow");
+    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mWorkflow\x1b[0m");
 
     const lines = logLines();
-    expect(lines).not.toContain("Cost Summary");
+    expect(lines).not.toContain("\x1b[1m\x1b[4mCost Summary\x1b[0m");
 
     expect(mockProcessExit).not.toHaveBeenCalled();
   });

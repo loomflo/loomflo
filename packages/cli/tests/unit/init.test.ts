@@ -71,6 +71,9 @@ let mockConsoleError: ReturnType<typeof vi.fn>;
 let mockStdoutWrite: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // Set required API key env var (T166 check runs before daemon config read)
+  process.env["ANTHROPIC_API_KEY"] = "sk-test";
+
   mockFetch = vi.fn();
   vi.stubGlobal("fetch", mockFetch);
 
@@ -86,6 +89,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete process.env["ANTHROPIC_API_KEY"];
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();

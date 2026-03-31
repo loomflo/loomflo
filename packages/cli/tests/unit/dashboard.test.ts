@@ -199,7 +199,7 @@ describe("dashboard command — browser open failure", () => {
     await runDashboard();
 
     expect(mockConsoleError).toHaveBeenCalledWith(
-      "Failed to open browser. Visit manually: http://127.0.0.1:4000",
+      "Failed to open browser automatically. Visit http://127.0.0.1:4000 in your browser.",
     );
   });
 });
