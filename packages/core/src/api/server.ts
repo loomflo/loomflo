@@ -91,6 +91,14 @@ export interface ServerOptions {
   config?: ConfigRoutesOptions;
   /** Callbacks for the costs routes. When omitted, costs routes are not registered. */
   costs?: CostsRoutesOptions;
+  /**
+   * Optional callback invoked when `POST /shutdown` is received.
+   *
+   * The handler is called asynchronously after the `{ ok: true }` response
+   * has been sent — the route always responds immediately and triggers the
+   * shutdown in the background. When omitted, `POST /shutdown` returns 404.
+   */
+  onShutdown?: () => void | Promise<void>;
 }
 
 /** Return value of {@link createServer}. */
@@ -275,6 +283,27 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   //
   // All other unmatched requests (non-GET, or requests that do not accept HTML)
   // receive a structured JSON 404 response.
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Shutdown route — authenticated POST /shutdown
+  // ---------------------------------------------------------------------------
+
+  if (options.onShutdown) {
+    const shutdownCallback = options.onShutdown;
+
+    server.post(
+      "/shutdown",
+      async (_request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        // Respond immediately, then trigger graceful shutdown in the background.
+        await reply.code(200).send({ ok: true });
+        void Promise.resolve(shutdownCallback());
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 404 handler
   // ---------------------------------------------------------------------------
 
   server.setNotFoundHandler(async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {

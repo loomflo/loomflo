@@ -172,15 +172,13 @@ export class Daemon {
         getUptime: (): number => Math.floor(process.uptime()),
         getWorkflow: (): null => null,
       },
+      onShutdown: (): void => {
+        void this.gracefulShutdown();
+      },
     });
 
     this.server = server;
     this.broadcast = broadcast;
-
-    this.server.post("/shutdown", async (_request, reply): Promise<void> => {
-      void this.gracefulShutdown();
-      await reply.code(200).send({ ok: true });
-    });
 
     try {
       await this.server.listen({ port: this.port, host: this.host });
