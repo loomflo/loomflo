@@ -37,6 +37,8 @@ export interface WorkflowRoutesOptions {
   getSharedMemory: () => SharedMemoryManager;
   /** Return the cost tracker. */
   getCostTracker: () => CostTracker;
+  /** Signal for aborting background tasks on server close. */
+  signal?: AbortSignal;
 }
 
 // ============================================================================
@@ -181,7 +183,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
 
       setWorkflow(workflow);
 
-      void runSpecGenerationBackground(workflow, options);
+      void runSpecGenerationBackground(workflow, options, options.signal);
 
       await reply.code(201).send({
         id: workflow.id,
@@ -315,10 +317,12 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
  *
  * @param workflow - The newly created workflow in 'spec' status.
  * @param options - Route options providing access to services.
+ * @param signal - Optional abort signal to cancel disk writes on server close.
  */
 async function runSpecGenerationBackground(
   workflow: Workflow,
   options: WorkflowRoutesOptions,
+  signal?: AbortSignal,
 ): Promise<void> {
   const { setWorkflow, getProvider, getSharedMemory, getCostTracker } = options;
 
@@ -333,6 +337,8 @@ async function runSpecGenerationBackground(
   try {
     const result = await loom.runSpecGeneration(workflow.description);
 
+    if (signal?.aborted) return;
+
     const updated: Workflow = {
       ...workflow,
       status: "building",
@@ -341,8 +347,12 @@ async function runSpecGenerationBackground(
     };
 
     setWorkflow(updated);
-    await saveWorkflowState(updated.projectPath, updated);
+    if (!signal?.aborted) {
+      await saveWorkflowState(updated.projectPath, updated);
+    }
   } catch (error: unknown) {
+    if (signal?.aborted) return;
+
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[workflow] Spec generation failed for ${workflow.id}: ${message}`);
 
@@ -353,6 +363,8 @@ async function runSpecGenerationBackground(
     };
 
     setWorkflow(updated);
-    await saveWorkflowState(updated.projectPath, updated);
+    if (!signal?.aborted) {
+      await saveWorkflowState(updated.projectPath, updated);
+    }
   }
 }

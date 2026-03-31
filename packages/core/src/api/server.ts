@@ -115,6 +115,8 @@ export interface ServerResult {
   server: FastifyInstance;
   /** Broadcast a JSON event to all connected WebSocket clients. */
   broadcast: (event: Record<string, unknown>) => void;
+  /** Signal that is aborted when the server closes. */
+  signal: AbortSignal;
 }
 
 // ============================================================================
@@ -141,6 +143,9 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   const server = Fastify({ logger: false });
 
+  /** Controller used to signal background tasks on server close. */
+  const abortController = new AbortController();
+
   /** Resolved dashboard build directory when it exists on disk, otherwise null. */
   const dashboardRoot = dashboardPath && existsSync(dashboardPath) ? dashboardPath : null;
 
@@ -157,6 +162,14 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       prefix: "/",
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Abort background tasks on server close
+  // ---------------------------------------------------------------------------
+
+  server.addHook("onClose", (): void => {
+    abortController.abort();
+  });
 
   // ---------------------------------------------------------------------------
   // Auth middleware — Bearer token on all HTTP routes except GET /health.
@@ -241,7 +254,9 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   );
 
   if (options.workflow) {
-    await server.register(workflowRoutes(options.workflow));
+    await server.register(
+      workflowRoutes({ ...options.workflow, signal: abortController.signal }),
+    );
   }
 
   if (options.nodes) {
@@ -358,5 +373,5 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
     }
   };
 
-  return { server, broadcast };
+  return { server, broadcast, signal: abortController.signal };
 }
