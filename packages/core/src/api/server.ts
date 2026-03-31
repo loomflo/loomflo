@@ -254,9 +254,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   );
 
   if (options.workflow) {
-    await server.register(
-      workflowRoutes({ ...options.workflow, signal: abortController.signal }),
-    );
+    await server.register(workflowRoutes({ ...options.workflow, signal: abortController.signal }));
   }
 
   if (options.nodes) {
