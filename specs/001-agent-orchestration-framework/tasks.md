@@ -410,37 +410,37 @@
 
 The `AnthropicProvider.complete()` wraps errors but has zero retry logic. A single 429 (rate limit) or 529 (overload) kills the entire agent loop with a fatal error. This is a guaranteed production failure.
 
-- [ ] T169 Add exponential backoff retry to `packages/core/src/providers/anthropic.ts`: on `status 429` or `status 529`, retry up to 5 times with delays [1s, 2s, 4s, 8s, 16s] + jitter. Log each retry attempt. After 5 failures, throw with a clear message: `Anthropic API overloaded after 5 retries — check https://status.anthropic.com`. Do not retry on 400/401/403 (user errors).
+- [x] T169 Add exponential backoff retry to `packages/core/src/providers/anthropic.ts`: on `status 429` or `status 529`, retry up to 5 times with delays [1s, 2s, 4s, 8s, 16s] + jitter. Log each retry attempt. After 5 failures, throw with a clear message: `Anthropic API overloaded after 5 retries — check https://status.anthropic.com`. Do not retry on 400/401/403 (user errors).
 
 ### Launch Blocker 2 — Budget limit not enforced mid-workflow
 
 The config has `budgetLimit` but the workflow engine never checks it against accumulated costs during execution.
 
-- [ ] T170 In `packages/core/src/workflow/workflow.ts`: before each agent loop iteration, check `costTracker.totalCost()` against `config.budgetLimit`. If exceeded, transition all running nodes to `blocked` state and emit a `budget_exceeded` event via WebSocket broadcaster. Add a `BudgetExceededError` class in `packages/core/src/costs/`.
+- [x] T170 In `packages/core/src/workflow/workflow.ts`: before each agent loop iteration, check `costTracker.totalCost()` against `config.budgetLimit`. If exceeded, transition all running nodes to `blocked` state and emit a `budget_exceeded` event via WebSocket broadcaster. Add a `BudgetExceededError` class in `packages/core/src/costs/`.
 
 ### Launch Blocker 3 — No input validation on `loomflo init`
 
 Empty or very short descriptions are sent to the LLM with no validation. This wastes tokens and produces garbage specs.
 
-- [ ] T171 In `packages/cli/src/commands/init.ts`: validate description before sending — minimum 10 characters, maximum 2000 characters, reject if it contains only whitespace. Print friendly error: `Error: Description must be between 10 and 2000 characters.`
+- [x] T171 In `packages/cli/src/commands/init.ts`: validate description before sending — minimum 10 characters, maximum 2000 characters, reject if it contains only whitespace. Print friendly error: `Error: Description must be between 10 and 2000 characters.`
 
 ### Launch Blocker 4 — Daemon port conflict not handled gracefully
 
 If port 3000 is already in use, the daemon crashes with a raw Node.js EADDRINUSE error that's not caught by the CLI.
 
-- [ ] T172 In `packages/core/src/daemon.ts` (`start()` method): catch EADDRINUSE errors and rethrow with a human-readable message: `Port <port> is already in use. Use --port to specify a different port or stop the existing process.` Propagate this to the CLI so `loomflo start` prints it cleanly.
+- [x] T172 In `packages/core/src/daemon.ts` (`start()` method): catch EADDRINUSE errors and rethrow with a human-readable message: `Port <port> is already in use. Use --port to specify a different port or stop the existing process.` Propagate this to the CLI so `loomflo start` prints it cleanly.
 
 ### Launch Blocker 5 — No graceful handling of ANTHROPIC_API_KEY expiry mid-workflow
 
 If the API key expires or is revoked after a workflow starts, the agent loop fails with a generic 401 error and the workflow hangs in `running` state forever.
 
-- [ ] T173 In `packages/core/src/agents/base-agent.ts` (inside `runAgentLoop`): detect 401 errors from the provider and return `{ status: "failed", error: "API key invalid or expired — check ANTHROPIC_API_KEY" }` immediately without retrying. Transition the node to `failed` state with a clear error message.
+- [x] T173 In `packages/core/src/agents/base-agent.ts` (inside `runAgentLoop`): detect 401 errors from the provider and return `{ status: "failed", error: "API key invalid or expired — check ANTHROPIC_API_KEY" }` immediately without retrying. Transition the node to `failed` state with a clear error message.
 
 ### Improvement — No structured logging
 
 All errors are swallowed or logged inconsistently. Hard to debug in production.
 
-- [ ] T174 Add structured error logging to `packages/core/src/api/server.ts`: register a Fastify `onError` hook that logs `{ timestamp, method, url, statusCode, errorMessage }` to stderr as JSON. Add a `LOOMFLO_LOG_LEVEL` env var (default: `info`) to control verbosity.
+- [x] T174 Add structured error logging to `packages/core/src/api/server.ts`: register a Fastify `onError` hook that logs `{ timestamp, method, url, statusCode, errorMessage }` to stderr as JSON. Add a `LOOMFLO_LOG_LEVEL` env var (default: `info`) to control verbosity.
 
 **Checkpoint**: Retry logic handles 429/529. Budget limit pauses workflow. `loomflo init` validates input. Port conflicts show clear error. Auth failures fail fast. Structured logs on stderr.
 

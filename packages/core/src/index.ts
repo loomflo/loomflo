@@ -41,6 +41,7 @@ export * from "./providers/base.js";
 export { AnthropicProvider } from "./providers/anthropic.js";
 export { OpenAIProvider } from "./providers/openai.js";
 export { OllamaProvider } from "./providers/ollama.js";
+export * from "./providers/credentials.js";
 
 // ============================================================================
 // Agents

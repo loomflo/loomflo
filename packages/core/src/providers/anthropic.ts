@@ -169,16 +169,33 @@ export class AnthropicProvider implements LLMProvider {
   /**
    * Creates an AnthropicProvider instance.
    *
-   * @param config - Provider configuration. apiKey is required.
+   * Supports two authentication modes — exactly one must be provided:
+   * - **apiKey** (standard): A `sk-ant-api...` key from console.anthropic.com.
+   *   Used via the `x-api-key` header.
+   * - **oauthToken** (OAuth): A `sk-ant-o...` Bearer token from the Claude.ai
+   *   OAuth flow. Injected via `Authorization: Bearer <token>` with the
+   *   `anthropic-beta: oauth-2025-04-20` header automatically added.
+   *
+   * @param config - Provider configuration. Either apiKey or oauthToken is required.
    *   Optional baseUrl overrides the API endpoint.
    *   Optional defaultModel sets the fallback model identifier.
    *   Optional defaultMaxTokens sets the fallback token limit.
    */
   constructor(config: ProviderConfig) {
-    this.client = new Anthropic({
-      apiKey: config.apiKey,
-      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-    });
+    if (config.oauthToken) {
+      // OAuth mode: pass token as apiKey via x-api-key header (Anthropic differentiates
+      // by prefix sk-ant-o... server-side). Add the oauth-2025-04-20 beta header.
+      this.client = new Anthropic({
+        apiKey: config.oauthToken,
+        defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+        ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
+      });
+    } else {
+      this.client = new Anthropic({
+        apiKey: config.apiKey,
+        ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
+      });
+    }
     this.defaultModel = config.defaultModel ?? DEFAULT_MODEL;
     this.defaultMaxTokens = config.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
   }

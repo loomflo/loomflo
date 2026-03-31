@@ -43,6 +43,39 @@ interface Spinner {
 // ============================================================================
 
 /**
+ * Check whether any valid Anthropic credentials are available.
+ *
+ * Checks three sources in priority order:
+ * 1. ANTHROPIC_API_KEY environment variable
+ * 2. ANTHROPIC_OAUTH_TOKEN environment variable
+ * 3. Claude Code OAuth credentials (~/.claude/.credentials.json)
+ *
+ * This is a lightweight pre-flight check — the daemon performs the actual
+ * credential resolution when creating the LLM provider.
+ *
+ * @returns True if at least one credential source is available.
+ */
+async function checkCredentialsAvailable(): Promise<boolean> {
+  if (process.env["ANTHROPIC_API_KEY"]) return true;
+  if (process.env["ANTHROPIC_OAUTH_TOKEN"]) return true;
+
+  // Check Claude Code credential store
+  try {
+    const credPath = join(homedir(), ".claude", ".credentials.json");
+    const content = await readFile(credPath, "utf-8");
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const oauth = parsed["claudeAiOauth"] as Record<string, unknown> | undefined;
+    if (oauth && typeof oauth["accessToken"] === "string" && oauth["accessToken"].length > 0) {
+      return true;
+    }
+  } catch {
+    // File missing or invalid — not an error, just no credentials.
+  }
+
+  return false;
+}
+
+/**
  * Read the daemon connection file from ~/.loomflo/daemon.json.
  *
  * The daemon writes this file at startup with the port it is listening on
@@ -144,13 +177,20 @@ export function createInitCommand(): Command {
         process.exit(1);
       }
 
-      // Ensure the Anthropic API key is available. Without it the daemon
-      // would start spec generation only to fail immediately on the first
-      // LLM call, wasting time and producing confusing errors.
-      if (!process.env["ANTHROPIC_API_KEY"]) {
+      // Ensure valid credentials are available (API key or OAuth token).
+      // Without them the daemon would start spec generation only to fail
+      // immediately on the first LLM call, wasting time and producing
+      // confusing errors.
+      // Checks: ANTHROPIC_API_KEY, ANTHROPIC_OAUTH_TOKEN env vars, and
+      // Claude Code OAuth credentials (~/.claude/.credentials.json).
+      const hasCredentials = await checkCredentialsAvailable();
+      if (!hasCredentials) {
         console.error(
-          "Error: ANTHROPIC_API_KEY environment variable is not set." +
-            " Export it before running loomflo init.",
+          "Error: No Anthropic credentials found.\n" +
+            "Provide one of:\n" +
+            "  - ANTHROPIC_API_KEY environment variable\n" +
+            "  - ANTHROPIC_OAUTH_TOKEN environment variable\n" +
+            "  - Claude Code login (run `claude` and authenticate)",
         );
         process.exit(1);
       }

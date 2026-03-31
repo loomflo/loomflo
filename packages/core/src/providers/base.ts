@@ -42,19 +42,30 @@ export type LLMMessage = z.infer<typeof LLMMessageSchema>;
  * Contains connection details needed to initialize an LLM provider.
  * Each provider implementation reads only the fields it needs;
  * unknown fields are passed through to support provider-specific options.
+ *
+ * Authentication modes (exactly one must be provided):
+ * - apiKey: Standard Anthropic API key (sk-ant-api...) from console.anthropic.com
+ * - oauthToken: OAuth Bearer token (sk-ant-o...) from Claude.ai OAuth flow,
+ *   used with the anthropic-beta: oauth-2025-04-20 header.
  */
-export const ProviderConfigSchema = z.object({
-  /** API key for authentication (e.g., ANTHROPIC_API_KEY value). */
-  apiKey: z.string().min(1),
-  /** Base URL override for the provider API (e.g., custom proxy or local endpoint). */
-  baseUrl: z.string().url().optional(),
-  /** Default model identifier (e.g., "claude-sonnet-4-6", "gpt-4o"). */
-  defaultModel: z.string().optional(),
-  /** Default maximum tokens for completions. */
-  defaultMaxTokens: z.number().int().positive().optional(),
-  /** Additional provider-specific options passed through without validation. */
-  options: z.record(z.string(), z.unknown()).optional(),
-});
+export const ProviderConfigSchema = z
+  .object({
+    /** API key for authentication (e.g., ANTHROPIC_API_KEY value). Mutually exclusive with oauthToken. */
+    apiKey: z.string().min(1).optional(),
+    /** OAuth Bearer token for authentication (e.g., from Claude.ai OAuth). Mutually exclusive with apiKey. */
+    oauthToken: z.string().min(1).optional(),
+    /** Base URL override for the provider API (e.g., custom proxy or local endpoint). */
+    baseUrl: z.string().url().optional(),
+    /** Default model identifier (e.g., "claude-sonnet-4-6", "gpt-4o"). */
+    defaultModel: z.string().optional(),
+    /** Default maximum tokens for completions. */
+    defaultMaxTokens: z.number().int().positive().optional(),
+    /** Additional provider-specific options passed through without validation. */
+    options: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((cfg) => cfg.apiKey !== undefined || cfg.oauthToken !== undefined, {
+    message: "Either apiKey or oauthToken must be provided in ProviderConfig",
+  });
 
 /** Configuration for initializing an LLM provider. */
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;

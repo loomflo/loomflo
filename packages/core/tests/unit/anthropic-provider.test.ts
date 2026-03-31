@@ -463,4 +463,28 @@ describe("AnthropicProvider", () => {
       expect(result.usage.outputTokens).toBe(0);
     });
   });
+
+  // --- 11. OAuth token authentication mode ---
+
+  describe("OAuth token authentication", () => {
+    it("instantiates correctly with oauthToken instead of apiKey", () => {
+      expect(() => new AnthropicProvider({ oauthToken: "sk-ant-o-test-token" })).not.toThrow();
+    });
+
+    it("completes successfully when initialized with oauthToken", async () => {
+      mockCreate.mockResolvedValueOnce(makeTextResponse("OAuth response"));
+
+      const oauthProvider = new AnthropicProvider({ oauthToken: "sk-ant-o-test-token" });
+      const result = await oauthProvider.complete(makeBaseParams());
+
+      expect(result.content).toEqual([{ type: "text", text: "OAuth response" }]);
+      expect(result.stopReason).toBe("end_turn");
+    });
+
+    it("throws when neither apiKey nor oauthToken is provided", async () => {
+      const { ProviderConfigSchema } = await import("../../src/providers/base.js");
+      const result = ProviderConfigSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+  });
 });
