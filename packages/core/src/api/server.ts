@@ -29,6 +29,14 @@ const WS_OPEN = 1;
 const BEARER_PREFIX = "Bearer ";
 
 /**
+ * Log verbosity level read from the `LOOMFLO_LOG_LEVEL` environment variable.
+ *
+ * Supported values: `'silent'`, `'error'`, `'warn'`, `'info'` (default), `'debug'`.
+ * When set to `'silent'`, structured error logging to stderr is suppressed.
+ */
+export const LOG_LEVEL: string = process.env["LOOMFLO_LOG_LEVEL"] ?? "info";
+
+/**
  * URL prefixes for authenticated API routes.
  *
  * GET requests to paths outside these prefixes are served without
@@ -199,10 +207,22 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   server.setErrorHandler(
     async (
       error: Error & { statusCode?: number },
-      _request: FastifyRequest,
+      request: FastifyRequest,
       reply: FastifyReply,
     ): Promise<void> => {
       const statusCode = error.statusCode ?? 500;
+
+      if (LOG_LEVEL !== "silent" && statusCode >= 400) {
+        const logEntry = {
+          timestamp: new Date().toISOString(),
+          method: request.method,
+          url: request.url,
+          statusCode,
+          errorMessage: error.message,
+        };
+        console.error(JSON.stringify(logEntry));
+      }
+
       await reply.code(statusCode).send({ error: error.message });
     },
   );
