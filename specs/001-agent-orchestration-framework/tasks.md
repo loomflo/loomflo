@@ -380,23 +380,23 @@
 
 ### Bug 3 — `loomflo config` makes HTTP calls instead of reading local file
 
-- [ ] T164 Fix `packages/cli/src/commands/config.ts`: `loomflo config get <key>` and `loomflo config set <key> <value>` should read/write `~/.loomflo/config.json` directly on disk (no daemon required). The daemon reads the same file on start. Remove the `DaemonClient` dependency from config commands. This makes config work even when daemon is stopped.
+- [x] T164 Fix `packages/cli/src/commands/config.ts`: `loomflo config get <key>` and `loomflo config set <key> <value>` should read/write `~/.loomflo/config.json` directly on disk (no daemon required). The daemon reads the same file on start. Remove the `DaemonClient` dependency from config commands. This makes config work even when daemon is stopped.
 
 ### Bug 4 — `loomflo stop` fails without --force
 
-- [ ] T165 Fix `packages/cli/src/commands/stop.ts`: graceful stop calls a `/shutdown` route that doesn't exist. Either register a `POST /shutdown` route in `createServer()` (preferred), or change the default behavior to always use SIGTERM. Route should call `daemon.stop()` and respond `{ ok: true }` before closing.
+- [x] T165 Fix `packages/cli/src/commands/stop.ts`: graceful stop calls a `/shutdown` route that doesn't exist. Either register a `POST /shutdown` route in `createServer()` (preferred), or change the default behavior to always use SIGTERM. Route should call `daemon.stop()` and respond `{ ok: true }` before closing.
 
 ### Bug 5 — `loomflo init` gives no feedback on missing ANTHROPIC_API_KEY
 
-- [ ] T166 In `packages/cli/src/commands/init.ts`: before sending init request to daemon, check if `ANTHROPIC_API_KEY` env var is set. If not, print a clear error: `Error: ANTHROPIC_API_KEY environment variable is not set. Export it before running loomflo init.` and exit with code 1.
+- [x] T166 In `packages/cli/src/commands/init.ts`: before sending init request to daemon, check if `ANTHROPIC_API_KEY` env var is set. If not, print a clear error: `Error: ANTHROPIC_API_KEY environment variable is not set. Export it before running loomflo init.` and exit with code 1.
 
 ### Bug 6 — `loomflo dashboard` doesn't print URL when daemon is running
 
-- [ ] T167 Fix `packages/cli/src/commands/dashboard.ts`: when `--no-open` flag is set, always print the dashboard URL even if daemon is already running. Currently silently fails when daemon is up. URL format: `http://127.0.0.1:<port>`.
+- [x] T167 Fix `packages/cli/src/commands/dashboard.ts`: when `--no-open` flag is set, always print the dashboard URL even if daemon is already running. Currently silently fails when daemon is up. URL format: `http://127.0.0.1:<port>`.
 
 ### Improvement — `loomflo status` should show more info
 
-- [ ] T168 Improve `packages/cli/src/commands/status.ts`: when daemon is running, show current workflow state (nodes count, running/done/failed), total cost so far, and elapsed time. Use `GET /nodes` and `GET /workflow` responses. Output should be a clean table (using console.table or manual formatting with colors).
+- [x] T168 Improve `packages/cli/src/commands/status.ts`: when daemon is running, show current workflow state (nodes count, running/done/failed), total cost so far, and elapsed time. Use `GET /nodes` and `GET /workflow` responses. Output should be a clean table (using console.table or manual formatting with colors).
 
 **Checkpoint**: All 5 CLI commands above work correctly. `loomflo config get/set` works offline. `loomflo stop` works without --force. `loomflo init` shows clear error on missing API key.
 

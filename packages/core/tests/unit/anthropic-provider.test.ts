@@ -161,12 +161,30 @@ describe("AnthropicProvider", () => {
   // --- 4. complete() error handling ---
 
   describe("complete() error handling", () => {
-    it("re-throws Anthropic API errors with structured message", async () => {
-      mockCreate.mockRejectedValueOnce(new MockAPIError(429, "Rate limit exceeded"));
+    it("re-throws non-retryable Anthropic API errors with structured message", async () => {
+      mockCreate.mockRejectedValueOnce(new MockAPIError(400, "Invalid request"));
 
       await expect(provider.complete(makeBaseParams())).rejects.toThrow(
-        "Anthropic API error (429): Rate limit exceeded",
+        "Anthropic API error (400): Invalid request",
       );
+    });
+
+    it("throws immediately on 401 without retry", async () => {
+      mockCreate.mockRejectedValueOnce(new MockAPIError(401, "Unauthorized"));
+
+      await expect(provider.complete(makeBaseParams())).rejects.toThrow(
+        "Anthropic API error (401): Unauthorized",
+      );
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws immediately on 403 without retry", async () => {
+      mockCreate.mockRejectedValueOnce(new MockAPIError(403, "Forbidden"));
+
+      await expect(provider.complete(makeBaseParams())).rejects.toThrow(
+        "Anthropic API error (403): Forbidden",
+      );
+      expect(mockCreate).toHaveBeenCalledTimes(1);
     });
 
     it("re-throws non-API errors unchanged", async () => {
@@ -174,6 +192,93 @@ describe("AnthropicProvider", () => {
       mockCreate.mockRejectedValueOnce(networkError);
 
       await expect(provider.complete(makeBaseParams())).rejects.toThrow("ECONNREFUSED");
+    });
+  });
+
+  // --- 4b. complete() retry behavior ---
+
+  describe("complete() retry behavior", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("retries on 429 and succeeds on second attempt", async () => {
+      mockCreate
+        .mockRejectedValueOnce(new MockAPIError(429, "Rate limit exceeded"))
+        .mockResolvedValueOnce(makeTextResponse("Recovered"));
+
+      const promise = provider.complete(makeBaseParams());
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.content).toEqual([{ type: "text", text: "Recovered" }]);
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(console.error).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries on 529 and succeeds on third attempt", async () => {
+      mockCreate
+        .mockRejectedValueOnce(new MockAPIError(529, "Overloaded"))
+        .mockRejectedValueOnce(new MockAPIError(529, "Overloaded"))
+        .mockResolvedValueOnce(makeTextResponse("OK"));
+
+      const promise = provider.complete(makeBaseParams());
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result.content).toEqual([{ type: "text", text: "OK" }]);
+      expect(mockCreate).toHaveBeenCalledTimes(3);
+      expect(console.error).toHaveBeenCalledTimes(2);
+    });
+
+    it("throws overloaded message after 5 retries on 429", async () => {
+      for (let i = 0; i < 6; i++) {
+        mockCreate.mockRejectedValueOnce(new MockAPIError(429, "Rate limit exceeded"));
+      }
+
+      const promise = provider.complete(makeBaseParams());
+      const assertion = expect(promise).rejects.toThrow(
+        "Anthropic API overloaded after 5 retries — check https://status.anthropic.com",
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+
+      expect(mockCreate).toHaveBeenCalledTimes(6);
+      expect(console.error).toHaveBeenCalledTimes(5);
+    });
+
+    it("throws overloaded message after 5 retries on 529", async () => {
+      for (let i = 0; i < 6; i++) {
+        mockCreate.mockRejectedValueOnce(new MockAPIError(529, "Overloaded"));
+      }
+
+      const promise = provider.complete(makeBaseParams());
+      const assertion = expect(promise).rejects.toThrow(
+        "Anthropic API overloaded after 5 retries — check https://status.anthropic.com",
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+
+      expect(mockCreate).toHaveBeenCalledTimes(6);
+    });
+
+    it("logs retry attempt details to stderr", async () => {
+      mockCreate
+        .mockRejectedValueOnce(new MockAPIError(429, "Rate limit exceeded"))
+        .mockResolvedValueOnce(makeTextResponse("OK"));
+
+      const promise = provider.complete(makeBaseParams());
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(console.error).toHaveBeenCalledTimes(1);
+      const logMessage = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(logMessage).toMatch(/^AnthropicProvider: retry 1\/5 after status 429 — waiting \d+ms$/);
     });
   });
 

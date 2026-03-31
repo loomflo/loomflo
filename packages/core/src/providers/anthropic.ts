@@ -163,6 +163,9 @@ export class AnthropicProvider implements LLMProvider {
   private readonly defaultModel: string;
   private readonly defaultMaxTokens: number;
 
+  /** HTTP status codes eligible for exponential backoff retry. */
+  private readonly RETRYABLE_STATUSES: readonly number[] = [429, 529];
+
   /**
    * Creates an AnthropicProvider instance.
    *
@@ -181,21 +184,44 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   /**
+   * Waits for an exponentially increasing delay before a retry attempt.
+   *
+   * Uses a base delay sequence of [1s, 2s, 4s, 8s, 16s] indexed by the
+   * 0-based attempt number, plus random jitter in the range [0, 500) ms
+   * to avoid thundering-herd effects when multiple callers retry
+   * simultaneously.
+   *
+   * @param attempt - Zero-indexed retry attempt (0 = first retry, 4 = fifth/last).
+   * @returns A promise that resolves after the computed delay.
+   */
+  private async retryDelay(attempt: number): Promise<void> {
+    const BASE_DELAYS_MS: readonly number[] = [1000, 2000, 4000, 8000, 16000];
+    const delay = (BASE_DELAYS_MS[attempt] ?? 16000) + Math.random() * 500;
+    await new Promise<void>((resolve) => setTimeout(resolve, delay));
+  }
+
+  /**
    * Sends a completion request to the Anthropic Messages API.
    *
    * Translates provider-agnostic CompletionParams into Anthropic's native
    * format, executes the API call, and normalizes the response into an
    * LLMResponse.
    *
+   * On retryable errors (HTTP 429 rate-limit or 529 overloaded), retries
+   * up to 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s) plus
+   * random jitter. Client errors (400, 401, 403) and other non-retryable
+   * errors are thrown immediately without retry.
+   *
    * @param params - Provider-agnostic completion parameters.
    * @returns Normalized LLM response with content blocks, stop reason,
    *   token usage, and model identifier.
-   * @throws {Error} If the Anthropic API returns an error. The original
-   *   error message is preserved in the thrown Error.
+   * @throws {Error} If the Anthropic API returns a non-retryable error,
+   *   or if all 5 retry attempts are exhausted on a retryable error.
    */
   async complete(params: CompletionParams): Promise<LLMResponse> {
     const model = params.model || this.defaultModel;
     const maxTokens = params.maxTokens ?? this.defaultMaxTokens;
+    const maxRetries = 5;
 
     const requestParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
       model,
@@ -205,23 +231,49 @@ export class AnthropicProvider implements LLMProvider {
       ...(params.tools?.length ? { tools: toAnthropicTools(params.tools) } : {}),
     };
 
-    try {
-      const response = await this.client.messages.create(requestParams);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.client.messages.create(requestParams);
 
-      return {
-        content: fromAnthropicContent(response.content),
-        stopReason: fromAnthropicStopReason(response.stop_reason),
-        usage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        },
-        model: response.model,
-      };
-    } catch (error: unknown) {
-      if (error instanceof Anthropic.APIError) {
-        throw new Error(`Anthropic API error (${String(error.status)}): ${error.message}`);
+        return {
+          content: fromAnthropicContent(response.content),
+          stopReason: fromAnthropicStopReason(response.stop_reason),
+          usage: {
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+          },
+          model: response.model,
+        };
+      } catch (error: unknown) {
+        if (error instanceof Anthropic.APIError) {
+          const status = Number(error.status);
+
+          if (
+            this.RETRYABLE_STATUSES.includes(status) &&
+            attempt < maxRetries
+          ) {
+            const delayMs = ([1000, 2000, 4000, 8000, 16000][attempt] ?? 16000) + Math.round(Math.random() * 500);
+            console.error(
+              `AnthropicProvider: retry ${String(attempt + 1)}/5 after status ${String(status)} — waiting ${String(delayMs)}ms`,
+            );
+            await this.retryDelay(attempt);
+            continue;
+          }
+
+          if (this.RETRYABLE_STATUSES.includes(status) && attempt >= maxRetries) {
+            throw new Error(
+              "Anthropic API overloaded after 5 retries — check https://status.anthropic.com",
+            );
+          }
+
+          throw new Error(`Anthropic API error (${String(status)}): ${error.message}`);
+        }
+        throw error;
       }
-      throw error;
     }
+
+    throw new Error(
+      "Anthropic API overloaded after 5 retries — check https://status.anthropic.com",
+    );
   }
 }
