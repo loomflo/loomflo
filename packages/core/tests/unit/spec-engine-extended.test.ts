@@ -4,10 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
-import {
-  SpecEngine,
-  SpecPipelineError,
-} from "../../src/spec/spec-engine.js";
+import { SpecEngine, SpecPipelineError } from "../../src/spec/spec-engine.js";
 import type {
   SpecEngineConfig,
   ClarificationCallback,
@@ -130,7 +127,8 @@ describe("SpecEngine (extended)", () => {
 
   describe("plan generation", () => {
     it("should write plan.md to .loomflo/specs/ when the LLM returns valid plan JSON", async () => {
-      const planContent = "# Implementation Plan\n\n## Summary\nBuild a REST API with auth.\n\n## Build Phases\n1. Setup\n2. Auth\n3. API";
+      const planContent =
+        "# Implementation Plan\n\n## Summary\nBuild a REST API with auth.\n\n## Build Phases\n1. Setup\n2. Auth\n3. API";
       const provider = mockProvider([
         textResponse("# Constitution\nRules."),
         textResponse("# Spec\nStories."),
@@ -296,10 +294,7 @@ describe("SpecEngine (extended)", () => {
 
   describe("graph building from spec", () => {
     it("should produce a graph with correct node count, valid edges, and detected topology", async () => {
-      const provider = mockProvider([
-        ...fiveArtifactResponses(),
-        textResponse(VALID_GRAPH_JSON),
-      ]);
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(VALID_GRAPH_JSON)]);
 
       const engine = new SpecEngine({ provider, model: "mock-model", projectPath });
       const result = await engine.runPipeline("Build a project");
@@ -333,10 +328,7 @@ describe("SpecEngine (extended)", () => {
         ],
       });
 
-      const provider = mockProvider([
-        ...fiveArtifactResponses(),
-        textResponse(linearGraph),
-      ]);
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(linearGraph)]);
 
       const engine = new SpecEngine({ provider, model: "mock-model", projectPath });
       const result = await engine.runPipeline("Sequential project");
@@ -352,14 +344,16 @@ describe("SpecEngine (extended)", () => {
           { id: "root", title: "Root", instructions: "1. Start", dependencies: [] },
           { id: "left", title: "Left", instructions: "1. Left path", dependencies: ["root"] },
           { id: "right", title: "Right", instructions: "1. Right path", dependencies: ["root"] },
-          { id: "merge", title: "Merge", instructions: "1. Converge", dependencies: ["left", "right"] },
+          {
+            id: "merge",
+            title: "Merge",
+            instructions: "1. Converge",
+            dependencies: ["left", "right"],
+          },
         ],
       });
 
-      const provider = mockProvider([
-        ...fiveArtifactResponses(),
-        textResponse(diamondGraph),
-      ]);
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(diamondGraph)]);
 
       const engine = new SpecEngine({ provider, model: "mock-model", projectPath });
       const result = await engine.runPipeline("Diamond project");
@@ -369,10 +363,7 @@ describe("SpecEngine (extended)", () => {
     });
 
     it("should populate cost estimates on each node", async () => {
-      const provider = mockProvider([
-        ...fiveArtifactResponses(),
-        textResponse(VALID_GRAPH_JSON),
-      ]);
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(VALID_GRAPH_JSON)]);
 
       const engine = new SpecEngine({ provider, model: "mock-model", projectPath });
       const result = await engine.runPipeline("Cost estimation project");
@@ -456,14 +447,7 @@ describe("SpecEngine (extended)", () => {
       const stepNames = startEvents.map(
         (e) => (e as { type: "spec_step_started"; stepName: string }).stepName,
       );
-      expect(stepNames).toEqual([
-        "constitution",
-        "spec",
-        "plan",
-        "tasks",
-        "analysis",
-        "graph",
-      ]);
+      expect(stepNames).toEqual(["constitution", "spec", "plan", "tasks", "analysis", "graph"]);
     });
 
     it("should pass the configured model to every LLM call", async () => {
@@ -560,9 +544,9 @@ describe("SpecEngine (extended)", () => {
 
       const errorEvents = events.filter((e) => e.type === "spec_step_error");
       expect(errorEvents).toHaveLength(1);
-      expect(
-        (errorEvents[0] as { type: "spec_step_error"; stepName: string }).stepName,
-      ).toBe("spec");
+      expect((errorEvents[0] as { type: "spec_step_error"; stepName: string }).stepName).toBe(
+        "spec",
+      );
     });
 
     it("should wrap non-Error throwables in SpecPipelineError", async () => {

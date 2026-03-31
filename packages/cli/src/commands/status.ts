@@ -287,13 +287,11 @@ export function createStatusCommand(): Command {
           statusCounts.set(node.status, (statusCounts.get(node.status) ?? 0) + 1);
         }
 
-        const sortedStatuses = [...statusCounts.entries()].sort(
-          (a, b) => {
-            const ai = STATUS_ORDER.indexOf(a[0]);
-            const bi = STATUS_ORDER.indexOf(b[0]);
-            return (ai === -1 ? STATUS_ORDER.length : ai) - (bi === -1 ? STATUS_ORDER.length : bi);
-          },
-        );
+        const sortedStatuses = [...statusCounts.entries()].sort((a, b) => {
+          const ai = STATUS_ORDER.indexOf(a[0]);
+          const bi = STATUS_ORDER.indexOf(b[0]);
+          return (ai === -1 ? STATUS_ORDER.length : ai) - (bi === -1 ? STATUS_ORDER.length : bi);
+        });
 
         console.log(sectionHeader("Nodes Summary"));
         console.log(`  Total: ${String(nodes.length)}`);

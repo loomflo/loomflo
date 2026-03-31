@@ -91,9 +91,7 @@ export function createDashboardCommand(): Command {
       const command = openCommand(url);
       exec(command, (error: Error | null): void => {
         if (error !== null) {
-          console.error(
-            `Failed to open browser automatically. Visit ${url} in your browser.`,
-          );
+          console.error(`Failed to open browser automatically. Visit ${url} in your browser.`);
         }
       });
     });

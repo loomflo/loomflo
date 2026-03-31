@@ -104,9 +104,11 @@ function createMockResponse(options: {
     status: options.status,
     headers,
     json: vi.fn().mockResolvedValue(options.body),
-    text: vi.fn().mockResolvedValue(
-      typeof options.body === "string" ? options.body : JSON.stringify(options.body),
-    ),
+    text: vi
+      .fn()
+      .mockResolvedValue(
+        typeof options.body === "string" ? options.body : JSON.stringify(options.body),
+      ),
   } as unknown as Response;
 }
 
@@ -182,25 +184,19 @@ describe("readDaemonConfig", () => {
   it("should throw when daemon.json is missing the port field", async () => {
     mockReadFile.mockResolvedValue(JSON.stringify({ token: "abc" }));
 
-    await expect(readDaemonConfig()).rejects.toThrow(
-      "Invalid daemon.json — missing port or token",
-    );
+    await expect(readDaemonConfig()).rejects.toThrow("Invalid daemon.json — missing port or token");
   });
 
   it("should throw when daemon.json is missing the token field", async () => {
     mockReadFile.mockResolvedValue(JSON.stringify({ port: 4000 }));
 
-    await expect(readDaemonConfig()).rejects.toThrow(
-      "Invalid daemon.json — missing port or token",
-    );
+    await expect(readDaemonConfig()).rejects.toThrow("Invalid daemon.json — missing port or token");
   });
 
   it("should throw when daemon.json parses to null", async () => {
     mockReadFile.mockResolvedValue("null");
 
-    await expect(readDaemonConfig()).rejects.toThrow(
-      "Invalid daemon.json — missing port or token",
-    );
+    await expect(readDaemonConfig()).rejects.toThrow("Invalid daemon.json — missing port or token");
   });
 });
 
@@ -214,9 +210,7 @@ describe("DaemonClient constructor", () => {
     const client = new DaemonClient(3000, "secret-token");
 
     // Access private fields via type-safe index for verification
-    expect((client as unknown as Record<string, unknown>)["baseUrl"]).toBe(
-      "http://127.0.0.1:3000",
-    );
+    expect((client as unknown as Record<string, unknown>)["baseUrl"]).toBe("http://127.0.0.1:3000");
     expect((client as unknown as Record<string, unknown>)["token"]).toBe("secret-token");
   });
 });
@@ -236,9 +230,7 @@ describe("DaemonClient.connect", () => {
 
     expect(mockReadFile).toHaveBeenCalled();
     expect(client).toBeInstanceOf(DaemonClient);
-    expect((client as unknown as Record<string, unknown>)["baseUrl"]).toBe(
-      "http://127.0.0.1:5000",
-    );
+    expect((client as unknown as Record<string, unknown>)["baseUrl"]).toBe("http://127.0.0.1:5000");
   });
 
   it("should not open a WebSocket by default", async () => {
@@ -293,7 +285,12 @@ describe("DaemonClient HTTP methods", () => {
       const reqBody = { name: "test-workflow" };
       const resBody = { id: "wf-1" };
       mockFetch.mockResolvedValue(
-        createMockResponse({ ok: true, status: 201, contentType: "application/json", body: resBody }),
+        createMockResponse({
+          ok: true,
+          status: 201,
+          contentType: "application/json",
+          body: resBody,
+        }),
       );
 
       const result = await client.post("/workflow", reqBody);
@@ -314,7 +311,12 @@ describe("DaemonClient HTTP methods", () => {
     it("should send a PUT request with JSON body", async () => {
       const reqBody = { status: "paused" };
       mockFetch.mockResolvedValue(
-        createMockResponse({ ok: true, status: 200, contentType: "application/json", body: { ok: true } }),
+        createMockResponse({
+          ok: true,
+          status: 200,
+          contentType: "application/json",
+          body: { ok: true },
+        }),
       );
 
       const result = await client.put("/workflow/wf-1", reqBody);
@@ -384,7 +386,12 @@ describe("DaemonClient.request", () => {
 
   it("should parse text response when content-type is not application/json", async () => {
     mockFetch.mockResolvedValue(
-      createMockResponse({ ok: false, status: 500, contentType: "text/plain", body: "Internal Error" }),
+      createMockResponse({
+        ok: false,
+        status: 500,
+        contentType: "text/plain",
+        body: "Internal Error",
+      }),
     );
 
     const result = await client.request<string>({ method: "GET", path: "/fail" });
@@ -396,7 +403,12 @@ describe("DaemonClient.request", () => {
 
   it("should return ok=false for non-2xx responses", async () => {
     mockFetch.mockResolvedValue(
-      createMockResponse({ ok: false, status: 404, contentType: "application/json", body: { error: "not found" } }),
+      createMockResponse({
+        ok: false,
+        status: 404,
+        contentType: "application/json",
+        body: { error: "not found" },
+      }),
     );
 
     const result = await client.request({ method: "GET", path: "/missing" });

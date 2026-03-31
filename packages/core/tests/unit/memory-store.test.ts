@@ -201,9 +201,7 @@ describe("concurrent writes to same file (5 writers)", () => {
     const ids = Array.from({ length: 5 }, (_, i) => `writer-${i}`);
     const entries = ids.map((id) => `Content from ${id}`);
 
-    await Promise.all(
-      ids.map((id, i) => manager.write("PROGRESS.md", entries[i] as string, id)),
-    );
+    await Promise.all(ids.map((id, i) => manager.write("PROGRESS.md", entries[i] as string, id)));
 
     const result = await manager.read("PROGRESS.md");
 
@@ -255,9 +253,7 @@ describe("concurrent writes to different files", () => {
 
 describe("file name validation edge cases", () => {
   it("rejects file name with backslash separator", async () => {
-    await expect(manager.read("sub\\file.md")).rejects.toThrow(
-      "must not contain path separators",
-    );
+    await expect(manager.read("sub\\file.md")).rejects.toThrow("must not contain path separators");
   });
 
   it("rejects file name with backslash separator on write", async () => {
@@ -275,15 +271,11 @@ describe("file name validation edge cases", () => {
   });
 
   it("rejects file name with double-dot segments", async () => {
-    await expect(manager.read("test..sneaky.md")).rejects.toThrow(
-      'must not contain ".." segments',
-    );
+    await expect(manager.read("test..sneaky.md")).rejects.toThrow('must not contain ".." segments');
   });
 
   it("rejects forward slash in the middle of name", async () => {
-    await expect(manager.read("sub/dir.md")).rejects.toThrow(
-      "must not contain path separators",
-    );
+    await expect(manager.read("sub/dir.md")).rejects.toThrow("must not contain path separators");
   });
 
   it("error messages include the invalid file name", async () => {

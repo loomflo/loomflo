@@ -259,7 +259,9 @@ describe("status command — happy path", () => {
     // Active nodes (both running and review) with colored statuses
     expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mActive Nodes\x1b[0m");
     expect(mockConsoleLog).toHaveBeenCalledWith("  - Planning [\x1b[32mrunning\x1b[0m] (2 agents)");
-    expect(mockConsoleLog).toHaveBeenCalledWith("  - Implementation [\x1b[35mreview\x1b[0m] (3 agents)");
+    expect(mockConsoleLog).toHaveBeenCalledWith(
+      "  - Implementation [\x1b[35mreview\x1b[0m] (3 agents)",
+    );
 
     // Cost table
     expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mNode Costs\x1b[0m");

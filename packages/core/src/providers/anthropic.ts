@@ -248,11 +248,9 @@ export class AnthropicProvider implements LLMProvider {
         if (error instanceof Anthropic.APIError) {
           const status = Number(error.status);
 
-          if (
-            this.RETRYABLE_STATUSES.includes(status) &&
-            attempt < maxRetries
-          ) {
-            const delayMs = ([1000, 2000, 4000, 8000, 16000][attempt] ?? 16000) + Math.round(Math.random() * 500);
+          if (this.RETRYABLE_STATUSES.includes(status) && attempt < maxRetries) {
+            const delayMs =
+              ([1000, 2000, 4000, 8000, 16000][attempt] ?? 16000) + Math.round(Math.random() * 500);
             console.error(
               `AnthropicProvider: retry ${String(attempt + 1)}/5 after status ${String(status)} — waiting ${String(delayMs)}ms`,
             );

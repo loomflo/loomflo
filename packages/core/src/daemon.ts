@@ -332,7 +332,12 @@ export class Daemon {
    * @returns A function that broadcasts a JSON event to all connected WebSocket clients.
    */
   getBroadcast(): (event: Record<string, unknown>) => void {
-    return this.broadcast ?? ((_event: Record<string, unknown>): void => { /* no-op broadcaster */ void _event; });
+    return (
+      this.broadcast ??
+      ((_event: Record<string, unknown>): void => {
+        /* no-op broadcaster */ void _event;
+      })
+    );
   }
 }
 

@@ -1,16 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-import { createServer } from '../../src/api/server.js';
-import type { WorkflowRoutesOptions } from '../../src/api/routes/workflow.js';
-import type { NodesRoutesOptions } from '../../src/api/routes/nodes.js';
-import type { LLMProvider, CompletionParams } from '../../src/providers/base.js';
-import type { LLMResponse, Workflow, Event } from '../../src/types.js';
-import type { CostTracker } from '../../src/costs/tracker.js';
-import type { SharedMemoryManager } from '../../src/memory/shared-memory.js';
-import type { FastifyInstance } from 'fastify';
+import { createServer } from "../../src/api/server.js";
+import type { WorkflowRoutesOptions } from "../../src/api/routes/workflow.js";
+import type { NodesRoutesOptions } from "../../src/api/routes/nodes.js";
+import type { LLMProvider, CompletionParams } from "../../src/providers/base.js";
+import type { LLMResponse, Workflow, Event } from "../../src/types.js";
+import type { CostTracker } from "../../src/costs/tracker.js";
+import type { SharedMemoryManager } from "../../src/memory/shared-memory.js";
+import type { FastifyInstance } from "fastify";
 
 // ============================================================================
 // Helpers
@@ -19,10 +19,10 @@ import type { FastifyInstance } from 'fastify';
 /** Create a minimal LLMResponse with text content. */
 function textResponse(text: string): LLMResponse {
   return {
-    content: [{ type: 'text', text }],
-    model: 'mock-model',
+    content: [{ type: "text", text }],
+    model: "mock-model",
     usage: { input: 100, output: 50 },
-    stopReason: 'end_turn',
+    stopReason: "end_turn",
   };
 }
 
@@ -33,22 +33,23 @@ function textResponse(text: string): LLMResponse {
 const THREE_NODE_LINEAR_GRAPH = JSON.stringify({
   nodes: [
     {
-      id: 'node-setup',
-      title: 'Project Setup',
-      instructions: '1. Initialize the project\n2. Create directory structure\n3. Install dependencies',
+      id: "node-setup",
+      title: "Project Setup",
+      instructions:
+        "1. Initialize the project\n2. Create directory structure\n3. Install dependencies",
       dependencies: [],
     },
     {
-      id: 'node-impl',
-      title: 'Core Implementation',
-      instructions: '1. Build the main module\n2. Create API endpoints\n3. Wire up database',
-      dependencies: ['node-setup'],
+      id: "node-impl",
+      title: "Core Implementation",
+      instructions: "1. Build the main module\n2. Create API endpoints\n3. Wire up database",
+      dependencies: ["node-setup"],
     },
     {
-      id: 'node-test',
-      title: 'Testing',
-      instructions: '1. Write unit tests\n2. Write integration tests\n3. Verify coverage',
-      dependencies: ['node-impl'],
+      id: "node-test",
+      title: "Testing",
+      instructions: "1. Write unit tests\n2. Write integration tests\n3. Verify coverage",
+      dependencies: ["node-impl"],
     },
   ],
 });
@@ -65,14 +66,16 @@ const THREE_NODE_LINEAR_GRAPH = JSON.stringify({
 function createMockProvider(): LLMProvider {
   let callIndex = 0;
   return {
-    name: 'mock',
+    name: "mock",
     complete: vi.fn(async (_params: CompletionParams): Promise<LLMResponse> => {
       callIndex++;
       console.log(`[E2E] LLM call #${String(callIndex)}`);
       if (callIndex === 6) {
-        return textResponse('```json\n' + THREE_NODE_LINEAR_GRAPH + '\n```');
+        return textResponse("```json\n" + THREE_NODE_LINEAR_GRAPH + "\n```");
       }
-      return textResponse(`# Step ${String(callIndex)} Content\nGenerated content for phase ${String(callIndex)}.`);
+      return textResponse(
+        `# Step ${String(callIndex)} Content\nGenerated content for phase ${String(callIndex)}.`,
+      );
     }),
   };
 }
@@ -81,9 +84,13 @@ function createMockProvider(): LLMProvider {
 function createMockSharedMemory(): SharedMemoryManager {
   return {
     initialize: vi.fn(async (): Promise<void> => undefined),
-    read: vi.fn(async (): Promise<string> => ''),
+    read: vi.fn(async (): Promise<string> => ""),
     write: vi.fn(async (): Promise<void> => undefined),
-    list: vi.fn(async (): Promise<Array<{ name: string; lastModifiedBy: string; lastModifiedAt: string }>> => []),
+    list: vi.fn(
+      async (): Promise<
+        Array<{ name: string; lastModifiedBy: string; lastModifiedAt: string }>
+      > => [],
+    ),
   } as unknown as SharedMemoryManager;
 }
 
@@ -119,14 +126,14 @@ async function pollWorkflowStatus(
 
   while (Date.now() - start < timeoutMs) {
     const res = await server.inject({
-      method: 'GET',
-      url: '/workflow',
+      method: "GET",
+      url: "/workflow",
       headers: { authorization: `Bearer ${token}` },
     });
 
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body) as Record<string, unknown>;
-      if (body['status'] === expectedStatus) {
+      if (body["status"] === expectedStatus) {
         return body;
       }
     }
@@ -136,17 +143,19 @@ async function pollWorkflowStatus(
     });
   }
 
-  throw new Error(`Workflow did not reach status '${expectedStatus}' within ${String(timeoutMs)}ms`);
+  throw new Error(
+    `Workflow did not reach status '${expectedStatus}' within ${String(timeoutMs)}ms`,
+  );
 }
 
 // ============================================================================
 // Test Suite
 // ============================================================================
 
-describe('End-to-end: init → spec → start → nodes (integration)', () => {
+describe("End-to-end: init → spec → start → nodes (integration)", () => {
   let projectPath: string;
   let server: FastifyInstance;
-  const AUTH_TOKEN = 'e2e-test-token-9876';
+  const AUTH_TOKEN = "e2e-test-token-9876";
 
   /** In-memory workflow state shared across route handlers. */
   let currentWorkflow: Workflow | null = null;
@@ -167,7 +176,10 @@ describe('End-to-end: init → spec → start → nodes (integration)', () => {
     /* Shared getters that return live state. */
     const getWorkflow = (): Workflow | null => currentWorkflow;
     const setWorkflow = (wf: Workflow): void => {
-      console.log(`[E2E] setWorkflow: ${wf.status}`, new Error().stack?.split('\n').slice(1, 4).join(' | '));
+      console.log(
+        `[E2E] setWorkflow: ${wf.status}`,
+        new Error().stack?.split("\n").slice(1, 4).join(" | "),
+      );
       currentWorkflow = wf;
     };
     const mockProvider = createMockProvider();
@@ -219,189 +231,204 @@ describe('End-to-end: init → spec → start → nodes (integration)', () => {
   // Full E2E Flow
   // --------------------------------------------------------------------------
 
-  it('should complete the full init → spec → start flow', { timeout: 30_000 }, async () => {
+  it("should complete the full init → spec → start flow", { timeout: 30_000 }, async () => {
     /* ---- Step 1: POST /workflow/init ----------------------------------- */
     const initRes = await server.inject({
-      method: 'POST',
-      url: '/workflow/init',
+      method: "POST",
+      url: "/workflow/init",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
       payload: {
-        description: 'Build a REST API with auth and PostgreSQL',
+        description: "Build a REST API with auth and PostgreSQL",
         projectPath,
       },
     });
 
     expect(initRes.statusCode).toBe(201);
-    const initBody = JSON.parse(initRes.body) as { id: string; status: string; description: string };
+    const initBody = JSON.parse(initRes.body) as {
+      id: string;
+      status: string;
+      description: string;
+    };
     expect(initBody.id).toBeDefined();
-    expect(initBody.status).toBe('spec');
-    expect(initBody.description).toBe('Build a REST API with auth and PostgreSQL');
+    expect(initBody.status).toBe("spec");
+    expect(initBody.description).toBe("Build a REST API with auth and PostgreSQL");
 
     /* ---- Step 2: Poll until spec generation completes (→ building) ----- */
-    const buildingBody = await pollWorkflowStatus(server, AUTH_TOKEN, 'building', 15_000);
-    expect(buildingBody['id']).toBe(initBody.id);
-    expect(buildingBody['graph']).toBeDefined();
+    const buildingBody = await pollWorkflowStatus(server, AUTH_TOKEN, "building", 15_000);
+    expect(buildingBody["id"]).toBe(initBody.id);
+    expect(buildingBody["graph"]).toBeDefined();
 
     /* Verify graph has the 3 nodes from our mock. */
-    const graph = buildingBody['graph'] as { nodes: Record<string, unknown> };
+    const graph = buildingBody["graph"] as { nodes: Record<string, unknown> };
     const nodeIds = Object.keys(graph.nodes);
     expect(nodeIds.length).toBe(3);
-    expect(nodeIds).toContain('node-setup');
-    expect(nodeIds).toContain('node-impl');
-    expect(nodeIds).toContain('node-test');
+    expect(nodeIds).toContain("node-setup");
+    expect(nodeIds).toContain("node-impl");
+    expect(nodeIds).toContain("node-test");
 
     /* ---- Step 3: GET /workflow confirms graph is present --------------- */
     const getRes = await server.inject({
-      method: 'GET',
-      url: '/workflow',
+      method: "GET",
+      url: "/workflow",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(getRes.statusCode).toBe(200);
-    const getBody = JSON.parse(getRes.body) as { status: string; graph: { nodes: Record<string, unknown> } };
-    expect(getBody.status).toBe('building');
+    const getBody = JSON.parse(getRes.body) as {
+      status: string;
+      graph: { nodes: Record<string, unknown> };
+    };
+    expect(getBody.status).toBe("building");
     expect(Object.keys(getBody.graph.nodes).length).toBe(3);
 
     /* ---- Step 4: POST /workflow/start transitions to running ----------- */
     const startRes = await server.inject({
-      method: 'POST',
-      url: '/workflow/start',
+      method: "POST",
+      url: "/workflow/start",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(startRes.statusCode).toBe(200);
     const startBody = JSON.parse(startRes.body) as { status: string };
-    expect(startBody.status).toBe('running');
+    expect(startBody.status).toBe("running");
 
     /* ---- Step 5: GET /workflow confirms running state ------------------ */
     const runningRes = await server.inject({
-      method: 'GET',
-      url: '/workflow',
+      method: "GET",
+      url: "/workflow",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(runningRes.statusCode).toBe(200);
     const runningBody = JSON.parse(runningRes.body) as { status: string };
-    expect(runningBody.status).toBe('running');
+    expect(runningBody.status).toBe("running");
 
     /* ---- Step 6: GET /nodes returns all 3 nodes ----------------------- */
     const nodesRes = await server.inject({
-      method: 'GET',
-      url: '/nodes',
+      method: "GET",
+      url: "/nodes",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(nodesRes.statusCode).toBe(200);
-    const nodesBody = JSON.parse(nodesRes.body) as Array<{ id: string; title: string; status: string }>;
+    const nodesBody = JSON.parse(nodesRes.body) as Array<{
+      id: string;
+      title: string;
+      status: string;
+    }>;
     expect(nodesBody.length).toBe(3);
 
     const titles = nodesBody.map((n) => n.title);
-    expect(titles).toContain('Project Setup');
-    expect(titles).toContain('Core Implementation');
-    expect(titles).toContain('Testing');
+    expect(titles).toContain("Project Setup");
+    expect(titles).toContain("Core Implementation");
+    expect(titles).toContain("Testing");
   });
 
   // --------------------------------------------------------------------------
   // Edge Cases
   // --------------------------------------------------------------------------
 
-  it('should reject a second init while the first is in progress', async () => {
+  it("should reject a second init while the first is in progress", async () => {
     await server.inject({
-      method: 'POST',
-      url: '/workflow/init',
+      method: "POST",
+      url: "/workflow/init",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
-      payload: { description: 'First project', projectPath },
+      payload: { description: "First project", projectPath },
     });
 
     const secondRes = await server.inject({
-      method: 'POST',
-      url: '/workflow/init',
+      method: "POST",
+      url: "/workflow/init",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
-      payload: { description: 'Second project', projectPath },
+      payload: { description: "Second project", projectPath },
     });
 
     expect(secondRes.statusCode).toBe(409);
   });
 
-  it('should show health endpoint without authentication', async () => {
+  it("should show health endpoint without authentication", async () => {
     const healthRes = await server.inject({
-      method: 'GET',
-      url: '/health',
+      method: "GET",
+      url: "/health",
     });
 
     expect(healthRes.statusCode).toBe(200);
     const body = JSON.parse(healthRes.body) as { status: string };
-    expect(body.status).toBe('ok');
+    expect(body.status).toBe("ok");
   });
 
-  it('should reject workflow operations without auth token', async () => {
+  it("should reject workflow operations without auth token", async () => {
     const res = await server.inject({
-      method: 'GET',
-      url: '/workflow',
+      method: "GET",
+      url: "/workflow",
     });
 
     expect(res.statusCode).toBe(401);
   });
 
-  it('should return 404 for nodes when no workflow exists', async () => {
+  it("should return 404 for nodes when no workflow exists", async () => {
     const nodesRes = await server.inject({
-      method: 'GET',
-      url: '/nodes',
+      method: "GET",
+      url: "/nodes",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(nodesRes.statusCode).toBe(404);
   });
 
-  it('should return individual node detail after init and start', { timeout: 30_000 }, async () => {
+  it("should return individual node detail after init and start", { timeout: 30_000 }, async () => {
     /* Init and wait for spec generation. */
     await server.inject({
-      method: 'POST',
-      url: '/workflow/init',
+      method: "POST",
+      url: "/workflow/init",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
       payload: {
-        description: 'Build a todo app',
+        description: "Build a todo app",
         projectPath,
       },
     });
 
-    await pollWorkflowStatus(server, AUTH_TOKEN, 'building', 15_000);
+    await pollWorkflowStatus(server, AUTH_TOKEN, "building", 15_000);
 
     /* Start the workflow. */
     await server.inject({
-      method: 'POST',
-      url: '/workflow/start',
+      method: "POST",
+      url: "/workflow/start",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     /* Fetch individual node detail. */
     const nodeRes = await server.inject({
-      method: 'GET',
-      url: '/nodes/node-setup',
+      method: "GET",
+      url: "/nodes/node-setup",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 
     expect(nodeRes.statusCode).toBe(200);
-    const nodeBody = JSON.parse(nodeRes.body) as { id: string; title: string; instructions: string };
-    expect(nodeBody.id).toBe('node-setup');
-    expect(nodeBody.title).toBe('Project Setup');
+    const nodeBody = JSON.parse(nodeRes.body) as {
+      id: string;
+      title: string;
+      instructions: string;
+    };
+    expect(nodeBody.id).toBe("node-setup");
+    expect(nodeBody.title).toBe("Project Setup");
     expect(nodeBody.instructions).toBeDefined();
   });
 
-  it('should return 404 for a non-existent node', { timeout: 30_000 }, async () => {
+  it("should return 404 for a non-existent node", { timeout: 30_000 }, async () => {
     /* Init and wait. */
     await server.inject({
-      method: 'POST',
-      url: '/workflow/init',
+      method: "POST",
+      url: "/workflow/init",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
-      payload: { description: 'Test', projectPath },
+      payload: { description: "Test", projectPath },
     });
 
-    await pollWorkflowStatus(server, AUTH_TOKEN, 'building', 15_000);
+    await pollWorkflowStatus(server, AUTH_TOKEN, "building", 15_000);
 
     const nodeRes = await server.inject({
-      method: 'GET',
-      url: '/nodes/nonexistent-node',
+      method: "GET",
+      url: "/nodes/nonexistent-node",
       headers: { authorization: `Bearer ${AUTH_TOKEN}` },
     });
 

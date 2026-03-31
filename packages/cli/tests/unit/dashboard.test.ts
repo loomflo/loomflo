@@ -190,11 +190,9 @@ describe("dashboard command — invalid port", () => {
 
 describe("dashboard command — browser open failure", () => {
   it("should log fallback message when exec callback receives an error", async () => {
-    mockExec.mockImplementation(
-      (_cmd: string, callback: (error: Error | null) => void): void => {
-        callback(new Error("xdg-open not found"));
-      },
-    );
+    mockExec.mockImplementation((_cmd: string, callback: (error: Error | null) => void): void => {
+      callback(new Error("xdg-open not found"));
+    });
 
     await runDashboard();
 

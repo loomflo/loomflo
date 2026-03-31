@@ -130,11 +130,7 @@ describe("WorkflowManager", () => {
   /** Tests for WorkflowManager.create() factory method. */
   describe("create()", () => {
     it("creates a workflow with init status", async () => {
-      const manager = await WorkflowManager.create(
-        "Build a todo app",
-        "/tmp/test",
-        makeConfig(),
-      );
+      const manager = await WorkflowManager.create("Build a todo app", "/tmp/test", makeConfig());
 
       expect(manager.status).toBe("init");
       expect(manager.description).toBe("Build a todo app");
@@ -270,10 +266,9 @@ describe("WorkflowManager", () => {
       const doneNode = makeNode("node-0", "Done Node", { status: "done" });
 
       const workflow = makeWorkflow(
-        makeGraph(
-          { "node-0": doneNode, "node-1": runningNode },
-          [{ from: "node-0", to: "node-1" }],
-        ),
+        makeGraph({ "node-0": doneNode, "node-1": runningNode }, [
+          { from: "node-0", to: "node-1" },
+        ]),
         { status: "paused" },
       );
 
@@ -308,10 +303,9 @@ describe("WorkflowManager", () => {
         resumeAt: futureTime,
       });
 
-      const workflow = makeWorkflow(
-        makeGraph({ "node-w": waitingNode }, []),
-        { status: "running" },
-      );
+      const workflow = makeWorkflow(makeGraph({ "node-w": waitingNode }, []), {
+        status: "running",
+      });
 
       vi.mocked(loadWorkflowState).mockResolvedValueOnce(workflow);
 
@@ -504,11 +498,11 @@ describe("WorkflowExecutionEngine", () => {
   /** Tests for scheduler delay handling in waiting state. */
   describe("node in waiting state respects scheduler delay", () => {
     it("passes the node delay string to the scheduler during activation", async () => {
-      const scheduleSpy = vi.fn<[string, string, () => void]>().mockImplementation(
-        (_nodeId: string, _delay: string, callback: () => void) => {
+      const scheduleSpy = vi
+        .fn<[string, string, () => void]>()
+        .mockImplementation((_nodeId: string, _delay: string, callback: () => void) => {
           callback();
-        },
-      );
+        });
 
       const scheduler = new Scheduler();
       scheduler.scheduleNode = scheduleSpy;
@@ -538,12 +532,10 @@ describe("WorkflowExecutionEngine", () => {
 
     it("transitions node through waiting before running", async () => {
       const observedStatuses: string[] = [];
-      const executor: NodeExecutor = vi.fn().mockImplementation(
-        (node: { status: string }) => {
-          observedStatuses.push(node.status);
-          return Promise.resolve({ status: "done", cost: 0 } satisfies NodeExecutionResult);
-        },
-      );
+      const executor: NodeExecutor = vi.fn().mockImplementation((node: { status: string }) => {
+        observedStatuses.push(node.status);
+        return Promise.resolve({ status: "done", cost: 0 } satisfies NodeExecutionResult);
+      });
 
       const graph = makeGraph({ "node-a": makeNode("node-a", "A") }, []);
       const manager = new WorkflowManager(makeWorkflow(graph));
@@ -559,9 +551,7 @@ describe("WorkflowExecutionEngine", () => {
   /** Tests for executor error handling. */
   describe("executor error handling", () => {
     it("treats thrown errors as node failures", async () => {
-      const executor: NodeExecutor = vi.fn().mockRejectedValue(
-        new Error("Unexpected crash"),
-      );
+      const executor: NodeExecutor = vi.fn().mockRejectedValue(new Error("Unexpected crash"));
 
       const graph = makeGraph({ "node-a": makeNode("node-a", "A") }, []);
       const manager = new WorkflowManager(makeWorkflow(graph));
@@ -578,14 +568,12 @@ describe("WorkflowExecutionEngine", () => {
   describe("stop signal", () => {
     it("stops the engine and returns paused result", async () => {
       let engine: WorkflowExecutionEngine;
-      const executor: NodeExecutor = vi.fn().mockImplementation(
-        (node: { id: string }) => {
-          if (node.id === "node-a") {
-            engine.stop();
-          }
-          return Promise.resolve({ status: "done", cost: 0 } satisfies NodeExecutionResult);
-        },
-      );
+      const executor: NodeExecutor = vi.fn().mockImplementation((node: { id: string }) => {
+        if (node.id === "node-a") {
+          engine.stop();
+        }
+        return Promise.resolve({ status: "done", cost: 0 } satisfies NodeExecutionResult);
+      });
 
       const graph = makeGraph(
         {

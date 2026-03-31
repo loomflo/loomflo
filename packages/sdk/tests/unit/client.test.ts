@@ -82,8 +82,7 @@ function createMockResponse(options: {
     ? vi.fn().mockRejectedValue(new SyntaxError("bad json"))
     : vi.fn().mockResolvedValue(options.body);
 
-  const textBody =
-    typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+  const textBody = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
 
   return {
     ok: options.ok,
@@ -157,9 +156,7 @@ describe("request (private, via public methods)", () => {
     await client.health();
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect((init.headers as Record<string, string>)["Authorization"]).toBe(
-      "Bearer my-secret",
-    );
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer my-secret");
   });
 
   it("should set Content-Type for POST requests", async () => {
@@ -171,9 +168,7 @@ describe("request (private, via public methods)", () => {
     await client.chat("hello");
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
-      "application/json",
-    );
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
     expect(init.body).toBe(JSON.stringify({ message: "hello" }));
   });
 
@@ -197,9 +192,7 @@ describe("request (private, via public methods)", () => {
       version: "1.0.0",
       workflow: null,
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.health();
@@ -215,9 +208,7 @@ describe("request (private, via public methods)", () => {
 describe("LoomfloApiError", () => {
   it("should be thrown on non-2xx response with JSON body", async () => {
     const errorBody = { error: "not found" };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: false, status: 404, body: errorBody }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: false, status: 404, body: errorBody }));
 
     const client = createClient();
 
@@ -279,9 +270,7 @@ describe("health()", () => {
       version: "0.1.0",
       workflow: { id: "wf-1", status: "running", nodeCount: 3, activeNodes: ["n1"] },
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.health();
@@ -309,9 +298,7 @@ describe("getWorkflow()", () => {
       updatedAt: "2026-01-01T01:00:00Z",
       graph: { nodes: [], edges: [], topology: "linear" },
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.getWorkflow();
@@ -353,9 +340,7 @@ describe("init()", () => {
       status: "init",
       description: "New project",
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.init("New project", "/tmp/proj", { level: 2 });
@@ -395,9 +380,7 @@ describe("init()", () => {
 
 describe("start()", () => {
   it("should call POST /workflow/start", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: {} }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: {} }));
 
     const client = createClient();
     await client.start();
@@ -414,9 +397,7 @@ describe("start()", () => {
 
 describe("pause()", () => {
   it("should call POST /workflow/pause", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: {} }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: {} }));
 
     const client = createClient();
     await client.pause();
@@ -429,9 +410,7 @@ describe("pause()", () => {
 
 describe("resume()", () => {
   it("should call POST /workflow/resume", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: {} }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: {} }));
 
     const client = createClient();
     await client.resume();
@@ -452,9 +431,7 @@ describe("chat()", () => {
       response: "I'll build that for you",
       action: { type: "graph_modification", details: { added: 2 } },
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.chat("Build a REST API");
@@ -479,9 +456,7 @@ describe("chatHistory()", () => {
         { role: "assistant", content: "Hi!", timestamp: "2026-01-01T00:00:01Z" },
       ],
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.chatHistory();
@@ -503,9 +478,7 @@ describe("getNodes()", () => {
       { id: "n1", title: "Auth", status: "running", agentCount: 2, cost: 0.5, retryCount: 0 },
       { id: "n2", title: "DB", status: "pending", agentCount: 1, cost: 0, retryCount: 0 },
     ];
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: { nodes } }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: { nodes } }));
 
     const client = createClient();
     const result = await client.getNodes();
@@ -535,9 +508,7 @@ describe("getNode()", () => {
       agents: [],
       fileOwnership: {},
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.getNode("n1");
@@ -570,9 +541,7 @@ describe("getSpecs()", () => {
       { name: "spec.md", path: "/proj/.loomflo/spec.md", size: 1024 },
       { name: "plan.md", path: "/proj/.loomflo/plan.md", size: 2048 },
     ];
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: { artifacts } }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: { artifacts } }));
 
     const client = createClient();
     const result = await client.getSpecs();
@@ -603,9 +572,7 @@ describe("getSpec()", () => {
     expect(result).toBe(markdownContent);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://127.0.0.1:3000/specs/spec.md");
-    expect((init.headers as Record<string, string>)["Authorization"]).toBe(
-      "Bearer test-token",
-    );
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer test-token");
   });
 
   it("should URL-encode the spec name", async () => {
@@ -658,9 +625,7 @@ describe("getCosts()", () => {
       nodes: [{ id: "n1", title: "Auth", cost: 3.0, retries: 1 }],
       loomCost: 2.0,
     };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: payload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
 
     const client = createClient();
     const result = await client.getCosts();
@@ -678,9 +643,7 @@ describe("getCosts()", () => {
 describe("getConfig()", () => {
   it("should call GET /config and return config object", async () => {
     const config = { level: 2, budgetLimit: 100 };
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: config }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: config }));
 
     const client = createClient();
     const result = await client.getConfig();
@@ -694,9 +657,7 @@ describe("getConfig()", () => {
 
 describe("setConfig()", () => {
   it("should call PUT /config with updates body", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: {} }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: {} }));
 
     const updates = { budgetLimit: 200 };
     const client = createClient();
@@ -728,9 +689,7 @@ describe("getEvents()", () => {
   };
 
   it("should call GET /events without query params when none provided", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: eventsPayload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: eventsPayload }));
 
     const client = createClient();
     const result = await client.getEvents();
@@ -741,9 +700,7 @@ describe("getEvents()", () => {
   });
 
   it("should append type query param", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: eventsPayload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: eventsPayload }));
 
     const client = createClient();
     await client.getEvents({ type: "node_started" });
@@ -753,9 +710,7 @@ describe("getEvents()", () => {
   });
 
   it("should append nodeId query param", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: eventsPayload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: eventsPayload }));
 
     const client = createClient();
     await client.getEvents({ nodeId: "n1" });
@@ -765,9 +720,7 @@ describe("getEvents()", () => {
   });
 
   it("should append limit and offset query params", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: eventsPayload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: eventsPayload }));
 
     const client = createClient();
     await client.getEvents({ limit: 10, offset: 20 });
@@ -778,9 +731,7 @@ describe("getEvents()", () => {
   });
 
   it("should include all provided query params", async () => {
-    mockFetch.mockResolvedValue(
-      createMockResponse({ ok: true, status: 200, body: eventsPayload }),
-    );
+    mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: eventsPayload }));
 
     const client = createClient();
     await client.getEvents({ type: "node_started", nodeId: "n2", limit: 5, offset: 0 });
@@ -850,18 +801,14 @@ describe("connect()", () => {
     const ws = capturedWebSockets[0];
     ws._emit("message", { data: "not-json{{" });
 
-    await expect(connectPromise).rejects.toThrow(
-      "Failed to parse WebSocket welcome message",
-    );
+    await expect(connectPromise).rejects.toThrow("Failed to parse WebSocket welcome message");
   });
 
   it("should throw when global WebSocket is not available", async () => {
     vi.stubGlobal("WebSocket", undefined);
 
     const client = createClient();
-    await expect(client.connect()).rejects.toThrow(
-      "Global WebSocket API is not available",
-    );
+    await expect(client.connect()).rejects.toThrow("Global WebSocket API is not available");
   });
 
   it("should URL-encode the token in the WebSocket URL", async () => {

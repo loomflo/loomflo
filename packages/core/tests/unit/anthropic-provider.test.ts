@@ -48,7 +48,10 @@ function makeBaseParams(overrides?: Partial<CompletionParams>): CompletionParams
   };
 }
 
-function makeTextResponse(text: string, overrides?: Record<string, unknown>): Record<string, unknown> {
+function makeTextResponse(
+  text: string,
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
   return {
     content: [{ type: "text", text }],
     stop_reason: "end_turn",
@@ -278,7 +281,9 @@ describe("AnthropicProvider", () => {
 
       expect(console.error).toHaveBeenCalledTimes(1);
       const logMessage = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-      expect(logMessage).toMatch(/^AnthropicProvider: retry 1\/5 after status 429 — waiting \d+ms$/);
+      expect(logMessage).toMatch(
+        /^AnthropicProvider: retry 1\/5 after status 429 — waiting \d+ms$/,
+      );
     });
   });
 
@@ -370,9 +375,7 @@ describe("AnthropicProvider", () => {
 
   describe("model override", () => {
     it("uses model from params over provider default", async () => {
-      mockCreate.mockResolvedValueOnce(
-        makeTextResponse("Done.", { model: "claude-opus-4-6" }),
-      );
+      mockCreate.mockResolvedValueOnce(makeTextResponse("Done.", { model: "claude-opus-4-6" }));
 
       await provider.complete(makeBaseParams({ model: "claude-opus-4-6" }));
 

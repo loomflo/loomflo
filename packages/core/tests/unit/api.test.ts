@@ -233,9 +233,7 @@ describe("workflow routes", () => {
       }),
       getProvider: vi.fn((): LLMProvider => ({ complete: vi.fn() }) as unknown as LLMProvider),
       getEventLog: vi.fn((): EventLog => mockEventLog),
-      getSharedMemory: vi.fn(
-        (): SharedMemoryManager => ({}) as unknown as SharedMemoryManager,
-      ),
+      getSharedMemory: vi.fn((): SharedMemoryManager => ({}) as unknown as SharedMemoryManager),
       getCostTracker: vi.fn((): CostTracker => ({}) as unknown as CostTracker),
     };
 
@@ -685,8 +683,7 @@ describe("specs routes", () => {
       });
 
       expect(res.statusCode).toBe(200);
-      const body: { artifacts: { name: string; path: string; size: number }[] } =
-        res.json();
+      const body: { artifacts: { name: string; path: string; size: number }[] } = res.json();
       expect(body.artifacts).toHaveLength(1);
       expect(body.artifacts[0].name).toBe("spec.md");
       expect(body.artifacts[0].path).toBe(".loomflo/specs/spec.md");
@@ -899,9 +896,7 @@ describe("memory routes", () => {
 
     it("returns 404 when memory file is not found", async () => {
       mockSharedMemory = {
-        read: vi.fn().mockRejectedValue(
-          new Error("Shared memory file not found: MISSING.md"),
-        ),
+        read: vi.fn().mockRejectedValue(new Error("Shared memory file not found: MISSING.md")),
       } as unknown as SharedMemoryManager;
 
       const res = await server.inject({
