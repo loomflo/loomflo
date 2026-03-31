@@ -77,8 +77,12 @@ export function createDashboardCommand(): Command {
       /* Open browser or print URL                                          */
       /* ------------------------------------------------------------------ */
 
+      // Always print the URL so the user can copy it regardless of whether
+      // the browser opens successfully. This is especially important for
+      // remote/headless environments and when --no-open is passed.
+      console.log(url);
+
       if (options.open === false) {
-        console.log(url);
         return;
       }
 
@@ -87,7 +91,9 @@ export function createDashboardCommand(): Command {
       const command = openCommand(url);
       exec(command, (error: Error | null): void => {
         if (error !== null) {
-          console.error(`Failed to open browser. Visit manually: ${url}`);
+          console.error(
+            `Failed to open browser automatically. Visit ${url} in your browser.`,
+          );
         }
       });
     });
