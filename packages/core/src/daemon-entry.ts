@@ -12,7 +12,13 @@
  * - LOOMFLO_HOST — Host address to bind to (default: 127.0.0.1).
  *   Set to 0.0.0.0 inside Docker containers.
  * - LOOMFLO_PROJECT_PATH — Absolute path to the project workspace.
+ * - LOOMFLO_DASHBOARD_PATH — Absolute path to the dashboard static files
+ *   directory (default: resolved from daemon-entry.js to
+ *   ../../packages/dashboard/dist).
  */
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { Daemon } from "./daemon.js";
 
@@ -32,11 +38,20 @@ const port = process.env["LOOMFLO_PORT"] ? Number(process.env["LOOMFLO_PORT"]) :
 const host = process.env["LOOMFLO_HOST"] ?? "127.0.0.1";
 const projectPath = process.env["LOOMFLO_PROJECT_PATH"] ?? process.cwd();
 
+/** Directory containing this compiled daemon-entry.js file. */
+const __dirname: string = dirname(fileURLToPath(import.meta.url));
+
+/** Default path to the dashboard static build output. */
+const defaultDashboardPath: string = resolve(__dirname, "..", "..", "packages", "dashboard", "dist");
+
+/** Absolute path to the dashboard static files directory. */
+const dashboardPath: string = process.env["LOOMFLO_DASHBOARD_PATH"] ?? defaultDashboardPath;
+
 // ============================================================================
 // Startup
 // ============================================================================
 
-const daemon = new Daemon({ port, host, projectPath });
+const daemon = new Daemon({ port, host, projectPath, dashboardPath });
 
 /**
  * Gracefully shut down the daemon on process signals.
