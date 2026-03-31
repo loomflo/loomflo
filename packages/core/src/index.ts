@@ -78,6 +78,7 @@ export { createEscalateTool } from "./tools/escalate.js";
 
 export * from "./costs/tracker.js";
 export * from "./costs/rate-limiter.js";
+export { BudgetExceededError } from "./costs/budget-error.js";
 
 // ============================================================================
 // Memory

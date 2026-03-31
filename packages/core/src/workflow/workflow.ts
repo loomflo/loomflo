@@ -12,6 +12,26 @@ import { loadWorkflowState, saveWorkflowState } from "../persistence/state.js";
 import { appendEvent, createEvent } from "../persistence/events.js";
 import { WorkflowGraph } from "./graph.js";
 import { WorkflowNode } from "./node.js";
+import { BudgetExceededError } from "../costs/budget-error.js";
+
+/**
+ * Result returned by a cost checker callback indicating the current budget state.
+ */
+export interface BudgetCheckResult {
+  /** Whether the budget has been exceeded. */
+  exceeded: boolean;
+  /** The total cost in USD at the time of the check. */
+  totalCost: number;
+  /** The configured budget limit in USD. */
+  budgetLimit: number;
+}
+
+/**
+ * Callback that reports the current budget state for budget enforcement checks.
+ *
+ * @returns The current budget check result.
+ */
+export type CostCheckerFn = () => BudgetCheckResult;
 
 /**
  * Valid state transitions for the workflow lifecycle.
@@ -66,6 +86,7 @@ export class WorkflowManager {
   private data: Workflow;
   private graph: WorkflowGraph;
   private nodeInstances: Map<string, WorkflowNode>;
+  private costChecker: CostCheckerFn | null = null;
 
   /**
    * Creates a WorkflowManager from existing workflow data.
@@ -346,6 +367,57 @@ export class WorkflowManager {
       throw new Error(`Cost amount must be non-negative, got ${String(amount)}`);
     }
     this.data.totalCost += amount;
+  }
+
+  /**
+   * Registers a cost checker callback used by {@link checkBudget}.
+   *
+   * The callback is invoked each time {@link checkBudget} is called and
+   * should return the current budget state from the {@link CostTracker}.
+   * Pass `null` to remove a previously registered checker.
+   *
+   * @param fn - Callback returning the current budget state, or null to unregister.
+   */
+  setCostChecker(fn: CostCheckerFn | null): void {
+    this.costChecker = fn;
+  }
+
+  /**
+   * Checks whether the workflow budget has been exceeded.
+   *
+   * If a cost checker has been registered via {@link setCostChecker} and
+   * the budget is exceeded, all nodes currently in `running` status are
+   * transitioned to `blocked`, the workflow is transitioned to `paused`
+   * (if currently `running`), and a {@link BudgetExceededError} is thrown.
+   *
+   * This method is intended to be called by the execution engine before
+   * activating each new node. It does not auto-persist — the caller is
+   * responsible for persisting state after catching the error.
+   *
+   * @throws {BudgetExceededError} If the budget limit has been exceeded.
+   */
+  checkBudget(): void {
+    if (!this.costChecker) {
+      return;
+    }
+
+    const { exceeded, totalCost, budgetLimit } = this.costChecker();
+    if (!exceeded) {
+      return;
+    }
+
+    for (const node of this.nodeInstances.values()) {
+      if (node.status === "running") {
+        node.transition("blocked");
+      }
+    }
+
+    if (this.data.status === "running") {
+      this.data.status = "paused";
+      this.data.updatedAt = new Date().toISOString();
+    }
+
+    throw new BudgetExceededError(totalCost, budgetLimit);
   }
 
   /**
