@@ -133,6 +133,28 @@ export function createInitCommand(): Command {
     .option("--budget <number>", "Budget limit in dollars")
     .option("--reviewer", "Enable the reviewer agent")
     .action(async (description: string, options: InitOptions): Promise<void> => {
+      /* ------------------------------------------------------------------ */
+      /* Pre-flight checks                                                  */
+      /* ------------------------------------------------------------------ */
+
+      // Validate description length before making any network calls.
+      const trimmed = description.trim();
+      if (trimmed.length < 10 || trimmed.length > 2000) {
+        console.error("Error: Description must be between 10 and 2000 characters.");
+        process.exit(1);
+      }
+
+      // Ensure the Anthropic API key is available. Without it the daemon
+      // would start spec generation only to fail immediately on the first
+      // LLM call, wasting time and producing confusing errors.
+      if (!process.env["ANTHROPIC_API_KEY"]) {
+        console.error(
+          "Error: ANTHROPIC_API_KEY environment variable is not set." +
+            " Export it before running loomflo init.",
+        );
+        process.exit(1);
+      }
+
       const daemon = await readDaemonConfig();
       const projectPath = resolve(options.projectPath);
 
