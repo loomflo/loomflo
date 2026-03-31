@@ -146,6 +146,17 @@ export async function runAgentLoop(
       response = await config.provider.complete(params);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // 401 means the API key is invalid/expired — retrying won't help
+      if (errorMessage.includes("(401)")) {
+        return {
+          output: extractTextOutput(messages),
+          tokenUsage,
+          status: "failed",
+          error: "API key invalid or expired — check ANTHROPIC_API_KEY",
+        };
+      }
+
       return {
         output: extractTextOutput(messages),
         tokenUsage,
