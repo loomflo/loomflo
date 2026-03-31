@@ -169,6 +169,12 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   server.addHook("onClose", (): void => {
     abortController.abort();
+    // Close all open WebSocket clients so the ws.Server can shut down
+    // and the Node.js event loop is not kept alive during tests.
+    for (const client of clients) {
+      client.close();
+    }
+    clients.clear();
   });
 
   // ---------------------------------------------------------------------------

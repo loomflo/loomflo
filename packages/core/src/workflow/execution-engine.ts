@@ -429,6 +429,12 @@ export class WorkflowExecutionEngine {
         error: result.error ?? "Unknown error",
         cost: result.cost,
       });
+      // Eagerly propagate blocked status to downstream pending nodes so that
+      // isTerminal() can correctly detect the terminal state without waiting
+      // for all chains to be explicitly checked. Without this, a chain like
+      // A → B → C where A returns "blocked" leaves C with a pending predecessor
+      // (B) that has no direct failed ancestor — causing an infinite loop.
+      await this.markUnreachableNodesBlocked();
     }
 
     await this.persistState();
@@ -448,11 +454,14 @@ export class WorkflowExecutionEngine {
   private async waitForAnyCompletion(): Promise<void> {
     if (this.activeNodes.size === 0) return;
 
+    // Guard against a race condition where signalWakeUp() fires before
+    // the wakeUp resolver is assigned. The Promise constructor runs
+    // synchronously, so wakeUp is set before any async continuation can call it.
     const racePromise = new Promise<void>((resolve) => {
       this.wakeUp = resolve;
     });
 
-    const activePromises = [...this.activeNodes.values()].map((p) => p.then(() => undefined));
+    const activePromises = [...this.activeNodes.values()].map((p) => p.then((): void => undefined));
 
     await Promise.race([racePromise, ...activePromises]);
     this.wakeUp = null;
