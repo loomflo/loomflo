@@ -402,11 +402,15 @@ async function runSpecGenerationBackground(
 ): Promise<void> {
   const { setWorkflow, getProvider, getSharedMemory, getCostTracker } = options;
 
+  // Ensure shared memory directory and standard files exist before spec generation
+  const sharedMemory = getSharedMemory();
+  await sharedMemory.initialize();
+
   const loom = new LoomAgent({
     provider: getProvider(),
     projectPath: workflow.projectPath,
     eventLog: { workflowId: workflow.id },
-    sharedMemory: getSharedMemory(),
+    sharedMemory,
     costTracker: getCostTracker(),
     maxTokensPerCall: 16384, // Spec graph can exceed 8192 default tokens
   });
