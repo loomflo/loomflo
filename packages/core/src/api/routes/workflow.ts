@@ -9,6 +9,7 @@ import type { EventQueryFilters } from "../../persistence/events.js";
 import { saveWorkflowState } from "../../persistence/state.js";
 import type { LLMProvider } from "../../providers/base.js";
 import type { Event, Workflow } from "../../types.js";
+import { WorkflowExecutionEngine, type NodeExecutor } from "../../workflow/execution-engine.js";
 import { WorkflowManager, type ResumeInfo } from "../../workflow/workflow.js";
 
 // ============================================================================
@@ -39,6 +40,12 @@ export interface WorkflowRoutesOptions {
   getCostTracker: () => CostTracker;
   /** Signal for aborting background tasks on server close. */
   signal?: AbortSignal;
+  /**
+   * Factory that creates a NodeExecutor for a given workflow.
+   * Called once when /workflow/start is invoked.
+   * Optional — if absent, nodes will not be executed (spec-only mode).
+   */
+  createNodeExecutor?: (workflow: Workflow) => NodeExecutor;
 }
 
 // ============================================================================
@@ -220,6 +227,9 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       setWorkflow(updated);
       await saveWorkflowState(updated.projectPath, updated);
 
+      // Fire-and-forget: engine runs in background, updates state via setWorkflow
+      void runExecutionBackground(updated, options, options.signal);
+
       await reply.code(200).send({ status: "running" } satisfies StartResponse);
     });
 
@@ -308,6 +318,72 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
 // ============================================================================
 // Background Helpers
 // ============================================================================
+
+/**
+ * Run workflow execution (Phase 2) in the background using the WorkflowExecutionEngine.
+ *
+ * Creates a WorkflowManager from the current workflow state, instantiates the engine
+ * with the injected NodeExecutor, and runs to completion. Periodically syncs the
+ * manager's live state back to the server's in-memory workflow via setWorkflow().
+ *
+ * On completion: updates workflow status based on engine result and persists.
+ * On failure: marks workflow as failed and persists.
+ *
+ * No-ops silently if createNodeExecutor is not provided (spec-only mode).
+ *
+ * @param workflow - The workflow in 'running' status.
+ * @param options - Route options providing access to services.
+ * @param signal - Optional abort signal to stop the engine on server close.
+ */
+async function runExecutionBackground(
+  workflow: Workflow,
+  options: WorkflowRoutesOptions,
+  signal?: AbortSignal,
+): Promise<void> {
+  const { setWorkflow, getCostTracker, createNodeExecutor } = options;
+  if (!createNodeExecutor) return; // spec-only mode, no-op
+
+  const manager = new WorkflowManager(workflow);
+  const executor = createNodeExecutor(workflow);
+  const costTracker = getCostTracker();
+
+  const engine = new WorkflowExecutionEngine({ manager, executor, costTracker });
+
+  // Wire abort signal → engine.stop()
+  const onAbort = (): void => {
+    engine.stop();
+  };
+  if (signal) {
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+
+  // Periodically sync engine state back to the server's in-memory workflow
+  const syncInterval = setInterval(() => {
+    setWorkflow(manager.toJSON());
+  }, 1000);
+
+  try {
+    await engine.run();
+
+    clearInterval(syncInterval);
+    if (signal) signal.removeEventListener("abort", onAbort);
+
+    // Final sync: engine has already transitioned the manager to done/failed/paused
+    const terminal = manager.toJSON();
+    setWorkflow(terminal);
+    await saveWorkflowState(terminal.projectPath, terminal);
+  } catch {
+    clearInterval(syncInterval);
+    if (signal) signal.removeEventListener("abort", onAbort);
+
+    if (signal?.aborted) return;
+
+    const current = manager.toJSON();
+    const failed: Workflow = { ...current, status: "failed", updatedAt: new Date().toISOString() };
+    setWorkflow(failed);
+    await saveWorkflowState(failed.projectPath, failed);
+  }
+}
 
 /**
  * Run spec generation in the background and update the workflow on completion.
