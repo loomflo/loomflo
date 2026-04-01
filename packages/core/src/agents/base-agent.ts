@@ -26,8 +26,8 @@ export interface AgentLoopConfig {
   maxTokens?: number;
   /** Wall-clock timeout in milliseconds. The loop aborts if exceeded. */
   timeout: number;
-  /** Cumulative token limit (input + output) across all LLM calls. The loop aborts if exceeded. */
-  tokenLimit: number;
+  /** Cumulative token limit (input + output) across all LLM calls. The loop aborts if exceeded. null = no limit. */
+  tokenLimit: number | null;
   /** Unique agent identifier for tool context and logging. */
   agentId: string;
   /** Node identifier the agent belongs to. */
@@ -120,15 +120,17 @@ export async function runAgentLoop(
       };
     }
 
-    // Check cumulative token budget before each LLM call
-    const totalTokens = tokenUsage.input + tokenUsage.output;
-    if (totalTokens >= config.tokenLimit) {
-      return {
-        output: extractTextOutput(messages),
-        tokenUsage,
-        status: "token_limit",
-        error: `Agent exceeded token limit of ${String(config.tokenLimit)} (used: ${String(totalTokens)})`,
-      };
+    // Check cumulative token budget before each LLM call (null = unlimited)
+    if (config.tokenLimit !== null) {
+      const totalTokens = tokenUsage.input + tokenUsage.output;
+      if (totalTokens >= config.tokenLimit) {
+        return {
+          output: extractTextOutput(messages),
+          tokenUsage,
+          status: "token_limit",
+          error: `Agent exceeded token limit of ${String(config.tokenLimit)} (used: ${String(totalTokens)})`,
+        };
+      }
     }
 
     // Build completion params

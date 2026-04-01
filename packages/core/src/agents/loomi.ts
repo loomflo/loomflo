@@ -697,18 +697,21 @@ async function spawnWorker(
     retryContext,
   });
 
-  return runAgentLoop({
-    systemPrompt,
-    tools,
-    provider: config.provider,
-    model: workerModel,
-    timeout: config.config.agentTimeout,
-    tokenLimit: config.config.agentTokenLimit,
-    agentId: plan.id,
-    nodeId: config.nodeId,
-    workspacePath: config.workspacePath,
-    writeScope: plan.writeScope,
-  });
+  return runAgentLoop(
+    {
+      systemPrompt,
+      tools,
+      provider: config.provider,
+      model: workerModel,
+      timeout: config.config.agentTimeout,
+      tokenLimit: config.config.agentTokenLimit,
+      agentId: plan.id,
+      nodeId: config.nodeId,
+      workspacePath: config.workspacePath,
+      writeScope: plan.writeScope,
+    },
+    [{ role: "user", content: "Begin your work. Follow your instructions and use the available tools to complete your tasks." }],
+  );
 }
 
 /**

@@ -4,8 +4,24 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { createServer } from "./api/server.js";
+import { runLoomi } from "./agents/loomi.js";
 import { appendEvent, createEvent } from "./persistence/events.js";
 import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
+import { CostTracker } from "./costs/tracker.js";
+import { SharedMemoryManager } from "./memory/shared-memory.js";
+import { MessageBus } from "./agents/message-bus.js";
+import { AnthropicProvider } from "./providers/anthropic.js";
+import { resolveCredentials } from "./providers/credentials.js";
+import { readFileTool } from "./tools/file-read.js";
+import { writeFileTool } from "./tools/file-write.js";
+import { editFileTool } from "./tools/file-edit.js";
+import { listFilesTool } from "./tools/file-list.js";
+import { searchFilesTool } from "./tools/file-search.js";
+import { shellExecTool } from "./tools/shell-exec.js";
+import { memoryReadTool } from "./tools/memory-read.js";
+import { memoryWriteTool } from "./tools/memory-write.js";
+import { loadConfig } from "./config.js";
+import type { NodeExecutor } from "./workflow/execution-engine.js";
 import type { Workflow } from "./types.js";
 
 // ============================================================================
@@ -163,14 +179,82 @@ export class Daemon {
     }
 
     const token = randomBytes(TOKEN_BYTES).toString("hex");
+    const projectPath = this.projectPath ?? process.cwd();
+
+    // Resolve credentials and build provider — optional, only needed for agent execution
+    let provider: AnthropicProvider | null = null;
+    try {
+      const credentials = await resolveCredentials();
+      provider = new AnthropicProvider(credentials.config);
+    } catch {
+      // No credentials found — spec-only mode (no agent execution)
+    }
+
+    const workerTools = [
+      readFileTool,
+      writeFileTool,
+      editFileTool,
+      listFilesTool,
+      searchFilesTool,
+      shellExecTool,
+      memoryReadTool,
+      memoryWriteTool,
+    ];
+
+    /** Build a NodeExecutor for a given workflow — called once per /workflow/start. */
+    const createNodeExecutor = (workflow: Workflow): NodeExecutor =>
+      async (node) => {
+        const config = await loadConfig({ projectPath: workflow.projectPath });
+        const messageBus = new MessageBus();
+
+        if (!provider) throw new Error("No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.");
+
+        const result = await runLoomi({
+          nodeId: node.id,
+          nodeTitle: node.title,
+          instructions: (node as unknown as { instructions?: string }).instructions ?? "",
+          workspacePath: workflow.projectPath,
+          provider,
+          model: config.models.loomi,
+          config,
+          messageBus,
+          eventLog: { workflowId: workflow.id },
+          costTracker: new CostTracker(),
+          sharedMemory: new SharedMemoryManager(workflow.projectPath),
+          escalationHandler: {
+            escalate: async () => { /* no-op in daemon — agents self-manage */ },
+          },
+          workerTools,
+        });
+
+        return {
+          status:
+            result.status === "completed" ? "done"
+            : result.status === "blocked" ? "blocked"
+            : "failed",
+          cost: 0,
+        };
+      };
 
     const { server, broadcast } = await createServer({
       token,
-      projectPath: this.projectPath ?? process.cwd(),
+      projectPath,
       dashboardPath: this.dashboardPath ?? null,
       health: {
         getUptime: (): number => Math.floor(process.uptime()),
         getWorkflow: (): null => null,
+      },
+      workflow: {
+        getWorkflow: () => null,
+        setWorkflow: () => {},
+        getProvider: () => provider!,
+        getEventLog: () => ({
+          append: async () => {},
+          query: async () => [],
+        }),
+        getSharedMemory: () => new SharedMemoryManager(projectPath),
+        getCostTracker: () => new CostTracker(),
+        createNodeExecutor,
       },
       onShutdown: (): void => {
         void this.gracefulShutdown();

@@ -81,7 +81,7 @@ export const ConfigSchema = z.object({
   /** Wall-clock timeout per agent call in milliseconds (default: 10 minutes). */
   agentTimeout: z.number().int().positive().default(600_000),
   /** Maximum tokens per agent LLM call. */
-  agentTokenLimit: z.number().int().positive().default(100_000),
+  agentTokenLimit: z.number().int().positive().nullable().default(null),
   /** Maximum LLM API calls per minute per agent (rate limiting). */
   apiRateLimit: z.number().int().positive().default(60),
 });

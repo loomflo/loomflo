@@ -60,7 +60,7 @@ export interface LoomaConfig {
     /** Wall-clock timeout in milliseconds. */
     agentTimeout: number;
     /** Cumulative token limit (input + output). */
-    agentTokenLimit: number;
+    agentTokenLimit: number | null;
     /** Maximum tokens per individual LLM call. */
     maxTokens?: number;
   };

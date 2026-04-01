@@ -93,7 +93,7 @@ describe("DEFAULT_CONFIG", () => {
       dashboardPort: 3000,
       dashboardAutoOpen: true,
       agentTimeout: 600_000,
-      agentTokenLimit: 100_000,
+      agentTokenLimit: null,
       apiRateLimit: 60,
     });
   });

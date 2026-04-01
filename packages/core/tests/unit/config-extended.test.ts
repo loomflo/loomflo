@@ -300,7 +300,7 @@ describe("missing optional fields - defaults applied", () => {
     expect(result.dashboardPort).toBe(3000);
     expect(result.dashboardAutoOpen).toBe(true);
     expect(result.agentTimeout).toBe(600_000);
-    expect(result.agentTokenLimit).toBe(100_000);
+    expect(result.agentTokenLimit).toBeNull();
     expect(result.apiRateLimit).toBe(60);
   });
 
