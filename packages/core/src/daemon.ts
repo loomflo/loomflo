@@ -236,17 +236,31 @@ export class Daemon {
         };
       };
 
+    // In-memory workflow state — shared between health route and workflow routes
+    let activeWorkflow: Workflow | null = null;
+
     const { server, broadcast } = await createServer({
       token,
       projectPath,
       dashboardPath: this.dashboardPath ?? null,
       health: {
         getUptime: (): number => Math.floor(process.uptime()),
-        getWorkflow: (): null => null,
+        getWorkflow: () => {
+          if (!activeWorkflow) return null;
+          const nodes = activeWorkflow.graph?.nodes ?? {};
+          return {
+            id: activeWorkflow.id,
+            status: activeWorkflow.status,
+            nodeCount: Object.keys(nodes).length,
+            activeNodes: Object.entries(nodes)
+              .filter(([, n]) => n.status === "running")
+              .map(([id]) => id),
+          };
+        },
       },
       workflow: {
-        getWorkflow: () => null,
-        setWorkflow: () => {},
+        getWorkflow: () => activeWorkflow,
+        setWorkflow: (wf: Workflow) => { activeWorkflow = wf; },
         getProvider: () => provider!,
         getEventLog: () => ({
           append: async () => {},
