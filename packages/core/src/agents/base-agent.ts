@@ -154,9 +154,7 @@ export async function runAgentLoop(
       // retriable-failed error so Loomi can surface the refresh instruction.
       // In API key mode it is a permanent credential error.
       if (errorMessage.includes("(401)")) {
-        const isOAuth =
-          "isOAuthMode" in config.provider &&
-          (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+        const isOAuth = config.provider.isOAuthMode === true;
 
         if (isOAuth) {
           return {

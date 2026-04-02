@@ -129,4 +129,14 @@ export interface LLMProvider {
    *   token usage, and the model that produced the response.
    */
   complete(params: CompletionParams): Promise<z.infer<typeof LLMResponseSchema>>;
+
+  /**
+   * True when this provider uses OAuth token authentication instead of an
+   * API key. Affects retry behavior: a 401 in OAuth mode indicates a token
+   * expiry (retriable after refresh) rather than an invalid key (hard-fail).
+   *
+   * Providers that do not support OAuth should leave this undefined (treated
+   * as false by consumers).
+   */
+  readonly isOAuthMode?: boolean;
 }

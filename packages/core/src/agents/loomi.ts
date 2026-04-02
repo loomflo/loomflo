@@ -1164,9 +1164,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
           // After the delay, verify the OAuth token is still valid before respawning workers.
           // If expired, surface a clear message and bail out — the user must refresh first.
-          const isOAuth =
-            "isOAuthMode" in config.provider &&
-            (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+          const isOAuth = config.provider.isOAuthMode === true;
           if (isOAuth) {
             const tokenStillValid = await isOAuthTokenValid();
             if (!tokenStillValid) {
@@ -1264,9 +1262,7 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
 
       // After the delay, verify the OAuth token is still valid before respawning workers.
       // If expired, surface a clear message and bail out — the user must refresh first.
-      const isOAuthRetry =
-        "isOAuthMode" in config.provider &&
-        (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+      const isOAuthRetry = config.provider.isOAuthMode === true;
       if (isOAuthRetry) {
         const tokenStillValid = await isOAuthTokenValid();
         if (!tokenStillValid) {
