@@ -731,3 +731,43 @@ describe("runAgentLoop — completion params", () => {
     expect(params.maxTokens).toBeUndefined();
   });
 });
+
+// ===========================================================================
+// T4.3 / T4.4: 401 handling in OAuth mode vs API key mode
+// ===========================================================================
+
+describe("runAgentLoop — 401 handling", () => {
+  it("T4.3 — API key mode: 401 is hard-fail with API key error message", async () => {
+    // provider throws an error with '(401)' in message, isOAuthMode = false
+    const failingProvider: LLMProvider = {
+      async complete(_params: CompletionParams) {
+        throw new Error("Anthropic API error (401): Unauthorized");
+      },
+    };
+    const config = makeConfig({ provider: failingProvider });
+
+    const result = await runAgentLoop(config, [{ role: "user", content: "hello" }]);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("API key invalid or expired");
+  });
+
+  it("T4.4 — OAuth mode: 401 returns retriable failed with token_expired message", async () => {
+    // provider has isOAuthMode = true and throws 401
+    // The current implementation does NOT distinguish OAuth mode — this test will FAIL
+    // until T208 is implemented
+    const oauthFailingProvider = {
+      isOAuthMode: true,
+      async complete(_params: CompletionParams) {
+        throw new Error("Anthropic API error (401): Unauthorized");
+      },
+    } as unknown as LLMProvider;
+    const config = makeConfig({ provider: oauthFailingProvider });
+
+    const result = await runAgentLoop(config, [{ role: "user", content: "hello" }]);
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("token_expired");
+    expect(result.error).not.toContain("API key invalid");
+  });
+});
