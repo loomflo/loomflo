@@ -35,6 +35,7 @@ function makeWorkflow(overrides?: Partial<Workflow>): Workflow {
       maxRetriesPerTask: 2,
       maxLoomasPerLoomi: null,
       retryStrategy: "adaptive",
+      retryDelay: "0",
       models: {
         loom: "claude-opus-4-6",
         loomi: "claude-opus-4-6",

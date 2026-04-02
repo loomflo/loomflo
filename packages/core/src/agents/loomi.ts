@@ -19,6 +19,7 @@ import type { Config } from "../config.js";
 import type { CostTracker } from "../costs/tracker.js";
 import type { SharedMemoryManager } from "../memory/shared-memory.js";
 import { createEvent, appendEvent } from "../persistence/events.js";
+import { parseDelay } from "../workflow/scheduler.js";
 import type { LLMProvider } from "../providers/base.js";
 import type { AgentInfo, EventType, ReviewReport } from "../types.js";
 import type { AgentLoopResult } from "./base-agent.js";
@@ -1152,6 +1153,14 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
           }
 
           retryCount++;
+
+          // Wait between retries if configured (e.g., "2h" to avoid API overload)
+          const retryDelayMs = parseDelay(config.config.retryDelay);
+          if (retryDelayMs > 0) {
+            await writeProgress(config, loomiAgentId, `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`);
+            await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
+          }
+
           continue;
         }
 
@@ -1222,6 +1231,13 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       });
 
       retryCount++;
+
+      // Wait between retries if configured (e.g., "2h" to avoid API overload)
+      const retryDelayMs = parseDelay(config.config.retryDelay);
+      if (retryDelayMs > 0) {
+        await writeProgress(config, loomiAgentId, `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`);
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
+      }
     }
   } finally {
     config.messageBus.unregisterAgent(loomiAgentId, config.nodeId);

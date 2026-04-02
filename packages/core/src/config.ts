@@ -58,6 +58,8 @@ export const ConfigSchema = z.object({
   maxRetriesPerNode: z.number().int().nonnegative().default(3),
   /** Maximum retries allowed per individual task within a node. */
   maxRetriesPerTask: z.number().int().nonnegative().default(2),
+  /** Delay between node retry attempts (e.g., "0", "30m", "2h"). Useful to avoid API overload. */
+  retryDelay: z.string().default("0"),
   /** Maximum worker agents (Loomas) per orchestrator (Loomi). Null means unlimited. */
   maxLoomasPerLoomi: z.number().int().positive().nullable().default(null),
   /** Strategy for modifying prompts on retry: 'adaptive' adjusts the prompt, 'same' retries as-is. */
