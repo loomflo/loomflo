@@ -149,8 +149,25 @@ export async function runAgentLoop(
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
 
-      // 401 means the API key is invalid/expired — retrying won't help
+      // 401 means the credential is invalid or expired — retrying won't help.
+      // In OAuth mode the token may have expired and can be refreshed; return a
+      // retriable-failed error so Loomi can surface the refresh instruction.
+      // In API key mode it is a permanent credential error.
       if (errorMessage.includes("(401)")) {
+        const isOAuth =
+          "isOAuthMode" in config.provider &&
+          (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+
+        if (isOAuth) {
+          return {
+            output: extractTextOutput(messages),
+            tokenUsage,
+            status: "failed",
+            error:
+              "token_expired: OAuth token expired — refresh with 'claude --print'",
+          };
+        }
+
         return {
           output: extractTextOutput(messages),
           tokenUsage,

@@ -28,6 +28,7 @@ import type { MessageBus } from "./message-bus.js";
 import { buildLoomaPrompt } from "./prompts.js";
 import type { Tool } from "../tools/base.js";
 import type { EscalationHandlerLike } from "../tools/escalate.js";
+import { isOAuthTokenValid } from "../providers/credentials.js";
 import type { CompletionHandlerLike, CompletionReport } from "../tools/report-complete.js";
 import { createReportCompleteTool } from "../tools/report-complete.js";
 import { createSendMessageTool } from "../tools/send-message.js";
@@ -1161,6 +1162,28 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
             await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
           }
 
+          // After the delay, verify the OAuth token is still valid before respawning workers.
+          // If expired, surface a clear message and bail out — the user must refresh first.
+          const isOAuth =
+            "isOAuthMode" in config.provider &&
+            (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+          if (isOAuth) {
+            const tokenStillValid = await isOAuthTokenValid();
+            if (!tokenStillValid) {
+              await writeProgress(
+                config,
+                loomiAgentId,
+                `## OAuth token expired — refresh with 'claude --print' then resume the workflow\n`,
+              );
+              return {
+                status: "failed",
+                completedAgents: allCompletedAgents,
+                failedAgents: activePlans.map((p) => p.id),
+                retryCount,
+              };
+            }
+          }
+
           continue;
         }
 
@@ -1237,6 +1260,28 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       if (retryDelayMs > 0) {
         await writeProgress(config, loomiAgentId, `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`);
         await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+
+      // After the delay, verify the OAuth token is still valid before respawning workers.
+      // If expired, surface a clear message and bail out — the user must refresh first.
+      const isOAuthRetry =
+        "isOAuthMode" in config.provider &&
+        (config.provider as { isOAuthMode: boolean }).isOAuthMode;
+      if (isOAuthRetry) {
+        const tokenStillValid = await isOAuthTokenValid();
+        if (!tokenStillValid) {
+          await writeProgress(
+            config,
+            loomiAgentId,
+            `## OAuth token expired — refresh with 'claude --print' then resume the workflow\n`,
+          );
+          return {
+            status: "failed",
+            completedAgents: allCompletedAgents,
+            failedAgents: permanentlyFailedAgents,
+            retryCount,
+          };
+        }
       }
     }
   } finally {

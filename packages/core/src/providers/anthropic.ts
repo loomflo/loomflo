@@ -173,10 +173,30 @@ export class AnthropicProvider implements LLMProvider {
   private readonly defaultModel: string;
   private readonly defaultMaxTokens: number;
   /** True when using OAuth token auth — requires Claude Code identity headers + system block. */
-  private readonly isOAuthMode: boolean;
+  /** True when using OAuth token auth — readable by consumers to adapt 401 handling. */
+  public readonly isOAuthMode: boolean;
+  /** Static token string or getter function that returns a fresh token on each call. */
+  private readonly oauthTokenSource?: string | (() => string | Promise<string>);
 
   /** HTTP status codes eligible for exponential backoff retry. */
   private readonly RETRYABLE_STATUSES: readonly number[] = [429, 529];
+
+  /**
+   * Resolves the current OAuth token from the stored source.
+   *
+   * If the source is a function (getter), it is called and awaited to obtain
+   * a fresh token. This enables external token-refresh logic to supply an
+   * up-to-date token before every API call. If the source is a static string,
+   * it is returned directly.
+   *
+   * @returns The resolved OAuth Bearer token string.
+   */
+  private async resolveOAuthToken(): Promise<string> {
+    if (typeof this.oauthTokenSource === "function") {
+      return await this.oauthTokenSource();
+    }
+    return this.oauthTokenSource ?? "";
+  }
 
   /**
    * Creates an AnthropicProvider instance.
@@ -187,6 +207,7 @@ export class AnthropicProvider implements LLMProvider {
    * - **oauthToken** (OAuth): A `sk-ant-o...` Bearer token from the Claude.ai
    *   OAuth flow. Injected via `Authorization: Bearer <token>` with the
    *   `anthropic-beta: oauth-2025-04-20` header automatically added.
+   *   Can be a static string or a getter function that returns a fresh token.
    *
    * @param config - Provider configuration. Either apiKey or oauthToken is required.
    *   Optional baseUrl overrides the API endpoint.
@@ -195,13 +216,18 @@ export class AnthropicProvider implements LLMProvider {
    */
   constructor(config: ProviderConfig) {
     if (config.oauthToken) {
+      // Store the token source (string or getter) for dynamic resolution in complete().
+      this.oauthTokenSource = config.oauthToken;
+
       // OAuth mode: authToken → Authorization: Bearer (NOT x-api-key).
       // Anthropic requires the claude-code-20250219 beta, CLI user-agent, and x-app: cli.
       // Without these headers + the Claude Code system identity, the API rejects the request.
       // Source: reverse-engineered from @mariozechner/pi-ai (OpenClaw's LLM engine).
+      // A placeholder authToken is used here; it is overwritten dynamically in
+      // complete() via resolveOAuthToken() before every API call.
       this.client = new Anthropic({
         apiKey: null,
-        authToken: config.oauthToken,
+        authToken: "placeholder",
         dangerouslyAllowBrowser: true,
         defaultHeaders: {
           "accept": "application/json",
@@ -282,6 +308,13 @@ export class AnthropicProvider implements LLMProvider {
       messages: toAnthropicMessages(params.messages),
       ...(params.tools?.length ? { tools: toAnthropicTools(params.tools) } : {}),
     };
+
+    // In OAuth mode, resolve a fresh token before every call. The SDK reads
+    // this.client.authToken inside its authHeaders() method when building the
+    // request, so updating the public property is sufficient.
+    if (this.isOAuthMode) {
+      this.client.authToken = await this.resolveOAuthToken();
+    }
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {

@@ -181,3 +181,53 @@ export async function tryResolveCredentials(options?: {
     return null;
   }
 }
+
+// ============================================================================
+// OAuth Token Validity Check
+// ============================================================================
+
+/**
+ * Minimum buffer before token expiry to consider it still valid (5 minutes).
+ * Ensures we don't start an agent loop with a token that will expire mid-call.
+ */
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
+/**
+ * Checks whether the Claude Code OAuth token stored on disk is still valid
+ * with at least a 5-minute safety buffer before expiry.
+ *
+ * Reads `~/.claude/.credentials.json`, parses the `claudeAiOauth.expiresAt`
+ * timestamp, and compares it against the current time plus the safety buffer.
+ *
+ * Returns `false` (rather than throwing) when the file is absent, malformed,
+ * or contains no expiry timestamp — treating all unknown states as invalid.
+ *
+ * @param credentialsPath - Override path for testing. Defaults to ~/.claude/.credentials.json.
+ * @returns `true` if the token expires more than 5 minutes in the future, `false` otherwise.
+ */
+export async function isOAuthTokenValid(credentialsPath?: string): Promise<boolean> {
+  const filePath = credentialsPath ?? join(homedir(), ".claude", ".credentials.json");
+
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return false;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return false;
+  }
+
+  const creds = parsed as ClaudeCodeCredentials;
+  const expiresAt = creds.claudeAiOauth?.expiresAt;
+
+  if (typeof expiresAt !== "number") {
+    return false;
+  }
+
+  return expiresAt > Date.now() + TOKEN_EXPIRY_BUFFER_MS;
+}
