@@ -300,6 +300,9 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
         const resumedWorkflow = result.manager.toJSON();
         setWorkflow(resumedWorkflow);
 
+        // Fire execution engine in background (same as /workflow/start)
+        void runExecutionBackground(resumedWorkflow, options, options.signal);
+
         await reply.code(200).send({
           status: resumedWorkflow.status,
           resumeInfo: result.info,
