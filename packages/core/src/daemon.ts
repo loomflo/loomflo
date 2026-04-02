@@ -237,7 +237,17 @@ export class Daemon {
       };
 
     // In-memory workflow state — shared between health route and workflow routes
+    // Load persisted state from disk on startup if it exists
     let activeWorkflow: Workflow | null = null;
+    try {
+      const { loadWorkflowState } = await import("./persistence/state.js");
+      const persisted = await loadWorkflowState(projectPath);
+      if (persisted !== null) {
+        activeWorkflow = persisted;
+      }
+    } catch {
+      /* No persisted workflow — start fresh */
+    }
 
     const { server, broadcast } = await createServer({
       token,
