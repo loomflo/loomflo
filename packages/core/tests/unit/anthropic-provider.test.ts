@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { CompletionParams } from "../../src/providers/base.js";
+import type { CompletionParams, ProviderConfig } from "../../src/providers/base.js";
 import type { ToolDefinition } from "../../src/types.js";
 
 // ---------------------------------------------------------------------------
@@ -486,5 +486,31 @@ describe("AnthropicProvider", () => {
       const result = ProviderConfigSchema.safeParse({});
       expect(result.success).toBe(false);
     });
+  });
+});
+
+// --- 12. Dynamic OAuth token (T4.1 / T4.2) ---
+describe("AnthropicProvider — dynamic OAuth token", () => {
+  it("T4.1 — calls token getter on every complete() invocation", async () => {
+    // token getter that increments a counter
+    let callCount = 0;
+    const tokenGetter = (): string => {
+      callCount++;
+      return "sk-ant-oat01-mock";
+    };
+    // Cast needed because ProviderConfig.oauthToken is currently string only
+    const provider = new AnthropicProvider({ oauthToken: tokenGetter } as unknown as ProviderConfig);
+    mockCreate.mockResolvedValueOnce(makeTextResponse("first"));
+    mockCreate.mockResolvedValueOnce(makeTextResponse("second"));
+    await provider.complete(makeBaseParams());
+    await provider.complete(makeBaseParams());
+    expect(callCount).toBe(2);
+  });
+
+  it("T4.2 — static string token behaves as before", async () => {
+    const provider = new AnthropicProvider({ oauthToken: "sk-ant-oat01-static" });
+    mockCreate.mockResolvedValueOnce(makeTextResponse("static ok"));
+    const result = await provider.complete(makeBaseParams());
+    expect(result.content).toEqual([{ type: "text", text: "static ok" }]);
   });
 });

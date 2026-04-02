@@ -52,8 +52,8 @@ export const ProviderConfigSchema = z
   .object({
     /** API key for authentication (e.g., ANTHROPIC_API_KEY value). Mutually exclusive with oauthToken. */
     apiKey: z.string().min(1).optional(),
-    /** OAuth Bearer token for authentication (e.g., from Claude.ai OAuth). Mutually exclusive with apiKey. */
-    oauthToken: z.string().min(1).optional(),
+    /** OAuth Bearer token or async getter function for authentication (e.g., from Claude.ai OAuth). Mutually exclusive with apiKey. */
+    oauthToken: z.union([z.string().min(1), z.custom<() => string | Promise<string>>((v) => typeof v === 'function')]).optional(),
     /** Base URL override for the provider API (e.g., custom proxy or local endpoint). */
     baseUrl: z.string().url().optional(),
     /** Default model identifier (e.g., "claude-sonnet-4-6", "gpt-4o"). */
@@ -68,7 +68,10 @@ export const ProviderConfigSchema = z
   });
 
 /** Configuration for initializing an LLM provider. */
-export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+export type ProviderConfig = Omit<z.infer<typeof ProviderConfigSchema>, 'oauthToken'> & {
+  /** OAuth Bearer token OR an async getter that returns a fresh token on each call. */
+  oauthToken?: string | (() => string | Promise<string>);
+};
 
 // ============================================================================
 // CompletionParams
@@ -126,4 +129,14 @@ export interface LLMProvider {
    *   token usage, and the model that produced the response.
    */
   complete(params: CompletionParams): Promise<z.infer<typeof LLMResponseSchema>>;
+
+  /**
+   * True when this provider uses OAuth token authentication instead of an
+   * API key. Affects retry behavior: a 401 in OAuth mode indicates a token
+   * expiry (retriable after refresh) rather than an invalid key (hard-fail).
+   *
+   * Providers that do not support OAuth should leave this undefined (treated
+   * as false by consumers).
+   */
+  readonly isOAuthMode?: boolean;
 }
