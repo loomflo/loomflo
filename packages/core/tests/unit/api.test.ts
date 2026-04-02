@@ -233,7 +233,10 @@ describe("workflow routes", () => {
       }),
       getProvider: vi.fn((): LLMProvider => ({ complete: vi.fn() }) as unknown as LLMProvider),
       getEventLog: vi.fn((): EventLog => mockEventLog),
-      getSharedMemory: vi.fn((): SharedMemoryManager => ({}) as unknown as SharedMemoryManager),
+      getSharedMemory: vi.fn(
+        (): SharedMemoryManager =>
+          ({ initialize: vi.fn().mockResolvedValue(undefined) }) as unknown as SharedMemoryManager,
+      ),
       getCostTracker: vi.fn((): CostTracker => ({}) as unknown as CostTracker),
     };
 
