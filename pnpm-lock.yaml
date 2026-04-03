@@ -44,9 +44,15 @@ importers:
 
   packages/cli:
     dependencies:
+      '@loomflo/core':
+        specifier: workspace:*
+        version: link:../core
       commander:
         specifier: ^13.0.0
         version: 13.1.0
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
     devDependencies:
       tsup:
         specifier: ^8.0.0

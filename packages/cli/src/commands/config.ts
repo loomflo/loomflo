@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { Command } from "commander";
+import { ConfigSchema } from "@loomflo/core";
+import { ZodError } from "zod";
 
 // ============================================================================
 // Constants
@@ -225,8 +227,13 @@ export function createConfigCommand(): Command {
         const global = await readConfigFile(globalConfigPath());
         const project = await readConfigFile(projectConfigPath());
         const merged = deepMerge(global, project);
-        console.log(JSON.stringify(merged, null, 2));
+        const resolved = ConfigSchema.parse(merged);
+        console.log(JSON.stringify(resolved, null, 2));
       } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          console.error(`Error: corrupted config - ${error.message}`);
+          process.exit(1);
+        }
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error reading config: ${msg}`);
         process.exit(1);
@@ -242,8 +249,9 @@ export function createConfigCommand(): Command {
         const global = await readConfigFile(globalConfigPath());
         const project = await readConfigFile(projectConfigPath());
         const merged = deepMerge(global, project);
+        const resolved = ConfigSchema.parse(merged);
 
-        const value = resolveKeyPath(merged, key);
+        const value = resolveKeyPath(resolved as unknown as Record<string, unknown>, key);
 
         if (value === undefined) {
           console.error(`Error: unknown config key "${key}"`);
@@ -252,6 +260,10 @@ export function createConfigCommand(): Command {
 
         console.log(formatValue(value));
       } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          console.error(`Error: corrupted config - ${error.message}`);
+          process.exit(1);
+        }
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error reading config: ${msg}`);
         process.exit(1);
@@ -274,6 +286,13 @@ export function createConfigCommand(): Command {
 
         // Read the existing config from the target file
         const existing = await readConfigFile(targetPath);
+
+        // Validate that the key exists in the schema
+        const defaults = ConfigSchema.parse({}) as unknown as Record<string, unknown>;
+        if (resolveKeyPath(defaults, key) === undefined) {
+          console.error(`Error: unknown config key "${key}"`);
+          process.exit(1);
+        }
 
         // Apply the new value
         const parsed = parseValue(rawValue);

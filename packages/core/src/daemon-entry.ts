@@ -46,7 +46,6 @@ const defaultDashboardPath: string = resolve(
   __dirname,
   "..",
   "..",
-  "packages",
   "dashboard",
   "dist",
 );
