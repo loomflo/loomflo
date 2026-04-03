@@ -44,6 +44,8 @@ export interface SpecEngineConfig {
    * spec generation (graph_modified, spec_artifact_ready).
    */
   broadcaster?: WebSocketBroadcaster;
+  /** Default delay applied to all nodes except the first (e.g. "500ms"). */
+  defaultDelay?: string;
 }
 
 /**
@@ -649,13 +651,13 @@ export function validateAndOptimizeGraph(
  * @param def - The graph node definition from the LLM output.
  * @returns A fully populated Node object in 'pending' status.
  */
-function createNodeFromDefinition(def: GraphNodeDefinition): Node {
+function createNodeFromDefinition(def: GraphNodeDefinition, defaultDelay: string = "0"): Node {
   return {
     id: def.id,
     title: def.title,
     status: "pending",
     instructions: def.instructions,
-    delay: "0",
+    delay: defaultDelay,
     resumeAt: null,
     agents: [],
     fileOwnership: {},
@@ -1285,9 +1287,11 @@ export class SpecEngine {
     }
 
     // Build the node map
+    const defaultDelay = this.config.defaultDelay ?? "0";
     const nodes: Record<string, Node> = {};
-    for (const def of graphDef.nodes) {
-      nodes[def.id] = createNodeFromDefinition(def);
+    for (let i = 0; i < graphDef.nodes.length; i++) {
+      const def = graphDef.nodes[i]!;
+      nodes[def.id] = createNodeFromDefinition(def, i > 0 ? defaultDelay : "0");
       this.broadcaster?.emitGraphModified("node_added", def.id, {
         title: def.title,
         instructionsSummary: def.instructions.slice(0, 120),
