@@ -98,6 +98,8 @@ export interface LoomConfig {
   graphModifier?: GraphModifierLike;
   /** Summary of the current graph state for context (execution mode). */
   graphSummary?: string;
+  /** Default delay between node activations. Passed to SpecEngine. */
+  defaultDelay?: string;
 }
 
 // ============================================================================
@@ -475,6 +477,7 @@ export class LoomAgent {
       projectPath: this.config.projectPath,
       maxTokens: this.config.maxTokensPerCall,
       clarificationCallback: this.config.clarificationCallback,
+      defaultDelay: this.config.defaultDelay,
     });
 
     const onProgress = (event: SpecStepEvent): void => {

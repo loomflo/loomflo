@@ -30,6 +30,7 @@ interface InitOptions {
   projectPath: string;
   budget?: string;
   reviewer?: boolean;
+  delay?: string;
 }
 
 /** Handle for a text-based progress spinner. */
@@ -165,6 +166,7 @@ export function createInitCommand(): Command {
     .option("--project-path <path>", "Project directory path", process.cwd())
     .option("--budget <number>", "Budget limit in dollars")
     .option("--reviewer", "Enable the reviewer agent")
+    .option("--delay <duration>", "Delay between node activations (e.g. 10m, 1h, 1d)")
     .action(async (description: string, options: InitOptions): Promise<void> => {
       /* ------------------------------------------------------------------ */
       /* Pre-flight checks                                                  */
@@ -209,6 +211,13 @@ export function createInitCommand(): Command {
       }
       if (options.reviewer === true) {
         config["reviewerEnabled"] = true;
+      }
+      if (options.delay !== undefined) {
+        if (!/^(0|\d+[mhd])$/.test(options.delay)) {
+          console.error('Error: --delay must be "0" or a duration like "10m", "1h", "1d"');
+          process.exit(1);
+        }
+        config["defaultDelay"] = options.delay;
       }
 
       const body: Record<string, unknown> = {

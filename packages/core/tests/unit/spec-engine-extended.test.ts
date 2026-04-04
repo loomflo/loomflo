@@ -376,6 +376,56 @@ describe("SpecEngine (extended)", () => {
   });
 
   // --------------------------------------------------------------------------
+  // 3b. defaultDelay configuration
+  // --------------------------------------------------------------------------
+
+  describe("defaultDelay configuration", () => {
+    it("should apply defaultDelay to non-root nodes when config.defaultDelay is set", async () => {
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(VALID_GRAPH_JSON)]);
+
+      const engine = new SpecEngine({
+        provider,
+        model: "mock-model",
+        projectPath,
+        defaultDelay: "10m",
+      });
+      const result = await engine.runPipeline("Delay config test");
+
+      const nodes = result.graph.nodes;
+      expect(nodes["node-1"]!.delay).toBe("0");
+      expect(nodes["node-2"]!.delay).toBe("10m");
+      expect(nodes["node-3"]!.delay).toBe("10m");
+    });
+
+    it("should default to delay 0 for all nodes when defaultDelay is not configured", async () => {
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(VALID_GRAPH_JSON)]);
+
+      const engine = new SpecEngine({ provider, model: "mock-model", projectPath });
+      const result = await engine.runPipeline("No delay config test");
+
+      for (const node of Object.values(result.graph.nodes)) {
+        expect(node.delay).toBe("0");
+      }
+    });
+
+    it("should apply defaultDelay 0 explicitly when set to 0", async () => {
+      const provider = mockProvider([...fiveArtifactResponses(), textResponse(VALID_GRAPH_JSON)]);
+
+      const engine = new SpecEngine({
+        provider,
+        model: "mock-model",
+        projectPath,
+        defaultDelay: "0",
+      });
+      const result = await engine.runPipeline("Explicit zero delay test");
+
+      for (const node of Object.values(result.graph.nodes)) {
+        expect(node.delay).toBe("0");
+      }
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // 4. Full 6-step pipeline
   // --------------------------------------------------------------------------
 

@@ -5,7 +5,8 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { createServer } from "./api/server.js";
 import { runLoomi } from "./agents/loomi.js";
-import { appendEvent, createEvent } from "./persistence/events.js";
+import { appendEvent, createEvent, queryEvents } from "./persistence/events.js";
+import type { EventQueryFilters } from "./persistence/events.js";
 import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
 import { CostTracker } from "./costs/tracker.js";
 import { SharedMemoryManager } from "./memory/shared-memory.js";
@@ -22,7 +23,7 @@ import { memoryReadTool } from "./tools/memory-read.js";
 import { memoryWriteTool } from "./tools/memory-write.js";
 import { loadConfig } from "./config.js";
 import type { NodeExecutor } from "./workflow/execution-engine.js";
-import type { Workflow } from "./types.js";
+import type { Event, Workflow } from "./types.js";
 
 // ============================================================================
 // Interfaces
@@ -273,12 +274,15 @@ export class Daemon {
         setWorkflow: (wf: Workflow) => { activeWorkflow = wf; },
         getProvider: () => provider!,
         getEventLog: () => ({
-          append: async () => {},
-          query: async () => [],
+          append: async (event: Event) => { await appendEvent(projectPath, event); },
+          query: async (filters?: EventQueryFilters) => queryEvents(projectPath, filters),
         }),
         getSharedMemory: () => new SharedMemoryManager(projectPath),
         getCostTracker: () => new CostTracker(),
         createNodeExecutor,
+      },
+      events: {
+        getProjectPath: () => projectPath,
       },
       onShutdown: (): void => {
         void this.gracefulShutdown();

@@ -416,6 +416,7 @@ async function runSpecGenerationBackground(
     sharedMemory,
     costTracker: getCostTracker(),
     maxTokensPerCall: 16384, // Spec graph can exceed 8192 default tokens
+    defaultDelay: workflow.config.defaultDelay,
   });
 
   try {
