@@ -1,0 +1,37 @@
+# Dependencies (installed in Docker build)
+node_modules/
+
+# Build artifacts (rebuilt in Docker build)
+packages/*/dist/
+.turbo/
+packages/*/.turbo/
+
+# Development files
+.git/
+.github/
+.env
+.env.*
+!.env.example
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test files
+packages/*/tests/
+vitest.config.ts
+packages/*/vitest.config.ts
+coverage/
+
+# Documentation and specs
+*.md
+!README.md
+specs/
+.specify/
+
+# Docker files (no recursion)
+Dockerfile
+docker-compose.yml
