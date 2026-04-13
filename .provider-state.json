@@ -1,0 +1,12 @@
+{
+  "current_step": 3,
+  "status": "complete",
+  "recommended": "moonshot",
+  "model": "moonshot-v1-8k",
+  "base_url": "https://api.moonshot.cn/v1",
+  "fallback": "nvidia (NVIDIA_API_KEY)",
+  "created_at": "2026-04-13T20:14:00Z",
+  "completed_at": "2026-04-13T20:30:00Z",
+  "branch": "003-openai-compat-provider",
+  "commits": ["a7243c15", "59d5d8d8", "dd1705c2"]
+}
