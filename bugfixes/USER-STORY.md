@@ -17,11 +17,13 @@ La route `/events` est bien enregistrée dans le serveur, mais dans `daemon.ts` 
 n'est pas passée à `createServer()` — le callback `getEventLog.query` retourne toujours `[]`.
 
 **Fichiers concernés :**
+
 - `packages/core/src/daemon.ts` — `getEventLog: () => ({ query: async () => [] })`
 - `packages/core/src/api/server.ts` — l'option `events` n'est pas passée → routes `/events` jamais enregistrées
 - `packages/core/src/persistence/events.ts` — `queryEvents()` fonctionne correctement (à utiliser)
 
 **Critères d'acceptance :**
+
 - `loomflo logs` retourne les N derniers événements du workflow actif (depuis `events.jsonl`)
 - `loomflo logs --type spec_phase_started` filtre par type
 - `loomflo logs --limit 10` pagine correctement
@@ -41,11 +43,13 @@ Tous les nodes sont créés avec `delay: "0"`. Il n'existe pas de flag CLI `--de
 et `defaultDelay` dans la config est ignoré lors de la création des nodes dans `spec-engine.ts`.
 
 **Fichiers concernés :**
+
 - `packages/core/src/spec/spec-engine.ts` — `createNodeFromDefinition()` : `delay` hardcodé à `"0"` (ligne 658)
 - `packages/cli/src/commands/init.ts` — pas de flag `--delay`
 - `packages/core/src/config.ts` — `defaultDelay` existe (type string) mais n'est pas consommé
 
 **Critères d'acceptance :**
+
 - `loomflo init --delay 10m "description"` → tous les nodes (sauf le premier) ont `delay: "10m"`
 - Si `--delay` non passé, la valeur `config.defaultDelay` est utilisée comme fallback
 - `loomflo config set defaultDelay 5m` → persiste et est utilisé par les prochains `init`
@@ -68,10 +72,12 @@ et `resolveKeyPath({}, "provider")` retourne `undefined` → erreur.
 Le bug est que les **valeurs par défaut du schema Zod** ne sont pas appliquées au merge.
 
 **Fichiers concernés :**
+
 - `packages/cli/src/commands/config.ts` — lecture via `readConfigFile()` sans parse Zod → pas de defaults
 - `packages/core/src/config.ts` — `ConfigSchema.parse({})` retourne toutes les valeurs par défaut
 
 **Critères d'acceptance :**
+
 - `loomflo config get provider` → `"anthropic"`
 - `loomflo config get models.loom` → `"claude-opus-4-6"`
 - `loomflo config get defaultDelay` → `"0"`

@@ -20,10 +20,7 @@ function makeTempDir(): string {
 }
 
 /** Write a Claude Code credentials file with the given OAuth data. */
-async function writeCredentials(
-  dir: string,
-  oauth: Record<string, unknown>,
-): Promise<string> {
+async function writeCredentials(dir: string, oauth: Record<string, unknown>): Promise<string> {
   await mkdir(dir, { recursive: true });
   const filePath = join(dir, ".credentials.json");
   await writeFile(filePath, JSON.stringify({ claudeAiOauth: oauth }), "utf-8");

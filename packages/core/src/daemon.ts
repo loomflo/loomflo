@@ -203,12 +203,16 @@ export class Daemon {
     ];
 
     /** Build a NodeExecutor for a given workflow — called once per /workflow/start. */
-    const createNodeExecutor = (workflow: Workflow): NodeExecutor =>
+    const createNodeExecutor =
+      (workflow: Workflow): NodeExecutor =>
       async (node) => {
         const config = await loadConfig({ projectPath: workflow.projectPath });
         const messageBus = new MessageBus();
 
-        if (!provider) throw new Error("No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.");
+        if (!provider)
+          throw new Error(
+            "No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.",
+          );
 
         const result = await runLoomi({
           nodeId: node.id,
@@ -223,16 +227,20 @@ export class Daemon {
           costTracker: new CostTracker(),
           sharedMemory: new SharedMemoryManager(workflow.projectPath),
           escalationHandler: {
-            escalate: async () => { /* no-op in daemon — agents self-manage */ },
+            escalate: async () => {
+              /* no-op in daemon — agents self-manage */
+            },
           },
           workerTools,
         });
 
         return {
           status:
-            result.status === "completed" ? "done"
-            : result.status === "blocked" ? "blocked"
-            : "failed",
+            result.status === "completed"
+              ? "done"
+              : result.status === "blocked"
+                ? "blocked"
+                : "failed",
           cost: 0,
         };
       };
@@ -271,13 +279,20 @@ export class Daemon {
       },
       workflow: {
         getWorkflow: () => activeWorkflow,
-        setWorkflow: (wf: Workflow) => { activeWorkflow = wf; },
+        setWorkflow: (wf: Workflow) => {
+          activeWorkflow = wf;
+        },
         getProvider: () => {
-          if (!provider) throw new Error("No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.");
+          if (!provider)
+            throw new Error(
+              "No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.",
+            );
           return provider;
         },
         getEventLog: () => ({
-          append: async (event: Event) => { await appendEvent(projectPath, event); },
+          append: async (event: Event) => {
+            await appendEvent(projectPath, event);
+          },
           query: async (filters?: EventQueryFilters) => queryEvents(projectPath, filters),
         }),
         getSharedMemory: () => new SharedMemoryManager(projectPath),

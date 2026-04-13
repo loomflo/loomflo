@@ -63,11 +63,7 @@ describe("queryEvents", () => {
     const dir = join(tmpDir, ".loomflo");
     await mkdir(dir, { recursive: true });
 
-    const lines = [
-      JSON.stringify(good),
-      "NOT VALID JSON{{{",
-      "",
-    ].join("\n");
+    const lines = [JSON.stringify(good), "NOT VALID JSON{{{", ""].join("\n");
     await writeFile(join(dir, "events.jsonl"), lines, "utf-8");
 
     const result = await queryEvents(tmpDir);
@@ -81,11 +77,7 @@ describe("queryEvents", () => {
     await mkdir(dir, { recursive: true });
 
     const badObj = { ts: "not-a-datetime", type: "bogus_type", workflowId: 123 };
-    const lines = [
-      JSON.stringify(good),
-      JSON.stringify(badObj),
-      "",
-    ].join("\n");
+    const lines = [JSON.stringify(good), JSON.stringify(badObj), ""].join("\n");
     await writeFile(join(dir, "events.jsonl"), lines, "utf-8");
 
     const result = await queryEvents(tmpDir);
@@ -102,11 +94,36 @@ describe("queryEvents", () => {
 
     beforeEach(async () => {
       events = [
-        makeEvent({ type: "node_started", nodeId: "n1", agentId: "a1", ts: "2026-03-24T10:00:00.000Z" }),
-        makeEvent({ type: "node_completed", nodeId: "n1", agentId: "a1", ts: "2026-03-24T10:01:00.000Z" }),
-        makeEvent({ type: "node_started", nodeId: "n2", agentId: "a2", ts: "2026-03-24T10:02:00.000Z" }),
-        makeEvent({ type: "node_failed", nodeId: "n2", agentId: "a2", ts: "2026-03-24T10:03:00.000Z" }),
-        makeEvent({ type: "workflow_started", nodeId: null, agentId: null, ts: "2026-03-24T10:04:00.000Z" }),
+        makeEvent({
+          type: "node_started",
+          nodeId: "n1",
+          agentId: "a1",
+          ts: "2026-03-24T10:00:00.000Z",
+        }),
+        makeEvent({
+          type: "node_completed",
+          nodeId: "n1",
+          agentId: "a1",
+          ts: "2026-03-24T10:01:00.000Z",
+        }),
+        makeEvent({
+          type: "node_started",
+          nodeId: "n2",
+          agentId: "a2",
+          ts: "2026-03-24T10:02:00.000Z",
+        }),
+        makeEvent({
+          type: "node_failed",
+          nodeId: "n2",
+          agentId: "a2",
+          ts: "2026-03-24T10:03:00.000Z",
+        }),
+        makeEvent({
+          type: "workflow_started",
+          nodeId: null,
+          agentId: null,
+          ts: "2026-03-24T10:04:00.000Z",
+        }),
       ];
       for (const e of events) {
         await appendEvent(tmpDir, e);

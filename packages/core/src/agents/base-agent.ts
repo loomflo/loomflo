@@ -161,8 +161,7 @@ export async function runAgentLoop(
             output: extractTextOutput(messages),
             tokenUsage,
             status: "failed",
-            error:
-              "token_expired: OAuth token expired — refresh with 'claude --print'",
+            error: "token_expired: OAuth token expired — refresh with 'claude --print'",
           };
         }
 

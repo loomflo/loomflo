@@ -1,4 +1,5 @@
 # LoomFlo — Audit E2E & Rapport Qualité
+
 **Date :** 31 mars 2026  
 **Auditeur :** bertholt  
 **Scope :** Pre-merge sur `main` — branch `001-agent-orchestration-framework`  
@@ -16,25 +17,25 @@ LoomFlo est un framework d'orchestration d'agents IA open source. Cet audit couv
 
 ## 1. Métriques Globales
 
-| Indicateur | Valeur |
-|---|---|
-| Lignes de code source | 19 556 |
-| Lignes de tests | 16 719 |
-| Ratio test/code | **85%** |
-| Fichiers source | ~45 |
-| Fichiers de tests | 28 |
-| Packages | 4 (core, cli, dashboard, sdk) |
+| Indicateur            | Valeur                        |
+| --------------------- | ----------------------------- |
+| Lignes de code source | 19 556                        |
+| Lignes de tests       | 16 719                        |
+| Ratio test/code       | **85%**                       |
+| Fichiers source       | ~45                           |
+| Fichiers de tests     | 28                            |
+| Packages              | 4 (core, cli, dashboard, sdk) |
 
 ---
 
 ## 2. Build
 
-| Étape | Statut | Durée |
-|---|---|---|
-| `pnpm build` (all packages) | ✅ PASS | ~8s |
-| ESM bundle core | ✅ | 149 KB |
-| DTS declarations | ✅ | 325 KB |
-| Turbo cache | ✅ opérationnel | — |
+| Étape                       | Statut          | Durée  |
+| --------------------------- | --------------- | ------ |
+| `pnpm build` (all packages) | ✅ PASS         | ~8s    |
+| ESM bundle core             | ✅              | 149 KB |
+| DTS declarations            | ✅              | 325 KB |
+| Turbo cache                 | ✅ opérationnel | —      |
 
 **Zero erreur de compilation.**
 
@@ -42,10 +43,10 @@ LoomFlo est un framework d'orchestration d'agents IA open source. Cet audit couv
 
 ## 3. Typecheck
 
-| Package | Statut |
-|---|---|
+| Package         | Statut      |
+| --------------- | ----------- |
 | `@loomflo/core` | ✅ 0 erreur |
-| `@loomflo/cli` | ✅ 0 erreur |
+| `@loomflo/cli`  | ✅ 0 erreur |
 
 TypeScript strict mode activé sur l'ensemble du projet.
 
@@ -53,36 +54,36 @@ TypeScript strict mode activé sur l'ensemble du projet.
 
 ## 4. Lint
 
-| Package | Statut | Problèmes |
-|---|---|---|
-| `@loomflo/core` | ✅ PASS* | 0 (1 fix appliqué) |
-| `@loomflo/cli` | ✅ PASS | 0 |
+| Package         | Statut    | Problèmes          |
+| --------------- | --------- | ------------------ |
+| `@loomflo/core` | ✅ PASS\* | 0 (1 fix appliqué) |
+| `@loomflo/cli`  | ✅ PASS   | 0                  |
 
-*Fix appliqué : `credentials.ts:87` — optional chain inutile sur valeur non-nullish (`credentials?.claudeAiOauth` → `credentials.claudeAiOauth`). Correction triviale, zero impact fonctionnel.
+\*Fix appliqué : `credentials.ts:87` — optional chain inutile sur valeur non-nullish (`credentials?.claudeAiOauth` → `credentials.claudeAiOauth`). Correction triviale, zero impact fonctionnel.
 
 ---
 
 ## 5. Tests Unitaires
 
-| Suite | Tests | Résultat | Durée |
-|---|---|---|---|
-| `@loomflo/core` (28 fichiers) | 831 pass / 1 skip | ✅ | 9.66s |
-| `@loomflo/cli` | 93 pass | ✅ | 1.87s |
-| **TOTAL** | **924 tests** | **✅ 100%** | **~12s** |
+| Suite                         | Tests             | Résultat    | Durée    |
+| ----------------------------- | ----------------- | ----------- | -------- |
+| `@loomflo/core` (28 fichiers) | 831 pass / 1 skip | ✅          | 9.66s    |
+| `@loomflo/cli`                | 93 pass           | ✅          | 1.87s    |
+| **TOTAL**                     | **924 tests**     | **✅ 100%** | **~12s** |
 
 ### Couverture par module (`@loomflo/core`)
 
-| Module | Statements | Branches | Functions | Lines |
-|---|---|---|---|---|
-| `providers/base.ts` | 100% | 100% | 100% | 100% |
-| `providers/credentials.ts` | 100% | 93% | 100% | 100% |
-| `providers/anthropic.ts` | 84% | 86% | 100% | 84% |
-| `spec/spec-engine.ts` | 95% | 84% | 100% | 95% |
-| `workflow/scheduler.ts` | 98% | 97% | 100% | 98% |
-| `workflow/graph.ts` | 100% | 97% | 100% | 100% |
-| `workflow/file-ownership.ts` | 100% | 97% | 100% | 100% |
-| `workflow/node.ts` | 97% | 94% | 92% | 97% |
-| `tools/escalate.ts` | 100% | 89% | 100% | 100% |
+| Module                       | Statements | Branches | Functions | Lines |
+| ---------------------------- | ---------- | -------- | --------- | ----- |
+| `providers/base.ts`          | 100%       | 100%     | 100%      | 100%  |
+| `providers/credentials.ts`   | 100%       | 93%      | 100%      | 100%  |
+| `providers/anthropic.ts`     | 84%        | 86%      | 100%      | 84%   |
+| `spec/spec-engine.ts`        | 95%        | 84%      | 100%      | 95%   |
+| `workflow/scheduler.ts`      | 98%        | 97%      | 100%      | 98%   |
+| `workflow/graph.ts`          | 100%       | 97%      | 100%      | 100%  |
+| `workflow/file-ownership.ts` | 100%       | 97%      | 100%      | 100%  |
+| `workflow/node.ts`           | 97%        | 94%      | 92%       | 97%   |
+| `tools/escalate.ts`          | 100%       | 89%      | 100%      | 100%  |
 
 **Zones non-couvertes :** `providers/ollama.ts` et `providers/openai.ts` (0% — implémentations stub, non activées). `anthropic.ts` lignes 57-76 (traduction de blocs `thinking` — feature Anthropic optionnelle).
 
@@ -101,11 +102,11 @@ Les tests d'intégration utilisent un mock du provider LLM pour éviter les appe
 **Token utilisé :** `sk-ant-oat01-...` (Claude Code OAuth, scope `user:inference`)  
 **Méthode :** Token extrait de `~/.claude/.credentials.json`
 
-| Test | Scénario | Résultat | Tokens (in/out) |
-|---|---|---|---|
-| E2E-1 | Completion basique | ✅ `LOOMFLO_OK` reçu | 46 / 10 |
-| E2E-2 | Synthesis avec `maxTokens: 50` | ✅ Réponse cohérente | — |
-| E2E-3 | Tool use (stop_reason: tool_use) | ✅ `tool_use` block retourné | — |
+| Test  | Scénario                         | Résultat                     | Tokens (in/out) |
+| ----- | -------------------------------- | ---------------------------- | --------------- |
+| E2E-1 | Completion basique               | ✅ `LOOMFLO_OK` reçu         | 46 / 10         |
+| E2E-2 | Synthesis avec `maxTokens: 50`   | ✅ Réponse cohérente         | —               |
+| E2E-3 | Tool use (stop_reason: tool_use) | ✅ `tool_use` block retourné | —               |
 
 **Modèle testé :** `claude-sonnet-4-6`
 
@@ -114,9 +115,11 @@ Les tests d'intégration utilisent un mock du provider LLM pour éviter les appe
 ## 8. Implémentation OAuth — Revue Technique
 
 ### Problème initial
+
 La première implémentation (`apiKey: config.oauthToken` + `anthropic-beta: oauth-2025-04-20`) retournait systématiquement `invalid_request_error` ou `OAuth authentication is currently not supported`.
 
 ### Solution reverse-engineerée
+
 Source : `@mariozechner/pi-ai/dist/providers/anthropic.js` (moteur LLM d'OpenClaw).
 
 **3 éléments critiques identifiés :**
@@ -150,22 +153,23 @@ AnthropicProvider
 
 ## 9. Architecture — Points Forts
 
-| Aspect | Évaluation |
-|---|---|
-| Isolation provider (1 seul import SDK) | ✅ Excellent |
-| Abstraction `LLMProvider` interface | ✅ Excellente |
-| Retry exponentiel 429/529 (5 tentatives) | ✅ Production-ready |
+| Aspect                                   | Évaluation           |
+| ---------------------------------------- | -------------------- |
+| Isolation provider (1 seul import SDK)   | ✅ Excellent         |
+| Abstraction `LLMProvider` interface      | ✅ Excellente        |
+| Retry exponentiel 429/529 (5 tentatives) | ✅ Production-ready  |
 | Budget enforcement `BudgetExceededError` | ✅ Implémenté (T170) |
-| Fail-fast 401 API key invalide | ✅ Implémenté (T173) |
-| Structured JSON logging | ✅ Implémenté (T174) |
-| File ownership exclusif par node | ✅ Implémenté |
-| Message bus inter-agents | ✅ Implémenté |
+| Fail-fast 401 API key invalide           | ✅ Implémenté (T173) |
+| Structured JSON logging                  | ✅ Implémenté (T174) |
+| File ownership exclusif par node         | ✅ Implémenté        |
+| Message bus inter-agents                 | ✅ Implémenté        |
 
 ---
 
 ## 10. Findings & Recommandations
 
 ### 🔴 BLOCKER (0)
+
 Aucun bloqueur.
 
 ### 🟡 WARNING (2)
@@ -212,4 +216,5 @@ La découverte clé de cet audit : Anthropic n'expose pas publiquement le protoc
 **Score qualité : 91/100**
 
 ---
-*Rapport généré par bertholt — 31 mars 2026, 22h00 UTC*
+
+_Rapport généré par bertholt — 31 mars 2026, 22h00 UTC_

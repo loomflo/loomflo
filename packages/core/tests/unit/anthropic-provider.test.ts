@@ -499,7 +499,9 @@ describe("AnthropicProvider — dynamic OAuth token", () => {
       return "sk-ant-oat01-mock";
     };
     // Cast needed because ProviderConfig.oauthToken is currently string only
-    const provider = new AnthropicProvider({ oauthToken: tokenGetter } as unknown as ProviderConfig);
+    const provider = new AnthropicProvider({
+      oauthToken: tokenGetter,
+    } as unknown as ProviderConfig);
     mockCreate.mockResolvedValueOnce(makeTextResponse("first"));
     mockCreate.mockResolvedValueOnce(makeTextResponse("second"));
     await provider.complete(makeBaseParams());

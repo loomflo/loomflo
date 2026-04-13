@@ -42,13 +42,7 @@ const projectPath = process.env["LOOMFLO_PROJECT_PATH"] ?? process.cwd();
 const __dirname: string = dirname(fileURLToPath(import.meta.url));
 
 /** Default path to the dashboard static build output. */
-const defaultDashboardPath: string = resolve(
-  __dirname,
-  "..",
-  "..",
-  "dashboard",
-  "dist",
-);
+const defaultDashboardPath: string = resolve(__dirname, "..", "..", "dashboard", "dist");
 
 /** Absolute path to the dashboard static files directory. */
 const dashboardPath: string = process.env["LOOMFLO_DASHBOARD_PATH"] ?? defaultDashboardPath;

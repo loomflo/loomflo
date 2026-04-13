@@ -712,7 +712,13 @@ async function spawnWorker(
       workspacePath: config.workspacePath,
       writeScope: plan.writeScope,
     },
-    [{ role: "user", content: "Begin your work. Follow your instructions and use the available tools to complete your tasks." }],
+    [
+      {
+        role: "user",
+        content:
+          "Begin your work. Follow your instructions and use the available tools to complete your tasks.",
+      },
+    ],
   );
 }
 
@@ -1158,7 +1164,11 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
           // Wait between retries if configured (e.g., "2h" to avoid API overload)
           const retryDelayMs = parseDelay(config.config.retryDelay);
           if (retryDelayMs > 0) {
-            await writeProgress(config, loomiAgentId, `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`);
+            await writeProgress(
+              config,
+              loomiAgentId,
+              `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`,
+            );
             await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
           }
 
@@ -1256,7 +1266,11 @@ export async function runLoomi(config: LoomiConfig): Promise<LoomiResult> {
       // Wait between retries if configured (e.g., "2h" to avoid API overload)
       const retryDelayMs = parseDelay(config.config.retryDelay);
       if (retryDelayMs > 0) {
-        await writeProgress(config, loomiAgentId, `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`);
+        await writeProgress(
+          config,
+          loomiAgentId,
+          `## Waiting ${config.config.retryDelay} before retry ${String(retryCount)}...\n`,
+        );
         await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
       }
 

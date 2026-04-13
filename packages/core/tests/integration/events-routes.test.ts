@@ -23,11 +23,46 @@ const TOKEN = "test-token-events";
 // ============================================================================
 
 const TEST_EVENTS: Event[] = [
-  { ts: "2026-03-24T10:00:00.000Z", type: "node_started",        workflowId: "wf-1", nodeId: "n-1", agentId: null,  details: {} },
-  { ts: "2026-03-24T10:01:00.000Z", type: "node_completed",      workflowId: "wf-1", nodeId: "n-1", agentId: null,  details: {} },
-  { ts: "2026-03-24T10:02:00.000Z", type: "node_started",        workflowId: "wf-1", nodeId: "n-2", agentId: "a-1", details: {} },
-  { ts: "2026-03-24T10:03:00.000Z", type: "workflow_completed",   workflowId: "wf-1", nodeId: null,  agentId: null,  details: {} },
-  { ts: "2026-03-24T10:04:00.000Z", type: "workflow_started",     workflowId: "wf-2", nodeId: null,  agentId: null,  details: {} },
+  {
+    ts: "2026-03-24T10:00:00.000Z",
+    type: "node_started",
+    workflowId: "wf-1",
+    nodeId: "n-1",
+    agentId: null,
+    details: {},
+  },
+  {
+    ts: "2026-03-24T10:01:00.000Z",
+    type: "node_completed",
+    workflowId: "wf-1",
+    nodeId: "n-1",
+    agentId: null,
+    details: {},
+  },
+  {
+    ts: "2026-03-24T10:02:00.000Z",
+    type: "node_started",
+    workflowId: "wf-1",
+    nodeId: "n-2",
+    agentId: "a-1",
+    details: {},
+  },
+  {
+    ts: "2026-03-24T10:03:00.000Z",
+    type: "workflow_completed",
+    workflowId: "wf-1",
+    nodeId: null,
+    agentId: null,
+    details: {},
+  },
+  {
+    ts: "2026-03-24T10:04:00.000Z",
+    type: "workflow_started",
+    workflowId: "wf-2",
+    nodeId: null,
+    agentId: null,
+    details: {},
+  },
 ];
 
 // ============================================================================

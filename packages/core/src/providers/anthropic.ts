@@ -230,7 +230,7 @@ export class AnthropicProvider implements LLMProvider {
         authToken: "placeholder",
         dangerouslyAllowBrowser: true,
         defaultHeaders: {
-          "accept": "application/json",
+          accept: "application/json",
           "anthropic-dangerous-direct-browser-access": "true",
           "anthropic-beta":
             "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14",
@@ -293,13 +293,13 @@ export class AnthropicProvider implements LLMProvider {
 
     // OAuth mode requires the Claude Code identity as the first system block.
     // Without it, Anthropic returns invalid_request_error even with a valid token.
-    const systemParam: Anthropic.Messages.MessageCreateParamsNonStreaming["system"] =
-      this.isOAuthMode
-        ? [
-            { type: "text", text: CLAUDE_CODE_IDENTITY },
-            { type: "text", text: params.system },
-          ]
-        : params.system;
+    const systemParam: Anthropic.Messages.MessageCreateParamsNonStreaming["system"] = this
+      .isOAuthMode
+      ? [
+          { type: "text", text: CLAUDE_CODE_IDENTITY },
+          { type: "text", text: params.system },
+        ]
+      : params.system;
 
     const requestParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
       model,
