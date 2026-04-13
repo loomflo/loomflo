@@ -258,7 +258,7 @@ export class Daemon {
         getUptime: (): number => Math.floor(process.uptime()),
         getWorkflow: () => {
           if (!activeWorkflow) return null;
-          const nodes = activeWorkflow.graph?.nodes ?? {};
+          const nodes = activeWorkflow.graph.nodes;
           return {
             id: activeWorkflow.id,
             status: activeWorkflow.status,
@@ -272,7 +272,10 @@ export class Daemon {
       workflow: {
         getWorkflow: () => activeWorkflow,
         setWorkflow: (wf: Workflow) => { activeWorkflow = wf; },
-        getProvider: () => provider!,
+        getProvider: () => {
+          if (!provider) throw new Error("No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.");
+          return provider;
+        },
         getEventLog: () => ({
           append: async (event: Event) => { await appendEvent(projectPath, event); },
           query: async (filters?: EventQueryFilters) => queryEvents(projectPath, filters),

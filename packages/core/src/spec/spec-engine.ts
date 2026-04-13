@@ -1289,8 +1289,7 @@ export class SpecEngine {
     // Build the node map
     const defaultDelay = this.config.defaultDelay ?? "0";
     const nodes: Record<string, Node> = {};
-    for (let i = 0; i < graphDef.nodes.length; i++) {
-      const def = graphDef.nodes[i]!;
+    for (const [i, def] of graphDef.nodes.entries()) {
       nodes[def.id] = createNodeFromDefinition(def, i > 0 ? defaultDelay : "0");
       this.broadcaster?.emitGraphModified("node_added", def.id, {
         title: def.title,
