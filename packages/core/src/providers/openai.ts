@@ -43,18 +43,15 @@ function toOpenAIMessages(
       const textBlocks = msg.content.filter((b) => b.type === "text");
       const toolUseBlocks = msg.content.filter((b) => b.type === "tool_use");
 
-      const toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = toolUseBlocks.map((b) => {
-        if (b.type !== "tool_use") throw new Error("Expected tool_use block");
-        return {
-          id: b.id,
-          type: "function" as const,
-          function: { name: b.name, arguments: JSON.stringify(b.input) },
-        };
-      });
+      const toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = toolUseBlocks.map((b) => ({
+        id: b.id,
+        type: "function" as const,
+        function: { name: b.name, arguments: JSON.stringify(b.input) },
+      }));
 
       result.push({
         role: "assistant",
-        content: textBlocks.map((b) => (b.type === "text" ? b.text : "")).join("") || null,
+        content: textBlocks.map((b) => b.text).join("") || null,
         ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
       } as OpenAI.Chat.ChatCompletionAssistantMessageParam);
     } else {
@@ -62,7 +59,6 @@ function toOpenAIMessages(
       const textBlocks = msg.content.filter((b) => b.type === "text");
 
       for (const b of toolResultBlocks) {
-        if (b.type !== "tool_result") continue;
         result.push({
           role: "tool",
           tool_call_id: b.toolUseId,
@@ -73,7 +69,7 @@ function toOpenAIMessages(
       if (textBlocks.length > 0) {
         result.push({
           role: "user",
-          content: textBlocks.map((b) => (b.type === "text" ? b.text : "")).join(""),
+          content: textBlocks.map((b) => b.text).join(""),
         });
       }
     }

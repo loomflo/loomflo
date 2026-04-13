@@ -255,9 +255,9 @@ export interface OpenAICompatCredentials {
   providerName: string;
 }
 
-export async function resolveOpenAICompatCredentials(options?: {
+export function resolveOpenAICompatCredentials(options?: {
   env?: Record<string, string | undefined>;
-}): Promise<OpenAICompatCredentials> {
+}): OpenAICompatCredentials {
   const env = options?.env ?? process.env;
 
   const moonshotKey = env["MOONSHOT_API_KEY"];

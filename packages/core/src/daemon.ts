@@ -186,14 +186,14 @@ export class Daemon {
 
     // Resolve credentials and build provider — optional, only needed for agent execution
     const config = await loadConfig({ projectPath });
-    const providerType = config.provider ?? "anthropic";
+    const providerType = config.provider;
     let provider: LLMProvider | null = null;
     try {
       if (providerType === "anthropic") {
         const credentials = await resolveCredentials();
         provider = new AnthropicProvider(credentials.config);
       } else {
-        const creds = await resolveOpenAICompatCredentials();
+        const creds = resolveOpenAICompatCredentials();
         provider = new OpenAIProvider({
           apiKey: creds.apiKey,
           baseUrl: creds.baseUrl,
