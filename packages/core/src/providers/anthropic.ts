@@ -296,8 +296,8 @@ export class AnthropicProvider implements LLMProvider {
     const systemParam: Anthropic.Messages.MessageCreateParamsNonStreaming["system"] = this
       .isOAuthMode
       ? [
-          { type: "text", text: CLAUDE_CODE_IDENTITY },
-          { type: "text", text: params.system },
+          { type: "text", text: CLAUDE_CODE_IDENTITY, cache_control: { type: "ephemeral" } },
+          { type: "text", text: params.system, cache_control: { type: "ephemeral" } },
         ]
       : params.system;
 
