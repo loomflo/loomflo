@@ -25,6 +25,8 @@ export * from "./config.js";
 // ============================================================================
 
 export * from "./daemon.js";
+export type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
+export { toProjectSummary } from "./daemon-types.js";
 
 // ============================================================================
 // Persistence
