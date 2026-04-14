@@ -26,6 +26,8 @@ import { memoryWriteTool } from "./tools/memory-write.js";
 import { loadConfig } from "./config.js";
 import type { NodeExecutor } from "./workflow/execution-engine.js";
 import type { Event, Workflow } from "./types.js";
+import type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
+import { toProjectSummary } from "./daemon-types.js";
 
 // ============================================================================
 // Interfaces
@@ -122,6 +124,32 @@ export class Daemon {
   private info: DaemonInfo | null = null;
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
+  private readonly projects: Map<string, ProjectRuntime> = new Map();
+
+  /** Register or replace a project runtime. */
+  upsertProject(rt: ProjectRuntime): void {
+    this.projects.set(rt.id, rt);
+  }
+
+  /** Return the runtime for a given id, or null. */
+  getProject(id: string): ProjectRuntime | null {
+    return this.projects.get(id) ?? null;
+  }
+
+  /** List all registered projects as summaries. */
+  listProjects(): ProjectSummary[] {
+    return [...this.projects.values()].map(toProjectSummary);
+  }
+
+  /** Remove a project by id. Returns true if removed, false if absent. */
+  removeProject(id: string): boolean {
+    return this.projects.delete(id);
+  }
+
+  /** Internal: return the full map (for per-project shutdown iteration). */
+  protected getAllRuntimes(): ProjectRuntime[] {
+    return [...this.projects.values()];
+  }
 
   /**
    * Create a new Daemon instance.
