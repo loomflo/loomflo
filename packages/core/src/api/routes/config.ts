@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { Config } from "../../config.js";
 import { ConfigSchema } from "../../config.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -9,9 +10,9 @@ import { ConfigSchema } from "../../config.js";
 /** Options accepted by the {@link configRoutes} factory. */
 export interface ConfigRoutesOptions {
   /** Return the current merged configuration. */
-  getConfig: () => Config;
+  getConfig?: () => Config;
   /** Apply a partial config update and return the new merged configuration. */
-  updateConfig: (partial: Partial<Config>) => Config;
+  updateConfig?: (partial: Partial<Config>) => Config;
 }
 
 /** Shape of the GET /config JSON response. */
@@ -40,16 +41,16 @@ export interface ConfigUpdateResponse {
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
-  const { getConfig, updateConfig } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /config
      *
      * Returns the current merged configuration object.
      */
-    fastify.get("/config", async (_request, reply): Promise<void> => {
-      const response: ConfigResponse = { config: getConfig() };
+    fastify.get("/config", async (request, reply): Promise<void> => {
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+      const config: Config = rt ? rt.config : (options.getConfig?.() ?? ({} as Config));
+      const response: ConfigResponse = { config };
       await reply.code(200).send(response);
     });
 
@@ -72,7 +73,21 @@ export function configRoutes(options: ConfigRoutesOptions): FastifyPluginAsync {
         return;
       }
 
-      const updated = updateConfig(parseResult.data);
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+
+      let updated: Config;
+      if (rt) {
+        rt.config = { ...rt.config, ...parseResult.data };
+        updated = rt.config;
+      } else {
+        const updateConfigFn = options.updateConfig;
+        if (!updateConfigFn) {
+          await reply.code(501).send({ error: "Config update not supported" });
+          return;
+        }
+        updated = updateConfigFn(parseResult.data);
+      }
+
       const response: ConfigUpdateResponse = { config: updated };
       await reply.code(200).send(response);
     });

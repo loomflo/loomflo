@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AgentInfo, Node, ReviewReport, Workflow } from "../../types.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -9,7 +10,7 @@ import type { AgentInfo, Node, ReviewReport, Workflow } from "../../types.js";
 /** Options accepted by the {@link nodesRoutes} factory. */
 export interface NodesRoutesOptions {
   /** Return the current active workflow, or null if none exists. */
-  getWorkflow: () => Workflow | null;
+  getWorkflow?: () => Workflow | null;
 }
 
 /** Summary representation of a node for the list endpoint. */
@@ -136,17 +137,22 @@ function toNodeDetail(node: Node): NodeDetail {
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
-  const { getWorkflow } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
+    /** Resolve the current workflow from req.runtime or option closure. */
+    function getWorkflow(request: FastifyRequest): Workflow | null {
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+      if (rt) return rt.workflow;
+      return options.getWorkflow?.() ?? null;
+    }
+
     /**
      * GET /nodes
      *
      * Returns an array of node summaries for the active workflow.
      * Returns 404 if no workflow is active.
      */
-    fastify.get("/nodes", async (_request, reply): Promise<void> => {
-      const workflow = getWorkflow();
+    fastify.get("/nodes", async (request, reply): Promise<void> => {
+      const workflow = getWorkflow(request);
 
       if (workflow === null) {
         await reply.code(404).send({ error: "No active workflow" });
@@ -165,7 +171,7 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
      * Returns 404 if no workflow is active or the node is not found.
      */
     fastify.get("/nodes/:id", async (request, reply): Promise<void> => {
-      const workflow = getWorkflow();
+      const workflow = getWorkflow(request);
 
       if (workflow === null) {
         await reply.code(404).send({ error: "No active workflow" });
@@ -198,7 +204,7 @@ export function nodesRoutes(options: NodesRoutesOptions): FastifyPluginAsync {
      * Returns 404 if no workflow is active, the node is not found, or no review report exists.
      */
     fastify.get("/nodes/:id/review", async (request, reply): Promise<void> => {
-      const workflow = getWorkflow();
+      const workflow = getWorkflow(request);
 
       if (workflow === null) {
         await reply.code(404).send({ error: "No active workflow" });

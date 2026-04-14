@@ -2,7 +2,8 @@
  * Integration tests for Daemon HTTP routes.
  *
  * Starts a real Daemon on a random port, exercises /health, authenticated
- * routes, and POST /shutdown, then tears down after each test.
+ * routes (including /projects/:id/* under T11), POST /shutdown, and auth
+ * enforcement, then tears down after each test.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Daemon, type DaemonConfig } from "../../src/daemon.js";
@@ -70,8 +71,8 @@ describe("Daemon routes (integration)", () => {
   // Authenticated route — 401 without token
   // --------------------------------------------------------------------------
 
-  it("GET /workflow without token returns 401 Unauthorized", async () => {
-    const res = await fetch(`http://127.0.0.1:${String(info.port)}/workflow`);
+  it("GET /daemon/status without token returns 401 Unauthorized", async () => {
+    const res = await fetch(`http://127.0.0.1:${String(info.port)}/daemon/status`);
 
     expect(res.status).toBe(401);
 

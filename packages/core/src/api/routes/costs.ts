@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { CostSummary } from "../../costs/tracker.js";
 import type { Workflow } from "../../types.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -9,11 +10,11 @@ import type { Workflow } from "../../types.js";
 /** Options accepted by the {@link costsRoutes} factory. */
 export interface CostsRoutesOptions {
   /** Return the current aggregated cost summary from the tracker. */
-  getCostSummary: () => CostSummary;
+  getCostSummary?: () => CostSummary;
   /** Return the current active workflow, or null if none exists. */
-  getWorkflow: () => Workflow | null;
+  getWorkflow?: () => Workflow | null;
   /** Return the cost in USD attributed to the Loom architect agent. */
-  getLoomCost: () => number;
+  getLoomCost?: () => number;
 }
 
 /** Per-node cost entry in the GET /costs response. */
@@ -55,8 +56,6 @@ interface CostsResponse {
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
-  const { getCostSummary, getWorkflow, getLoomCost } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /costs
@@ -65,15 +64,21 @@ export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
      * including per-node costs, total cost, budget info, and Loom overhead.
      * Returns 404 if no workflow is active.
      */
-    fastify.get("/costs", async (_request, reply): Promise<void> => {
-      const workflow = getWorkflow();
+    fastify.get("/costs", async (request, reply): Promise<void> => {
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+
+      const workflow: Workflow | null = rt ? rt.workflow : (options.getWorkflow?.() ?? null);
 
       if (workflow === null) {
         await reply.code(404).send({ error: "No active workflow" });
         return;
       }
 
-      const summary: CostSummary = getCostSummary();
+      const summary: CostSummary = rt
+        ? rt.costTracker.getSummary()
+        : (options.getCostSummary?.() ?? { totalCost: 0, perNode: {}, perAgent: {}, budgetLimit: null, budgetRemaining: null, entries: [] });
+
+      const loomCost: number = rt ? 0 : (options.getLoomCost?.() ?? 0);
 
       const nodes: CostNodeEntry[] = Object.values(workflow.graph.nodes).map((node) => ({
         id: node.id,
@@ -87,7 +92,7 @@ export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
         budgetLimit: summary.budgetLimit,
         budgetRemaining: summary.budgetRemaining,
         nodes,
-        loomCost: getLoomCost(),
+        loomCost,
       };
 
       await reply.code(200).send(response);

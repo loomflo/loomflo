@@ -5,8 +5,7 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { createServer } from "./api/server.js";
 import { runLoomi } from "./agents/loomi.js";
-import { appendEvent, createEvent, queryEvents } from "./persistence/events.js";
-import type { EventQueryFilters } from "./persistence/events.js";
+import { appendEvent, createEvent } from "./persistence/events.js";
 import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
 import { CostTracker } from "./costs/tracker.js";
 import { SharedMemoryManager } from "./memory/shared-memory.js";
@@ -14,7 +13,7 @@ import { MessageBus } from "./agents/message-bus.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import type { LLMProvider } from "./providers/base.js";
-import { resolveCredentials, resolveOpenAICompatCredentials } from "./providers/credentials.js";
+import { resolveCredentials } from "./providers/credentials.js";
 import { ProviderProfiles, type ProviderProfile } from "./providers/profiles.js";
 import { readFileTool } from "./tools/file-read.js";
 import { writeFileTool } from "./tools/file-write.js";
@@ -26,7 +25,7 @@ import { memoryReadTool } from "./tools/memory-read.js";
 import { memoryWriteTool } from "./tools/memory-write.js";
 import { loadConfig } from "./config.js";
 import type { NodeExecutor } from "./workflow/execution-engine.js";
-import type { Event, Workflow } from "./types.js";
+import type { Workflow } from "./types.js";
 import type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
 import { toProjectSummary } from "./daemon-types.js";
 
@@ -210,29 +209,6 @@ export class Daemon {
     const token = randomBytes(TOKEN_BYTES).toString("hex");
     const projectPath = this.projectPath ?? process.cwd();
 
-    // Resolve credentials and build provider — optional, only needed for agent execution
-    const config = await loadConfig({ projectPath });
-    const providerType = config.provider;
-    let provider: LLMProvider | null = null;
-    try {
-      if (providerType === "anthropic") {
-        const credentials = await resolveCredentials();
-        provider = new AnthropicProvider(credentials.config);
-      } else {
-        const creds = resolveOpenAICompatCredentials();
-        provider = new OpenAIProvider({
-          apiKey: creds.apiKey,
-          baseUrl: creds.baseUrl,
-          defaultModel: creds.defaultModel,
-        });
-        console.log(
-          `LoomFlo: using OpenAI-compat provider '${creds.providerName}' (${creds.defaultModel ?? "default model"})`,
-        );
-      }
-    } catch {
-      // No credentials found — spec-only mode (no agent execution)
-    }
-
     const workerTools = [
       readFileTool,
       writeFileTool,
@@ -244,14 +220,17 @@ export class Daemon {
       memoryWriteTool,
     ];
 
-    /** Build a NodeExecutor for a given workflow — called once per /workflow/start. */
+    /**
+     * Build a NodeExecutor for a given project runtime and workflow.
+     * Used by workflowRoutes inside /projects/:id/* (T11).
+     */
     const createNodeExecutor =
-      (workflow: Workflow): NodeExecutor =>
+      (rt: ProjectRuntime, workflow: Workflow): NodeExecutor =>
       async (node) => {
-        const config = await loadConfig({ projectPath: workflow.projectPath });
+        const nodeConfig = await loadConfig({ projectPath: workflow.projectPath });
         const messageBus = new MessageBus();
 
-        if (!provider)
+        if (!rt.provider)
           throw new Error(
             "No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.",
           );
@@ -261,13 +240,13 @@ export class Daemon {
           nodeTitle: node.title,
           instructions: (node as unknown as { instructions?: string }).instructions ?? "",
           workspacePath: workflow.projectPath,
-          provider,
-          model: config.models.loomi,
-          config,
+          provider: rt.provider,
+          model: nodeConfig.models.loomi,
+          config: nodeConfig,
           messageBus,
           eventLog: { workflowId: workflow.id },
-          costTracker: new CostTracker(),
-          sharedMemory: new SharedMemoryManager(workflow.projectPath),
+          costTracker: rt.costTracker,
+          sharedMemory: rt.sharedMemory,
           escalationHandler: {
             escalate: async () => {
               /* no-op in daemon — agents self-manage */
@@ -287,19 +266,6 @@ export class Daemon {
         };
       };
 
-    // In-memory workflow state — shared between health route and workflow routes
-    // Load persisted state from disk on startup if it exists
-    let activeWorkflow: Workflow | null = null;
-    try {
-      const { loadWorkflowState } = await import("./persistence/state.js");
-      const persisted = await loadWorkflowState(projectPath);
-      if (persisted !== null) {
-        activeWorkflow = persisted;
-      }
-    } catch {
-      /* No persisted workflow — start fresh */
-    }
-
     const { server, broadcast } = await createServer({
       token,
       projectPath,
@@ -309,44 +275,11 @@ export class Daemon {
       daemonPort: this.port,
       health: {
         getUptime: (): number => Math.floor(process.uptime()),
-        getWorkflow: () => {
-          if (!activeWorkflow) return null;
-          const nodes = activeWorkflow.graph.nodes;
-          return {
-            id: activeWorkflow.id,
-            status: activeWorkflow.status,
-            nodeCount: Object.keys(nodes).length,
-            activeNodes: Object.entries(nodes)
-              .filter(([, n]) => n.status === "running")
-              .map(([id]) => id),
-          };
-        },
+        getWorkflow: (): null => null,
       },
-      workflow: {
-        getWorkflow: () => activeWorkflow,
-        setWorkflow: (wf: Workflow) => {
-          activeWorkflow = wf;
-        },
-        getProvider: () => {
-          if (!provider)
-            throw new Error(
-              "No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.",
-            );
-          return provider;
-        },
-        getEventLog: () => ({
-          append: async (event: Event) => {
-            await appendEvent(projectPath, event);
-          },
-          query: async (filters?: EventQueryFilters) => queryEvents(projectPath, filters),
-        }),
-        getSharedMemory: () => new SharedMemoryManager(projectPath),
-        getCostTracker: () => new CostTracker(),
-        createNodeExecutor,
-      },
-      events: {
-        getProjectPath: () => projectPath,
-      },
+      createNodeExecutor,
+      registerProject: (input) => this.registerProject(input),
+      deregisterProject: (id) => this.deregisterProject(id),
       onShutdown: (): void => {
         void this.gracefulShutdown();
       },

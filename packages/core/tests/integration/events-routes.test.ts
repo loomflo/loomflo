@@ -1,15 +1,17 @@
 /**
- * Integration tests for GET /events route.
+ * Integration tests for GET /projects/:id/events route.
  *
- * Starts a Fastify server via createServer(), pre-populates an events.jsonl
- * file in a temp directory, and exercises filtering, pagination, and auth.
+ * Starts a Daemon via startForTest(), registers a project, pre-populates an
+ * events.jsonl file in a temp directory, and exercises filtering, pagination,
+ * and auth under the /projects/:id/* URL scheme (T11).
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import type { FastifyInstance } from "fastify";
-import { createServer } from "../../src/api/server.js";
+import { Daemon } from "../../src/daemon.js";
+import { ProviderProfiles } from "../../src/providers/profiles.js";
 import type { Event } from "../../src/types.js";
 
 // ============================================================================
@@ -17,6 +19,9 @@ import type { Event } from "../../src/types.js";
 // ============================================================================
 
 const TOKEN = "test-token-events";
+const AUTH = { authorization: `Bearer ${TOKEN}` };
+const PROJECT_ID = "proj_events01";
+const CREDS_PATH = join(homedir(), ".loomflo", "credentials.json");
 
 // ============================================================================
 // Test Events
@@ -70,9 +75,24 @@ const TEST_EVENTS: Event[] = [
 // ============================================================================
 
 let tmpDir: string;
+let daemon: Daemon;
 let server: FastifyInstance;
+let credentialsBackup: string | null = null;
+
+const BASE_URL = `/projects/${PROJECT_ID}`;
 
 beforeEach(async () => {
+  // Back up any existing credentials.json
+  try {
+    credentialsBackup = await readFile(CREDS_PATH, "utf-8");
+  } catch {
+    credentialsBackup = null;
+  }
+
+  // Seed a 'default' profile so registerProject can build a provider
+  const profiles = new ProviderProfiles(CREDS_PATH);
+  await profiles.upsert("default", { type: "anthropic", apiKey: "sk-test-xxx" });
+
   tmpDir = await mkdtemp(join(tmpdir(), "loomflo-events-routes-"));
 
   // Pre-populate .loomflo/events.jsonl
@@ -81,30 +101,42 @@ beforeEach(async () => {
   const lines = TEST_EVENTS.map((e) => JSON.stringify(e)).join("\n") + "\n";
   await writeFile(join(loomfloDir, "events.jsonl"), lines, "utf-8");
 
-  const result = await createServer({
-    token: TOKEN,
+  daemon = new Daemon({ port: 0, host: "127.0.0.1" });
+  await (daemon as unknown as { startForTest: (t: string) => Promise<void> }).startForTest(TOKEN);
+
+  await daemon.registerProject({
+    id: PROJECT_ID,
+    name: "events-test",
     projectPath: tmpDir,
-    dashboardPath: null,
-    events: { getProjectPath: () => tmpDir },
+    providerProfileId: "default",
   });
-  server = result.server;
+
+  server = (daemon as unknown as { server: FastifyInstance }).server;
 });
 
 afterEach(async () => {
-  await server.close();
+  await daemon.stop();
   await rm(tmpDir, { recursive: true, force: true });
+
+  // Restore credentials.json
+  if (credentialsBackup !== null) {
+    await mkdir(join(homedir(), ".loomflo"), { recursive: true });
+    await writeFile(CREDS_PATH, credentialsBackup, { mode: 0o600 });
+  } else {
+    await rm(CREDS_PATH, { force: true });
+  }
 });
 
 // ============================================================================
 // Tests
 // ============================================================================
 
-describe("GET /events (integration)", () => {
+describe("GET /projects/:id/events (integration)", () => {
   it("returns all events with proper auth", async () => {
     const res = await server.inject({
       method: "GET",
-      url: "/events",
-      headers: { authorization: `Bearer ${TOKEN}` },
+      url: `${BASE_URL}/events`,
+      headers: AUTH,
     });
 
     expect(res.statusCode).toBe(200);
@@ -118,8 +150,8 @@ describe("GET /events (integration)", () => {
   it("filters by type via ?type=node_started", async () => {
     const res = await server.inject({
       method: "GET",
-      url: "/events?type=node_started",
-      headers: { authorization: `Bearer ${TOKEN}` },
+      url: `${BASE_URL}/events?type=node_started`,
+      headers: AUTH,
     });
 
     expect(res.statusCode).toBe(200);
@@ -133,8 +165,8 @@ describe("GET /events (integration)", () => {
   it("paginates via ?limit=2", async () => {
     const res = await server.inject({
       method: "GET",
-      url: "/events?limit=2",
-      headers: { authorization: `Bearer ${TOKEN}` },
+      url: `${BASE_URL}/events?limit=2`,
+      headers: AUTH,
     });
 
     expect(res.statusCode).toBe(200);
@@ -147,12 +179,25 @@ describe("GET /events (integration)", () => {
   it("returns 401 without auth", async () => {
     const res = await server.inject({
       method: "GET",
-      url: "/events",
+      url: `${BASE_URL}/events`,
     });
 
     expect(res.statusCode).toBe(401);
 
     const body = res.json() as { error: string };
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 404 for unknown project id", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/projects/proj_unknown/events",
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(404);
+
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("project_not_registered");
   });
 });
