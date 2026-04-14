@@ -50,26 +50,15 @@ export interface DaemonConfig {
  *
  * The daemon does not own workflow state directly — the caller provides
  * these hooks so the daemon can coordinate an orderly shutdown with
- * the execution engine.
+ * the execution engine for each registered project.
  */
 export interface ShutdownHooks {
-  /** Stop dispatching new agent LLM calls. Called first during shutdown. */
-  stopDispatching: () => void;
-  /**
-   * Wait for all currently in-flight LLM calls to complete.
-   * Resolves when no more active calls remain.
-   */
-  waitForActiveCalls: () => Promise<void>;
-  /**
-   * Return the current in-memory workflow state for persistence,
-   * or `null` if no active workflow exists.
-   */
-  getWorkflow: () => Workflow | null;
-  /**
-   * Mark any currently running nodes as interrupted in the workflow.
-   * Returns the IDs of nodes that were marked.
-   */
-  markNodesInterrupted: () => string[];
+  /** Stop dispatching new LLM calls for a given project. */
+  stopDispatching: (projectId: string) => void;
+  /** Wait for in-flight LLM calls to drain for a given project. */
+  waitForActiveCalls: (projectId: string) => Promise<void>;
+  /** Mark running nodes as interrupted for a project; return their IDs. */
+  markNodesInterrupted: (projectId: string) => string[];
 }
 
 /** Runtime information about a running daemon instance. */
@@ -418,66 +407,61 @@ export class Daemon {
    *   Defaults to 30 seconds.
    */
   async gracefulShutdown(timeoutMs: number = GRACEFUL_SHUTDOWN_TIMEOUT_MS): Promise<void> {
-    if (this.shuttingDown) {
-      return;
-    }
+    if (this.shuttingDown) return;
     this.shuttingDown = true;
 
-    if (!this.shutdownHooks) {
+    const runtimes = this.getAllRuntimes();
+
+    if (this.shutdownHooks === null && runtimes.length === 0) {
       await this.stop();
       return;
     }
 
-    const { stopDispatching, waitForActiveCalls, getWorkflow, markNodesInterrupted } =
-      this.shutdownHooks;
+    // Shut down all projects in parallel.
+    await Promise.all(runtimes.map((rt) => this.shutdownOneProject(rt, timeoutMs)));
 
-    // Step 1: Stop dispatching new agent calls.
-    stopDispatching();
-
-    // Step 2: Wait for active calls with timeout.
-    try {
-      await Promise.race([
-        waitForActiveCalls(),
-        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-      ]);
-    } catch {
-      // Timeout or error — proceed with shutdown regardless.
-    }
-
-    // Step 3: Mark running nodes as interrupted.
-    const interruptedNodeIds = markNodesInterrupted();
-
-    // Step 4 & 5: Persist final state if there's an active workflow.
-    const workflow = getWorkflow();
-    if (workflow !== null && this.projectPath) {
-      // Log interruption events for each interrupted node.
-      for (const nodeId of interruptedNodeIds) {
-        const event = createEvent({
-          type: "node_failed",
-          workflowId: workflow.id,
-          nodeId,
-          details: { reason: "daemon_shutdown", interrupted: true },
-        });
-        await appendEvent(this.projectPath, event);
-      }
-
-      // Save workflow state immediately (bypass debounce).
-      await saveWorkflowStateImmediate(this.projectPath, workflow);
-    }
-
-    // Step 6: Flush any remaining pending writes.
     await flushPendingWrites();
-
-    // Step 7: Close the server.
     if (this.server) {
       await this.server.close();
       this.server = null;
     }
-
-    // Step 8: Remove daemon.json.
     await removeDaemonFile();
     this.info = null;
     this.shuttingDown = false;
+  }
+
+  private async shutdownOneProject(
+    rt: ProjectRuntime,
+    timeoutMs: number,
+  ): Promise<void> {
+    const hooks = this.shutdownHooks;
+    if (!hooks) return;
+
+    hooks.stopDispatching(rt.id);
+
+    try {
+      await Promise.race([
+        hooks.waitForActiveCalls(rt.id),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+      ]);
+    } catch {
+      /* proceed regardless */
+    }
+
+    const interruptedNodeIds = hooks.markNodesInterrupted(rt.id);
+
+    if (rt.workflow !== null) {
+      for (const nodeId of interruptedNodeIds) {
+        const event = createEvent({
+          type: "node_failed",
+          workflowId: rt.workflow.id,
+          nodeId,
+          details: { reason: "daemon_shutdown", interrupted: true },
+        });
+        await appendEvent(rt.projectPath, event);
+      }
+      await saveWorkflowStateImmediate(rt.projectPath, rt.workflow);
+    }
   }
 
   /**
