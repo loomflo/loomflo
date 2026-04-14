@@ -267,7 +267,7 @@ describe("health()", () => {
     const payload: HealthResponse = {
       status: "ok",
       uptime: 60,
-      version: "0.1.0",
+      version: "0.2.0",
       workflow: { id: "wf-1", status: "running", nodeCount: 3, activeNodes: ["n1"] },
     };
     mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));

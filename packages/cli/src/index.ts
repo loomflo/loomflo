@@ -26,7 +26,7 @@ function createProgram(): Command {
   const program = new Command()
     .name("loomflo")
     .description("AI Agent Orchestration Framework")
-    .version("0.1.0");
+    .version("0.2.0");
 
   // Implemented commands
   program.addCommand(createInitCommand());
