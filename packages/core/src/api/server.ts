@@ -134,6 +134,14 @@ export interface ServerResult {
   server: FastifyInstance;
   /** Broadcast a JSON event to all connected WebSocket clients. */
   broadcast: (event: Record<string, unknown>) => void;
+  /**
+   * Broadcast a JSON event to WebSocket clients subscribed to the given project.
+   *
+   * The envelope sent to each matching client is `{ projectId, ...event }`.
+   * A client receives the event if it subscribed with `{ all: true }` or if it
+   * explicitly listed `projectId` in its `{ projectIds: [...] }` subscription.
+   */
+  broadcastForProject: (projectId: string, event: Record<string, unknown>) => void;
   /** Signal that is aborted when the server closes. */
   signal: AbortSignal;
 }
@@ -222,6 +230,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       client.close();
     }
     clients.clear();
+    subscriptions.clear();
   });
 
   // ---------------------------------------------------------------------------
@@ -379,7 +388,21 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // WebSocket endpoint with query-param token auth
   // ---------------------------------------------------------------------------
 
+  /**
+   * Per-connection subscription state.
+   *
+   * - `all`: when true, the client receives events for every project.
+   * - `projectIds`: the set of project IDs the client has explicitly subscribed to.
+   */
+  interface ClientSubscription {
+    all: boolean;
+    projectIds: Set<string>;
+  }
+
   const clients = new Set<SocketClient>();
+
+  /** Map from connected socket to its subscription state. */
+  const subscriptions = new Map<SocketClient, ClientSubscription>();
 
   server.get("/ws", { websocket: true }, (socket: SocketClient, _request: FastifyRequest): void => {
     const url = new URL(_request.url, `http://${_request.headers.host ?? "localhost"}`);
@@ -391,11 +414,43 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
     }
 
     clients.add(socket);
+    subscriptions.set(socket, { all: false, projectIds: new Set() });
 
     socket.send(JSON.stringify({ type: "connected", version: VERSION }));
 
+    socket.on("message", (...args: unknown[]): void => {
+      const raw = args[0] as Buffer | string;
+      let msg: unknown;
+      try {
+        msg = JSON.parse(typeof raw === "string" ? raw : raw.toString());
+      } catch {
+        return;
+      }
+      if (
+        typeof msg !== "object" ||
+        msg === null ||
+        (msg as Record<string, unknown>)["type"] !== "subscribe"
+      ) {
+        return;
+      }
+      const sub = subscriptions.get(socket);
+      if (!sub) return;
+      const payload = msg as Record<string, unknown>;
+      if (payload["all"] === true) {
+        sub.all = true;
+      }
+      if (Array.isArray(payload["projectIds"])) {
+        for (const id of payload["projectIds"] as unknown[]) {
+          if (typeof id === "string") {
+            sub.projectIds.add(id);
+          }
+        }
+      }
+    });
+
     socket.on("close", (): void => {
       clients.delete(socket);
+      subscriptions.delete(socket);
     });
   });
 
@@ -465,5 +520,24 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
     }
   };
 
-  return { server, broadcast, signal: abortController.signal };
+  /**
+   * Send a project-scoped event to WebSocket clients that are subscribed
+   * to the given project (or have subscribed with `{ all: true }`).
+   *
+   * The message sent to each eligible client is `{ projectId, ...event }`.
+   *
+   * @param projectId - The project whose subscribers should receive the event.
+   * @param event - The event payload to forward.
+   */
+  const broadcastForProject = (projectId: string, event: Record<string, unknown>): void => {
+    const envelope = JSON.stringify({ projectId, ...event });
+    for (const [client, sub] of subscriptions) {
+      if (client.readyState !== WS_OPEN) continue;
+      if (sub.all || sub.projectIds.has(projectId)) {
+        client.send(envelope);
+      }
+    }
+  };
+
+  return { server, broadcast, broadcastForProject, signal: abortController.signal };
 }

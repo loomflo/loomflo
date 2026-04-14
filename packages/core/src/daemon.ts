@@ -115,6 +115,10 @@ export class Daemon {
   private readonly dashboardPath: string | undefined;
   private server: FastifyInstance | null = null;
   private broadcast: ((event: Record<string, unknown>) => void) | null = null;
+  /** Broadcast a project-scoped event to subscribed WebSocket clients. */
+  broadcastForProject: (projectId: string, event: Record<string, unknown>) => void = (): void => {
+    /* no-op until server is started */
+  };
   private info: DaemonInfo | null = null;
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
@@ -266,7 +270,7 @@ export class Daemon {
         };
       };
 
-    const { server, broadcast } = await createServer({
+    const { server, broadcast, broadcastForProject } = await createServer({
       token,
       projectPath,
       dashboardPath: this.dashboardPath ?? null,
@@ -287,6 +291,7 @@ export class Daemon {
 
     this.server = server;
     this.broadcast = broadcast;
+    this.broadcastForProject = broadcastForProject;
 
     try {
       await this.server.listen({ port: this.port, host: this.host });
@@ -502,7 +507,7 @@ export class Daemon {
    */
   async startForTest(token: string): Promise<void> {
     const { createServer } = await import("./api/server.js");
-    const { server } = await createServer({
+    const { server, broadcastForProject } = await createServer({
       token,
       projectPath: process.cwd(),
       dashboardPath: null,
@@ -513,6 +518,7 @@ export class Daemon {
       deregisterProject: (id: string) => this.deregisterProject(id),
     });
     this.server = server;
+    this.broadcastForProject = broadcastForProject;
     await this.server.listen({ port: 0, host: "127.0.0.1" });
   }
 }
