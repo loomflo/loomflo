@@ -11,6 +11,8 @@ import { workflowRoutes, type WorkflowRoutesOptions } from "./routes/workflow.js
 import { chatRoutes, type ChatRoutesOptions } from "./routes/chat.js";
 import { configRoutes, type ConfigRoutesOptions } from "./routes/config.js";
 import { costsRoutes, type CostsRoutesOptions } from "./routes/costs.js";
+import { daemonRoutes } from "./routes/daemon.js";
+import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 
 // ============================================================================
 // Constants
@@ -107,6 +109,12 @@ export interface ServerOptions {
    * shutdown in the background. When omitted, `POST /shutdown` returns 404.
    */
   onShutdown?: () => void | Promise<void>;
+  /** Return all registered projects as summaries (for /daemon/status). When omitted, returns []. */
+  listProjects?: () => ProjectSummary[];
+  /** Return a project runtime by id (reserved for future per-project routes). When omitted, returns null. */
+  getRuntime?: (projectId: string) => ProjectRuntime | null;
+  /** TCP port the daemon is listening on (for /daemon/status). When omitted, 0. */
+  daemonPort?: number;
 }
 
 /** Return value of {@link createServer}. */
@@ -249,6 +257,13 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // ---------------------------------------------------------------------------
   // Routes
   // ---------------------------------------------------------------------------
+
+  const startedAtMs = Date.now();
+  await server.register(daemonRoutes, {
+    listProjects: options.listProjects ?? ((): ProjectSummary[] => []),
+    daemonPort: options.daemonPort ?? 0,
+    startedAtMs,
+  });
 
   await server.register(
     healthRoutes(

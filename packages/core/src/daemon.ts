@@ -71,11 +71,16 @@ export interface DaemonInfo {
   token: string;
   /** Process ID of the daemon. */
   pid: number;
+  /** Daemon version string. */
+  version: string;
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
+
+/** Current daemon version — written to daemon.json so clients can verify compatibility. */
+const DAEMON_VERSION = "0.2.0";
 
 /** Directory name for global Loomflo config/state. */
 const LOOMFLO_HOME_DIR = ".loomflo";
@@ -295,6 +300,9 @@ export class Daemon {
       token,
       projectPath,
       dashboardPath: this.dashboardPath ?? null,
+      listProjects: () => this.listProjects(),
+      getRuntime: (id) => this.getProject(id),
+      daemonPort: this.port,
       health: {
         getUptime: (): number => Math.floor(process.uptime()),
         getWorkflow: () => {
@@ -360,6 +368,7 @@ export class Daemon {
       host: this.host,
       token,
       pid: process.pid,
+      version: DAEMON_VERSION,
     };
 
     await writeDaemonFile(this.info);

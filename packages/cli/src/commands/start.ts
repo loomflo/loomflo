@@ -35,6 +35,7 @@ interface DaemonInfo {
   port: number;
   token: string;
   pid: number;
+  version?: string;
 }
 
 // ============================================================================
