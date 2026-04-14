@@ -73,9 +73,9 @@ function isIdentity(value: unknown): value is ProjectIdentity {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.id === "string" &&
-    typeof v.name === "string" &&
-    typeof v.providerProfileId === "string" &&
-    typeof v.createdAt === "string"
+    typeof v["id"] === "string" &&
+    typeof v["name"] === "string" &&
+    typeof v["providerProfileId"] === "string" &&
+    typeof v["createdAt"] === "string"
   );
 }
