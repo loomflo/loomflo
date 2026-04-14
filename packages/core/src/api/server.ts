@@ -14,6 +14,7 @@ import { costsRoutes } from "./routes/costs.js";
 import { specsRoutes } from "./routes/specs.js";
 import { daemonRoutes } from "./routes/daemon.js";
 import { projectsCrudRoutes } from "./routes/projects-crud.js";
+import { legacyGoneRoutes } from "./routes/legacy-gone.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 
 // ============================================================================
@@ -319,6 +320,18 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       registerProject: options.registerProject,
       deregisterProject: options.deregisterProject,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Legacy v0.1.0 routes — return 410 Gone with a newRoute hint (T12)
+  //
+  // Only registered when the caller does NOT pass `options.workflow`. When
+  // `options.workflow` is provided (backward-compat mode), the root-level
+  // workflow routes are already registered below and must not be duplicated.
+  // ---------------------------------------------------------------------------
+
+  if (!options.workflow) {
+    await server.register(legacyGoneRoutes);
   }
 
   // ---------------------------------------------------------------------------
