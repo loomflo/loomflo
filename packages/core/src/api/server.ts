@@ -12,6 +12,7 @@ import { chatRoutes, type ChatRoutesOptions } from "./routes/chat.js";
 import { configRoutes, type ConfigRoutesOptions } from "./routes/config.js";
 import { costsRoutes, type CostsRoutesOptions } from "./routes/costs.js";
 import { daemonRoutes } from "./routes/daemon.js";
+import { projectsCrudRoutes } from "./routes/projects-crud.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 
 // ============================================================================
@@ -115,6 +116,16 @@ export interface ServerOptions {
   getRuntime?: (projectId: string) => ProjectRuntime | null;
   /** TCP port the daemon is listening on (for /daemon/status). When omitted, 0. */
   daemonPort?: number;
+  /** Build and register a ProjectRuntime. When omitted, /projects CRUD routes are not registered. */
+  registerProject?: (input: {
+    id: string;
+    name: string;
+    projectPath: string;
+    providerProfileId: string;
+    configOverrides?: Record<string, unknown>;
+  }) => Promise<ProjectRuntime>;
+  /** Remove a project from the registry by id. When omitted, /projects CRUD routes are not registered. */
+  deregisterProject?: (id: string) => Promise<boolean>;
 }
 
 /** Return value of {@link createServer}. */
@@ -273,6 +284,15 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       },
     ),
   );
+
+  if (options.registerProject && options.deregisterProject) {
+    await server.register(projectsCrudRoutes, {
+      listProjects: options.listProjects ?? ((): ProjectSummary[] => []),
+      getProject: options.getRuntime ?? ((): null => null),
+      registerProject: options.registerProject,
+      deregisterProject: options.deregisterProject,
+    });
+  }
 
   if (options.workflow) {
     await server.register(workflowRoutes({ ...options.workflow, signal: abortController.signal }));

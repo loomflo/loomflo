@@ -15,6 +15,7 @@ import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import type { LLMProvider } from "./providers/base.js";
 import { resolveCredentials, resolveOpenAICompatCredentials } from "./providers/credentials.js";
+import { ProviderProfiles, type ProviderProfile } from "./providers/profiles.js";
 import { readFileTool } from "./tools/file-read.js";
 import { writeFileTool } from "./tools/file-write.js";
 import { editFileTool } from "./tools/file-edit.js";
@@ -119,6 +120,9 @@ export class Daemon {
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
   private readonly projects: Map<string, ProjectRuntime> = new Map();
+  private readonly profiles = new ProviderProfiles(
+    join(homedir(), ".loomflo", "credentials.json"),
+  );
 
   /** Register or replace a project runtime. */
   upsertProject(rt: ProjectRuntime): void {
@@ -506,6 +510,78 @@ export class Daemon {
       })
     );
   }
+
+  /**
+   * Build and register a ProjectRuntime from a provider profile.
+   *
+   * @param input - Project registration parameters.
+   * @returns The newly created ProjectRuntime.
+   * @throws If the provider profile is not found.
+   */
+  async registerProject(input: {
+    id: string;
+    name: string;
+    projectPath: string;
+    providerProfileId: string;
+  }): Promise<ProjectRuntime> {
+    const profile = await this.profiles.get(input.providerProfileId);
+    if (!profile) throw new Error(`provider_missing_credentials: ${input.providerProfileId}`);
+
+    const provider = await buildProviderFromProfile(profile);
+    const config = await loadConfig({ projectPath: input.projectPath });
+
+    const rt: ProjectRuntime = {
+      id: input.id,
+      name: input.name,
+      projectPath: input.projectPath,
+      providerProfileId: input.providerProfileId,
+      workflow: null,
+      provider,
+      config,
+      costTracker: new CostTracker(),
+      messageBus: new MessageBus(),
+      sharedMemory: new SharedMemoryManager(input.projectPath),
+      startedAt: new Date().toISOString(),
+      status: "idle",
+    };
+    this.upsertProject(rt);
+    return rt;
+  }
+
+  /**
+   * Remove a project from the registry by id.
+   *
+   * @param id - The project id to deregister.
+   * @returns True if the project was found and removed, false if it was not registered.
+   */
+  async deregisterProject(id: string): Promise<boolean> {
+    return this.removeProject(id);
+  }
+
+  /**
+   * Test-only helper: start the server with a given static token (port 0).
+   *
+   * This method is intentionally not part of the public API surface.
+   * It is used exclusively by unit tests to create an in-process server
+   * accessible via `server.inject()`.
+   *
+   * @param token - Static auth token to use instead of a random one.
+   */
+  async startForTest(token: string): Promise<void> {
+    const { createServer } = await import("./api/server.js");
+    const { server } = await createServer({
+      token,
+      projectPath: process.cwd(),
+      dashboardPath: null,
+      listProjects: () => this.listProjects(),
+      getRuntime: (id: string) => this.getProject(id),
+      daemonPort: 0,
+      registerProject: (input) => this.registerProject(input),
+      deregisterProject: (id: string) => this.deregisterProject(id),
+    });
+    this.server = server;
+    await this.server.listen({ port: 0, host: "127.0.0.1" });
+  }
 }
 
 // ============================================================================
@@ -590,4 +666,38 @@ export async function loadDaemonInfo(): Promise<DaemonInfo | null> {
   }
 
   return parsed as DaemonInfo;
+}
+
+// ============================================================================
+// Provider Builder
+// ============================================================================
+
+/**
+ * Build an LLMProvider from a stored ProviderProfile.
+ *
+ * @param profile - The provider profile describing credentials and provider type.
+ * @returns A ready-to-use LLMProvider instance.
+ */
+async function buildProviderFromProfile(profile: ProviderProfile): Promise<LLMProvider> {
+  switch (profile.type) {
+    case "anthropic-oauth": {
+      const creds = await resolveCredentials();
+      return new AnthropicProvider(creds.config);
+    }
+    case "anthropic":
+      return new AnthropicProvider({ apiKey: profile.apiKey });
+    case "openai":
+      return new OpenAIProvider({
+        apiKey: profile.apiKey,
+        baseUrl: profile.baseUrl,
+        defaultModel: profile.defaultModel,
+      });
+    case "moonshot":
+    case "nvidia":
+      return new OpenAIProvider({
+        apiKey: profile.apiKey,
+        baseUrl: profile.baseUrl,
+        defaultModel: profile.defaultModel,
+      });
+  }
 }
