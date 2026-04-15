@@ -22,6 +22,7 @@ const TOKEN = "test-token-events";
 const AUTH = { authorization: `Bearer ${TOKEN}` };
 const PROJECT_ID = "proj_events01";
 const CREDS_PATH = join(homedir(), ".loomflo", "credentials.json");
+const PROJECTS_JSON = join(homedir(), ".loomflo", "projects.json");
 
 // ============================================================================
 // Test Events
@@ -78,6 +79,7 @@ let tmpDir: string;
 let daemon: Daemon;
 let server: FastifyInstance;
 let credentialsBackup: string | null = null;
+let registryBackup: string | null = null;
 
 const BASE_URL = `/projects/${PROJECT_ID}`;
 
@@ -88,6 +90,15 @@ beforeEach(async () => {
   } catch {
     credentialsBackup = null;
   }
+
+  // Back up any existing projects.json and start from an empty registry
+  try {
+    registryBackup = await readFile(PROJECTS_JSON, "utf-8");
+  } catch {
+    registryBackup = null;
+  }
+  await mkdir(join(homedir(), ".loomflo"), { recursive: true });
+  await writeFile(PROJECTS_JSON, "[]");
 
   // Seed a 'default' profile so registerProject can build a provider
   const profiles = new ProviderProfiles(CREDS_PATH);
@@ -124,6 +135,13 @@ afterEach(async () => {
     await writeFile(CREDS_PATH, credentialsBackup, { mode: 0o600 });
   } else {
     await rm(CREDS_PATH, { force: true });
+  }
+
+  // Restore projects.json
+  if (registryBackup !== null) {
+    await writeFile(PROJECTS_JSON, registryBackup);
+  } else {
+    await rm(PROJECTS_JSON, { force: true });
   }
 });
 

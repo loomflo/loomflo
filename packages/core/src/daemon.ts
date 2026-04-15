@@ -7,6 +7,7 @@ import { createServer } from "./api/server.js";
 import { runLoomi } from "./agents/loomi.js";
 import { appendEvent, createEvent } from "./persistence/events.js";
 import { flushPendingWrites, saveWorkflowStateImmediate } from "./persistence/state.js";
+import { ProjectsRegistry } from "./persistence/projects.js";
 import { CostTracker } from "./costs/tracker.js";
 import { SharedMemoryManager } from "./memory/shared-memory.js";
 import { MessageBus } from "./agents/message-bus.js";
@@ -125,6 +126,9 @@ export class Daemon {
   private readonly projects: Map<string, ProjectRuntime> = new Map();
   private readonly profiles = new ProviderProfiles(
     join(homedir(), ".loomflo", "credentials.json"),
+  );
+  private readonly projectsRegistry = new ProjectsRegistry(
+    join(homedir(), ".loomflo", "projects.json"),
   );
 
   /** Register or replace a project runtime. */
@@ -305,6 +309,18 @@ export class Daemon {
       throw error;
     }
 
+    // Reload projects persisted from a previous daemon session.
+    const persisted = await this.projectsRegistry.list();
+    for (const entry of persisted) {
+      try {
+        await this.registerProject(entry);
+      } catch (err) {
+        console.warn(
+          `[loomflo] could not reload ${entry.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+
     this.info = {
       port: this.port,
       host: this.host,
@@ -483,6 +499,12 @@ export class Daemon {
       status: "idle",
     };
     this.upsertProject(rt);
+    await this.projectsRegistry.upsert({
+      id: rt.id,
+      name: rt.name,
+      projectPath: rt.projectPath,
+      providerProfileId: rt.providerProfileId,
+    });
     return rt;
   }
 
@@ -493,7 +515,9 @@ export class Daemon {
    * @returns True if the project was found and removed, false if it was not registered.
    */
   async deregisterProject(id: string): Promise<boolean> {
-    return this.removeProject(id);
+    const removed = this.removeProject(id);
+    if (removed) await this.projectsRegistry.remove(id);
+    return removed;
   }
 
   /**
@@ -520,6 +544,18 @@ export class Daemon {
     this.server = server;
     this.broadcastForProject = broadcastForProject;
     await this.server.listen({ port: 0, host: "127.0.0.1" });
+
+    // Reload projects persisted from a previous daemon session.
+    const persisted = await this.projectsRegistry.list();
+    for (const entry of persisted) {
+      try {
+        await this.registerProject(entry);
+      } catch (err) {
+        console.warn(
+          `[loomflo] could not reload ${entry.id}: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 }
 

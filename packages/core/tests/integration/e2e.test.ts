@@ -32,6 +32,7 @@ const AUTH_TOKEN = "e2e-test-token-9876";
 const AUTH = { authorization: `Bearer ${AUTH_TOKEN}` };
 const PROJECT_ID = "proj_e2e00001";
 const CREDS_PATH = join(homedir(), ".loomflo", "credentials.json");
+const PROJECTS_JSON = join(homedir(), ".loomflo", "projects.json");
 
 // ============================================================================
 // Test Suite
@@ -42,6 +43,7 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
   let daemon: Daemon;
   let server: FastifyInstance;
   let credentialsBackup: string | null = null;
+  let registryBackup: string | null = null;
 
   const BASE_URL = `/projects/${PROJECT_ID}`;
 
@@ -52,6 +54,15 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
     } catch {
       credentialsBackup = null;
     }
+
+    // Back up any existing projects.json and start from an empty registry
+    try {
+      registryBackup = await readFile(PROJECTS_JSON, "utf-8");
+    } catch {
+      registryBackup = null;
+    }
+    await mkdir(join(homedir(), ".loomflo"), { recursive: true });
+    await writeFile(PROJECTS_JSON, "[]");
 
     // Seed a 'default' profile so registerProject can build a provider
     const profiles = new ProviderProfiles(CREDS_PATH);
@@ -92,6 +103,13 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
       await writeFile(CREDS_PATH, credentialsBackup, { mode: 0o600 });
     } else {
       await rm(CREDS_PATH, { force: true });
+    }
+
+    // Restore projects.json
+    if (registryBackup !== null) {
+      await writeFile(PROJECTS_JSON, registryBackup);
+    } else {
+      await rm(PROJECTS_JSON, { force: true });
     }
   });
 
