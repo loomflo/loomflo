@@ -18,7 +18,8 @@
     "clean": "turbo run clean",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "test:e2e": "LOOMFLO_E2E=1 vitest run --config vitest.e2e.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

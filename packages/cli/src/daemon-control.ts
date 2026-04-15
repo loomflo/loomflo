@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { join, resolve } from "node:path";
 import { withFileLock } from "@loomflo/core";
 
@@ -52,6 +53,10 @@ function isProcessAlive(pid: number): boolean {
 export async function ensureDaemonRunning(): Promise<DaemonInfo> {
   const existing = await getRunningDaemon();
   if (existing) return assertCompatible(existing);
+
+  // proper-lockfile requires the target file to exist before locking.
+  await mkdir(dirname(DAEMON_LOCK_PATH), { recursive: true });
+  await writeFile(DAEMON_LOCK_PATH, "", { flag: "a" }); // create if absent
 
   await withFileLock(
     DAEMON_LOCK_PATH,
