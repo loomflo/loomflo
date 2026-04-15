@@ -61,7 +61,9 @@ export async function ensureProjectIdentity(
   if (existing) return existing;
 
   const legacyState = join(dir, ".loomflo", "state.json");
-  const legacy = await stat(legacyState).then(() => true).catch(() => false);
+  const legacy = await stat(legacyState)
+    .then(() => true)
+    .catch(() => false);
   if (legacy) {
     console.warn(`[loomflo] migrating legacy project at ${dir} to multi-project layout`);
   }

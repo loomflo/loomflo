@@ -170,20 +170,20 @@ loomflo daemon stop
 
 ## CLI Commands
 
-| Command                            | Description                                                              |
-| ---------------------------------- | ------------------------------------------------------------------------ |
-| `loomflo start`                    | Start this project's workflow (auto-starts the daemon + registers)       |
-| `loomflo stop`                     | Stop this project's workflow (the daemon keeps running)                  |
-| `loomflo init "description"`       | Generate spec + execution graph from a description                       |
-| `loomflo chat "message"`           | Chat with the Architect agent                                            |
-| `loomflo status`                   | Show workflow state, active nodes, costs                                 |
-| `loomflo resume`                   | Resume an interrupted workflow                                           |
-| `loomflo dashboard`                | Open the web dashboard in your browser                                   |
-| `loomflo logs [node-id]`           | View agent logs (optionally filtered by node)                            |
-| `loomflo config set <key> <value>` | Set a configuration value                                                |
-| `loomflo config get <key>`         | Get a configuration value                                                |
-| `loomflo daemon start\|stop\|status\|restart` | Control the daemon process lifecycle (independent of any project) |
-| `loomflo project list\|remove\|prune`         | Inspect or clean up the daemon's project registry                 |
+| Command                                       | Description                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `loomflo start`                               | Start this project's workflow (auto-starts the daemon + registers) |
+| `loomflo stop`                                | Stop this project's workflow (the daemon keeps running)            |
+| `loomflo init "description"`                  | Generate spec + execution graph from a description                 |
+| `loomflo chat "message"`                      | Chat with the Architect agent                                      |
+| `loomflo status`                              | Show workflow state, active nodes, costs                           |
+| `loomflo resume`                              | Resume an interrupted workflow                                     |
+| `loomflo dashboard`                           | Open the web dashboard in your browser                             |
+| `loomflo logs [node-id]`                      | View agent logs (optionally filtered by node)                      |
+| `loomflo config set <key> <value>`            | Set a configuration value                                          |
+| `loomflo config get <key>`                    | Get a configuration value                                          |
+| `loomflo daemon start\|stop\|status\|restart` | Control the daemon process lifecycle (independent of any project)  |
+| `loomflo project list\|remove\|prune`         | Inspect or clean up the daemon's project registry                  |
 
 ## Dashboard
 

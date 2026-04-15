@@ -158,9 +158,7 @@ describe("resume command — request error", () => {
 
     await expect(runResume()).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: POST /workflow/resume -> HTTP 409",
-    );
+    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /workflow/resume -> HTTP 409");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 });

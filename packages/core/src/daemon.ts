@@ -124,9 +124,7 @@ export class Daemon {
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
   private readonly projects: Map<string, ProjectRuntime> = new Map();
-  private readonly profiles = new ProviderProfiles(
-    join(homedir(), ".loomflo", "credentials.json"),
-  );
+  private readonly profiles = new ProviderProfiles(join(homedir(), ".loomflo", "credentials.json"));
   private readonly projectsRegistry = new ProjectsRegistry(
     join(homedir(), ".loomflo", "projects.json"),
   );
@@ -310,9 +308,7 @@ export class Daemon {
       try {
         await this.registerProject(entry);
       } catch (err) {
-        console.warn(
-          `[loomflo] could not reload ${entry.id}: ${(err as Error).message}`,
-        );
+        console.warn(`[loomflo] could not reload ${entry.id}: ${(err as Error).message}`);
       }
     }
 
@@ -392,10 +388,7 @@ export class Daemon {
     this.shuttingDown = false;
   }
 
-  private async shutdownOneProject(
-    rt: ProjectRuntime,
-    timeoutMs: number,
-  ): Promise<void> {
+  private async shutdownOneProject(rt: ProjectRuntime, timeoutMs: number): Promise<void> {
     const hooks = this.shutdownHooks;
     if (!hooks) return;
 
@@ -546,9 +539,7 @@ export class Daemon {
       try {
         await this.registerProject(entry);
       } catch (err) {
-        console.warn(
-          `[loomflo] could not reload ${entry.id}: ${(err as Error).message}`,
-        );
+        console.warn(`[loomflo] could not reload ${entry.id}: ${(err as Error).message}`);
       }
     }
   }

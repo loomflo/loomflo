@@ -64,9 +64,9 @@ describe("withFileLock", () => {
       },
       { timeoutMs: 2000 },
     );
-    await expect(
-      withFileLock(lockFile, async () => 1, { timeoutMs: 50 }),
-    ).rejects.toBeInstanceOf(FileLockTimeoutError);
+    await expect(withFileLock(lockFile, async () => 1, { timeoutMs: 50 })).rejects.toBeInstanceOf(
+      FileLockTimeoutError,
+    );
     await holder;
   });
 });

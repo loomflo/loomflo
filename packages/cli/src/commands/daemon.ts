@@ -10,7 +10,9 @@ export function createDaemonCommand(): Command {
     .description("Start the Loomflo daemon (no project)")
     .action(async () => {
       const info = await ensureDaemonRunning();
-      console.log(`Daemon v${info.version ?? "?"} running on port ${String(info.port)} (pid ${String(info.pid)})`);
+      console.log(
+        `Daemon v${info.version ?? "?"} running on port ${String(info.port)} (pid ${String(info.pid)})`,
+      );
     });
 
   root
@@ -45,7 +47,10 @@ export function createDaemonCommand(): Command {
         console.log("Daemon is not running.");
         return;
       }
-      const res = await fetchJson(`http://127.0.0.1:${String(info.port)}/daemon/status`, info.token);
+      const res = await fetchJson(
+        `http://127.0.0.1:${String(info.port)}/daemon/status`,
+        info.token,
+      );
       console.log(JSON.stringify(res, null, 2));
     });
 

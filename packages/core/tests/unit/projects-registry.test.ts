@@ -34,8 +34,18 @@ describe("ProjectsRegistry", () => {
 
   it("overwrites an existing entry with the same id", async () => {
     const reg = new ProjectsRegistry(join(tmp, "projects.json"));
-    await reg.upsert({ id: "proj_a1", name: "v1", projectPath: "/a", providerProfileId: "default" });
-    await reg.upsert({ id: "proj_a1", name: "v2", projectPath: "/a", providerProfileId: "default" });
+    await reg.upsert({
+      id: "proj_a1",
+      name: "v1",
+      projectPath: "/a",
+      providerProfileId: "default",
+    });
+    await reg.upsert({
+      id: "proj_a1",
+      name: "v2",
+      projectPath: "/a",
+      providerProfileId: "default",
+    });
     const list = await reg.list();
     expect(list).toHaveLength(1);
     expect(list[0]?.name).toBe("v2");
@@ -63,7 +73,12 @@ describe("ProjectsRegistry", () => {
 
   it("writes 0600 permissions", async () => {
     const reg = new ProjectsRegistry(join(tmp, "projects.json"));
-    await reg.upsert({ id: "proj_a1", name: "app", projectPath: "/a", providerProfileId: "default" });
+    await reg.upsert({
+      id: "proj_a1",
+      name: "app",
+      projectPath: "/a",
+      providerProfileId: "default",
+    });
     const { stat } = await import("node:fs/promises");
     const s = await stat(join(tmp, "projects.json"));
     // 0o600 = owner read/write only

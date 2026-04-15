@@ -76,7 +76,14 @@ export function costsRoutes(options: CostsRoutesOptions): FastifyPluginAsync {
 
       const summary: CostSummary = rt
         ? rt.costTracker.getSummary()
-        : (options.getCostSummary?.() ?? { totalCost: 0, perNode: {}, perAgent: {}, budgetLimit: null, budgetRemaining: null, entries: [] });
+        : (options.getCostSummary?.() ?? {
+            totalCost: 0,
+            perNode: {},
+            perAgent: {},
+            budgetLimit: null,
+            budgetRemaining: null,
+            entries: [],
+          });
 
       const loomCost: number = rt ? 0 : (options.getLoomCost?.() ?? 0);
 

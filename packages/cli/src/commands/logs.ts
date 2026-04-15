@@ -141,9 +141,7 @@ export function createLogsCommand(): Command {
         /* ---------------------------------------------------------------- */
 
         if (opts.follow) {
-          console.warn(
-            "--follow is temporarily disabled pending WebSocket multiplexing (S3/S4)",
-          );
+          console.warn("--follow is temporarily disabled pending WebSocket multiplexing (S3/S4)");
           return;
         }
       } catch (err) {

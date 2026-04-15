@@ -8,11 +8,11 @@ describe("legacy routes return 410 Gone", () => {
     ["POST", "/workflow/pause"],
     ["POST", "/workflow/resume"],
     ["POST", "/workflow/stop"],
-    ["GET",  "/workflow"],
-    ["GET",  "/events"],
-    ["GET",  "/nodes"],
+    ["GET", "/workflow"],
+    ["GET", "/events"],
+    ["GET", "/nodes"],
     ["POST", "/chat"],
-    ["GET",  "/config"],
+    ["GET", "/config"],
   ])("%s %s → 410", async (method, url) => {
     const { server } = await createServer({
       token: "t",

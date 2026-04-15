@@ -1,10 +1,6 @@
 import { dirname, parse } from "node:path";
 import { readFile } from "node:fs/promises";
-import {
-  ensureProjectIdentity,
-  readProjectIdentity,
-  type ProjectIdentity,
-} from "@loomflo/core";
+import { ensureProjectIdentity, readProjectIdentity, type ProjectIdentity } from "@loomflo/core";
 
 export interface ResolveOptions {
   cwd: string;

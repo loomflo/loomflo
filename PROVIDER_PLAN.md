@@ -1,13 +1,16 @@
 # LoomFlo — Plan d'intégration Provider Alternatif
 
 ## Provider recommandé: Moonshot AI — moonshot-v1-8k
+
 ## Justification:
+
 - Adrien l'a mentionné en premier; API 100% OpenAI-compatible (même SDK, baseUrl différente)
 - Prix: moonshot-v1-8k ≈ $0.012/1K tokens (vs Claude Sonnet ≈ $0.003 input/$0.015 output — comparable pour de gros volumes)
 - En cas d'absence de clé Moonshot, Nvidia NIM est le fallback (NVIDIA_API_KEY → baseUrl `https://integrate.api.nvidia.com/v1`)
 - Aucune clé trouvée dans l'environnement actuel → Adrien devra setter MOONSHOT_API_KEY ou NVIDIA_API_KEY
 
 ## Contexte technique
+
 - `packages/core/src/config.ts` a déjà un champ `provider: z.string().default("anthropic")` — le champ existe, le daemon l'ignore
 - `packages/core/src/providers/openai.ts` est un stub vide (throw Error)
 - `openai` npm package n'est PAS installé — il faut l'ajouter
@@ -18,12 +21,14 @@
 ## Step 1: Installer openai SDK + Implémenter OpenAIProvider complet
 
 ### Fichiers à modifier
+
 - `packages/core/package.json` — ajouter dépendance openai
 - `packages/core/src/providers/openai.ts` — remplacer le stub par l'implémentation complète
 
 ### Actions exactes
 
 **1a. Installer le package openai dans packages/core:**
+
 ```bash
 cd /home/borled/projects/loomflo/packages/core && npm install openai
 ```
@@ -76,9 +81,7 @@ function toOpenAIMessages(
   messages: LLMMessage[],
   system: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
-  const result: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: system },
-  ];
+  const result: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: system }];
 
   for (const msg of messages) {
     if (typeof msg.content === "string") {
@@ -220,8 +223,7 @@ export class OpenAIProvider implements LLMProvider {
           model: response.model,
         };
       } catch (error: unknown) {
-        const status =
-          error instanceof OpenAI.APIError ? Number(error.status) : null;
+        const status = error instanceof OpenAI.APIError ? Number(error.status) : null;
 
         if (status && this.RETRYABLE_STATUSES.includes(status) && attempt < maxRetries) {
           const BASE_DELAYS_MS = [1000, 2000, 4000, 8000, 16000];
@@ -246,9 +248,11 @@ export class OpenAIProvider implements LLMProvider {
 ```
 
 **1c. Vérifier que TypeScript compile:**
+
 ```bash
 cd /home/borled/projects/loomflo && npm run build --workspace=packages/core 2>&1 | tail -20
 ```
+
 Si erreur de type sur `tool_result` ou `toolUseId`, vérifie la définition dans `types.ts` et adapte.
 
 ---
@@ -256,6 +260,7 @@ Si erreur de type sur `tool_result` ou `toolUseId`, vérifie la définition dans
 ## Step 2: Intégration daemon + credentials — lire config.provider
 
 ### Fichiers à modifier
+
 - `packages/core/src/providers/credentials.ts` — ajouter résolution pour clés non-Anthropic
 - `packages/core/src/daemon.ts` — utiliser config.provider au lieu de hardcoder AnthropicProvider
 
@@ -343,11 +348,14 @@ export async function resolveOpenAICompatCredentials(options?: {
 **2b. Modifier `packages/core/src/daemon.ts`**
 
 Remplacer les imports actuels (lignes 14-15):
+
 ```typescript
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { resolveCredentials } from "./providers/credentials.js";
 ```
+
 Par:
+
 ```typescript
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
@@ -356,43 +364,49 @@ import type { LLMProvider } from "./providers/base.js";
 ```
 
 Remplacer le bloc de résolution du provider (lignes ~185-192):
+
 ```typescript
-    // Resolve credentials and build provider — optional, only needed for agent execution
-    let provider: AnthropicProvider | null = null;
-    try {
-      const credentials = await resolveCredentials();
-      provider = new AnthropicProvider(credentials.config);
-    } catch {
-      // No credentials found — spec-only mode (no agent execution)
-    }
+// Resolve credentials and build provider — optional, only needed for agent execution
+let provider: AnthropicProvider | null = null;
+try {
+  const credentials = await resolveCredentials();
+  provider = new AnthropicProvider(credentials.config);
+} catch {
+  // No credentials found — spec-only mode (no agent execution)
+}
 ```
+
 Par:
+
 ```typescript
-    // Resolve credentials and build provider — optional, only needed for agent execution
-    // config.provider: "anthropic" (default) | "openai" | "moonshot" | "nvidia" | any OpenAI-compat
-    const providerType = (await loadConfig({ projectPath: this.projectPath })).provider;
-    let provider: LLMProvider | null = null;
-    try {
-      if (providerType === "anthropic") {
-        const credentials = await resolveCredentials();
-        provider = new AnthropicProvider(credentials.config);
-      } else {
-        const creds = await resolveOpenAICompatCredentials();
-        provider = new OpenAIProvider({
-          apiKey: creds.apiKey,
-          baseUrl: creds.baseUrl,
-          defaultModel: creds.defaultModel,
-        });
-        console.log(`LoomFlo: using OpenAI-compat provider "${creds.providerName}" (${creds.defaultModel ?? "default model"})`);
-      }
-    } catch {
-      // No credentials found — spec-only mode (no agent execution)
-    }
+// Resolve credentials and build provider — optional, only needed for agent execution
+// config.provider: "anthropic" (default) | "openai" | "moonshot" | "nvidia" | any OpenAI-compat
+const providerType = (await loadConfig({ projectPath: this.projectPath })).provider;
+let provider: LLMProvider | null = null;
+try {
+  if (providerType === "anthropic") {
+    const credentials = await resolveCredentials();
+    provider = new AnthropicProvider(credentials.config);
+  } else {
+    const creds = await resolveOpenAICompatCredentials();
+    provider = new OpenAIProvider({
+      apiKey: creds.apiKey,
+      baseUrl: creds.baseUrl,
+      defaultModel: creds.defaultModel,
+    });
+    console.log(
+      `LoomFlo: using OpenAI-compat provider "${creds.providerName}" (${creds.defaultModel ?? "default model"})`,
+    );
+  }
+} catch {
+  // No credentials found — spec-only mode (no agent execution)
+}
 ```
 
 Également changer la déclaration du type de `provider` dans `createNodeExecutor` pour utiliser `LLMProvider` au lieu de `AnthropicProvider` (ligne ~212). Si daemon.ts passe `provider` à `runLoomi`, vérifier que `runLoomi` accepte `LLMProvider` et pas `AnthropicProvider` spécifiquement — si non, mettre à jour la signature.
 
 **2c. Build pour vérifier:**
+
 ```bash
 cd /home/borled/projects/loomflo && npm run build --workspace=packages/core 2>&1 | tail -30
 ```
@@ -404,12 +418,14 @@ cd /home/borled/projects/loomflo && npm run build --workspace=packages/core 2>&1
 ### Actions exactes
 
 **3a. Lancer les tests:**
+
 ```bash
 cd /home/borled/projects/loomflo && npm test --workspace=packages/core 2>&1 | tail -40
 ```
 
 **3b. Vérifier que le config provider fonctionne:**
 Créer un test rapide dans `/tmp/test-openai-provider.ts`:
+
 ```bash
 # Test de base: vérifier que l'import compile et que la classe s'instancie
 cd /home/borled/projects/loomflo && node -e "
@@ -421,6 +437,7 @@ console.log('OpenAIProvider instantiated OK:', typeof p.complete);
 
 **3c. Documenter la configuration pour Adrien:**
 Créer `/home/borled/projects/loomflo/PROVIDER_SETUP.md`:
+
 ```
 # Configurer un provider alternatif dans LoomFlo
 
@@ -443,6 +460,7 @@ export OPENAI_COMPAT_MODEL="moonshot-v1-32k"
 ```
 
 **3d. git commit:**
+
 ```bash
 cd /home/borled/projects/loomflo
 git add packages/core/src/providers/openai.ts packages/core/src/providers/credentials.ts packages/core/src/daemon.ts packages/core/package.json PROVIDER_SETUP.md

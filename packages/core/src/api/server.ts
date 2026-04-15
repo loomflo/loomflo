@@ -357,10 +357,12 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   await server.register(
     async (scoped) => {
       scoped.addHook("preValidation", projectRuntimeHook);
-      await scoped.register(workflowRoutes({
-        signal: abortController.signal,
-        createNodeExecutor: options.createNodeExecutor,
-      }));
+      await scoped.register(
+        workflowRoutes({
+          signal: abortController.signal,
+          createNodeExecutor: options.createNodeExecutor,
+        }),
+      );
       await scoped.register(eventsRoutes({}));
       await scoped.register(chatRoutes({}));
       await scoped.register(nodesRoutes({}));

@@ -14,10 +14,12 @@ describe("GET /daemon/status", () => {
       workflow: {
         getWorkflow: () => null,
         setWorkflow: () => undefined,
-        getProvider: () => { throw new Error("no provider"); },
+        getProvider: () => {
+          throw new Error("no provider");
+        },
         getEventLog: () => ({ append: async () => undefined, query: async () => [] }),
-        getSharedMemory: () => ({} as never),
-        getCostTracker: () => ({} as never),
+        getSharedMemory: () => ({}) as never,
+        getCostTracker: () => ({}) as never,
       },
       events: { getProjectPath: () => "/tmp" },
       onShutdown: () => undefined,

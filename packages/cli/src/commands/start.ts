@@ -7,10 +7,7 @@ import type { ProjectIdentity } from "@loomflo/core";
 
 interface StartDeps {
   ensureDaemon: () => Promise<DaemonInfo>;
-  fetchProject: (
-    info: DaemonInfo,
-    id: string,
-  ) => Promise<{ id: string; status: string } | null>;
+  fetchProject: (info: DaemonInfo, id: string) => Promise<{ id: string; status: string } | null>;
   postProject: (
     info: DaemonInfo,
     body: {

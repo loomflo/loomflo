@@ -11,7 +11,9 @@ describe("WebSocket subscription", () => {
     daemon = new Daemon({ port: 0, host: "127.0.0.1" });
     await (daemon as unknown as { startForTest: (t: string) => Promise<void> }).startForTest("tok");
     // Read the bound port from the internal server address.
-    const server = (daemon as unknown as { server: { server: { address: () => { port: number } } } }).server;
+    const server = (
+      daemon as unknown as { server: { server: { address: () => { port: number } } } }
+    ).server;
     port = server.server.address().port;
   });
 
@@ -35,7 +37,10 @@ describe("WebSocket subscription", () => {
     ws.close();
     const ticks = received.filter(
       (m): m is { projectId: string; type: string } =>
-        typeof m === "object" && m !== null && "type" in m && (m as { type: string }).type === "tick",
+        typeof m === "object" &&
+        m !== null &&
+        "type" in m &&
+        (m as { type: string }).type === "tick",
     );
     expect(ticks).toHaveLength(1);
     expect(ticks[0]?.projectId).toBe("proj_a");
@@ -59,7 +64,10 @@ describe("WebSocket subscription", () => {
     ws.close();
     const ticks = received.filter(
       (m): m is { projectId: string; type: string } =>
-        typeof m === "object" && m !== null && "type" in m && (m as { type: string }).type === "tick",
+        typeof m === "object" &&
+        m !== null &&
+        "type" in m &&
+        (m as { type: string }).type === "tick",
     );
     expect(ticks.map((t) => t.projectId).sort()).toEqual(["proj_a", "proj_b"]);
   });

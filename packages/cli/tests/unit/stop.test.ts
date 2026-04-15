@@ -121,9 +121,7 @@ describe("stop command — request error", () => {
 
     await expect(runStop()).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: POST /workflow/stop -> HTTP 500",
-    );
+    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /workflow/stop -> HTTP 500");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 });
@@ -134,7 +132,9 @@ describe("stop command — request error", () => {
 
 describe("stop command — daemon not running", () => {
   it("should log error and exit(1) when openClient rejects", async () => {
-    mockOpenClient.mockRejectedValue(new Error("Daemon is not running. Run 'loomflo start' first."));
+    mockOpenClient.mockRejectedValue(
+      new Error("Daemon is not running. Run 'loomflo start' first."),
+    );
 
     await expect(runStop()).rejects.toThrow("process.exit");
 

@@ -99,7 +99,12 @@ describe("/projects CRUD", () => {
       projectPath: workspace,
       providerProfileId: "default",
     };
-    await (daemon as any).server.inject({ method: "POST", url: "/projects", headers: AUTH, payload });
+    await (daemon as any).server.inject({
+      method: "POST",
+      url: "/projects",
+      headers: AUTH,
+      payload,
+    });
     const dup = await (daemon as any).server.inject({
       method: "POST",
       url: "/projects",

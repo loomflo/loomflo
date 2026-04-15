@@ -17,8 +17,16 @@ describe("multi-project parallel", () => {
 
   beforeEach(async () => {
     // Back up any existing files so we don't clobber dev state
-    try { savedCredentials = await readFile(CREDENTIALS, "utf-8"); } catch { savedCredentials = null; }
-    try { savedProjects = await readFile(PROJECTS_JSON, "utf-8"); } catch { savedProjects = null; }
+    try {
+      savedCredentials = await readFile(CREDENTIALS, "utf-8");
+    } catch {
+      savedCredentials = null;
+    }
+    try {
+      savedProjects = await readFile(PROJECTS_JSON, "utf-8");
+    } catch {
+      savedProjects = null;
+    }
     await mkdir(join(homedir(), ".loomflo"), { recursive: true });
     // Start from empty registry
     await writeFile(PROJECTS_JSON, "[]");

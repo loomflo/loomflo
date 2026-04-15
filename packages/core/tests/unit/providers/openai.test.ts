@@ -101,9 +101,7 @@ describe("OpenAIProvider", () => {
     mockCreate.mockRejectedValue(new MockAPIError(401, "Unauthorized"));
 
     const provider = new OpenAIProvider({ apiKey: "bad-key" });
-    await expect(provider.complete(minimalParams())).rejects.toThrow(
-      "OpenAI-compat API error",
-    );
+    await expect(provider.complete(minimalParams())).rejects.toThrow("OpenAI-compat API error");
     // 401 is not retryable — should be called exactly once
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });

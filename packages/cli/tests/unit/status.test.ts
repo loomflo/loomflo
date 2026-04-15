@@ -182,17 +182,15 @@ async function runStatus(): Promise<void> {
  * @param responses - Map of API path to resolved value or Error (for rejection).
  */
 function setupRequestResponses(responses: Record<string, unknown>): void {
-  mockRequest.mockImplementation(
-    (_method: string, path: string): Promise<unknown> => {
-      // Strip query string for matching
-      const basePath = path.split("?")[0] ?? path;
-      const value = responses[basePath];
-      if (value instanceof Error) {
-        return Promise.reject(value);
-      }
-      return Promise.resolve(value);
-    },
-  );
+  mockRequest.mockImplementation((_method: string, path: string): Promise<unknown> => {
+    // Strip query string for matching
+    const basePath = path.split("?")[0] ?? path;
+    const value = responses[basePath];
+    if (value instanceof Error) {
+      return Promise.reject(value);
+    }
+    return Promise.resolve(value);
+  });
 }
 
 /**

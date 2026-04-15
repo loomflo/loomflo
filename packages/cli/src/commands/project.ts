@@ -18,7 +18,10 @@ export function createProjectCommand(): Command {
     .description("List projects known to the daemon")
     .action(async () => {
       const info = await getRunningDaemon();
-      if (!info) { console.log("Daemon is not running."); return; }
+      if (!info) {
+        console.log("Daemon is not running.");
+        return;
+      }
       const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects`, {
         headers: { authorization: `Bearer ${info.token}` },
       });
@@ -54,7 +57,9 @@ export function createProjectCommand(): Command {
       const projects = (await res.json()) as ProjectSummary[];
       let removed = 0;
       for (const p of projects) {
-        const exists = await stat(p.projectPath).then(() => true).catch(() => false);
+        const exists = await stat(p.projectPath)
+          .then(() => true)
+          .catch(() => false);
         if (!exists) {
           await fetch(`http://127.0.0.1:${String(info.port)}/projects/${p.id}`, {
             method: "DELETE",

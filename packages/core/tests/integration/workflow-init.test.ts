@@ -71,7 +71,9 @@ describe("POST /projects/:id/workflow/init (integration)", () => {
     await mkdir(projectPath, { recursive: true });
 
     daemon = new Daemon({ port: 0, host: "127.0.0.1" });
-    await (daemon as unknown as { startForTest: (t: string) => Promise<void> }).startForTest(AUTH_TOKEN);
+    await (daemon as unknown as { startForTest: (t: string) => Promise<void> }).startForTest(
+      AUTH_TOKEN,
+    );
 
     await daemon.registerProject({
       id: PROJECT_ID,
