@@ -41,6 +41,7 @@ export {
   generateProjectId,
 } from "./persistence/project-identity.js";
 export type { ProjectIdentity } from "./persistence/project-identity.js";
+export { withFileLock, FileLockTimeoutError } from "./persistence/file-lock.js";
 
 // ============================================================================
 // LLM Providers
