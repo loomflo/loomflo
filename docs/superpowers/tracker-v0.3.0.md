@@ -8,7 +8,7 @@
 | Sub-project | Branch | Plan | Status |
 |---|---|---|---|
 | S1 — Multi-project daemon | `004-multi-project-daemon` | `plans/2026-04-14-s1-multi-project-daemon.md` | Implementation complete; **PR pending** |
-| S3 — Visual CLI theme | `006-cli-theme` | `plans/2026-04-15-s3-cli-theme.md` | **In progress** — T1–T5 done, T6–T9 pending |
+| S3 — Visual CLI theme | `006-cli-theme` | `plans/2026-04-15-s3-cli-theme.md` | **Complete** — T1–T9 done, PR pending |
 | S2 — Onboarding wizard | `005-onboarding-wizard` | `plans/2026-04-15-s2-onboarding-wizard.md` | Not started (depends on S3) |
 | S4 — Observation CLI | `007-observation-cli` | `plans/2026-04-15-s4-observation-cli.md` | Not started (depends on S1+S3) |
 | S5 — Multi-project dashboard | `008-multiproject-dashboard` | `plans/2026-04-15-s5-multiproject-dashboard.md` | Not started (depends on S1+S3) |
@@ -45,10 +45,10 @@ S2 and S4 can run in parallel once S3 lands. S5 is independent of S2/S4 but also
 - [x] T3 — Theme module (`theme.ts` + `index.ts` semantic API)
 - [x] T4 — Output helpers (`output.ts` — `withJsonSupport` / `writeJson` / `writeError`)
 - [x] T5 — Theme preview script (`scripts/theme-preview.ts`)
-- [ ] T6 — Migrate `init`, `start`, `status`, `resume` to `theme.*`
-- [ ] T7 — Migrate `stop`, `chat`, `logs`, `daemon`, `project`, `config`, `dashboard`
-- [ ] T8 — Migrate `client.ts` errors + ESLint `no-console` rule on `src/commands/**`
-- [ ] T9 — Full verification + README + CHANGELOG + PR
+- [x] T6 — Migrate `init`, `start`, `status`, `resume` to `theme.*`
+- [x] T7 — Migrate `stop`, `chat`, `logs`, `daemon`, `project`, `config`, `dashboard`
+- [x] T8 — Migrate `client.ts` errors + ESLint `no-console` rule on `src/commands/**`
+- [x] T9 — Full verification + README + CHANGELOG + PR
 
 ---
 
