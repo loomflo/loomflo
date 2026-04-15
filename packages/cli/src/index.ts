@@ -8,6 +8,7 @@ import { createDaemonCommand } from "./commands/daemon.js";
 import { createDashboardCommand } from "./commands/dashboard.js";
 import { createInitCommand } from "./commands/init.js";
 import { createLogsCommand } from "./commands/logs.js";
+import { createProjectCommand } from "./commands/project.js";
 import { createResumeCommand } from "./commands/resume.js";
 import { createStartCommand } from "./commands/start.js";
 import { createStatusCommand } from "./commands/status.js";
@@ -41,6 +42,7 @@ function createProgram(): Command {
   program.addCommand(createLogsCommand());
   program.addCommand(createDashboardCommand());
   program.addCommand(createDaemonCommand());
+  program.addCommand(createProjectCommand());
 
   return program;
 }
