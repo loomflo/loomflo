@@ -1,5 +1,6 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { SharedMemoryManager } from "../../memory/shared-memory.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -24,7 +25,7 @@ export interface MemoryListResponse {
 /** Options accepted by the {@link memoryRoutes} factory. */
 export interface MemoryRoutesOptions {
   /** Return the current shared memory manager, or null if no workflow is active. */
-  getSharedMemory: () => SharedMemoryManager | null;
+  getSharedMemory?: () => SharedMemoryManager | null;
 }
 
 // ============================================================================
@@ -41,17 +42,22 @@ export interface MemoryRoutesOptions {
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
-  const { getSharedMemory } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
+    /** Resolve the shared memory manager from req.runtime or option closure. */
+    function getSharedMemory(request: FastifyRequest): SharedMemoryManager | null {
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+      if (rt) return rt.sharedMemory;
+      return options.getSharedMemory?.() ?? null;
+    }
+
     /**
      * GET /memory
      *
      * Lists all shared memory files with metadata (name, lastModifiedBy, lastModifiedAt).
      * Returns 404 if no workflow is active.
      */
-    fastify.get("/memory", async (_request, reply): Promise<void> => {
-      const sharedMemory = getSharedMemory();
+    fastify.get("/memory", async (request, reply): Promise<void> => {
+      const sharedMemory = getSharedMemory(request);
 
       if (sharedMemory === null) {
         await reply.code(404).send({ error: "No active workflow" });
@@ -79,7 +85,7 @@ export function memoryRoutes(options: MemoryRoutesOptions): FastifyPluginAsync {
     fastify.get<{ Params: { name: string } }>(
       "/memory/:name",
       async (request, reply): Promise<void> => {
-        const sharedMemory = getSharedMemory();
+        const sharedMemory = getSharedMemory(request);
 
         if (sharedMemory === null) {
           await reply.code(404).send({ error: "No active workflow" });

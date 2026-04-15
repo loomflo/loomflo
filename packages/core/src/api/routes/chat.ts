@@ -19,11 +19,11 @@ export interface ChatHistoryEntry {
 /** Options accepted by the {@link chatRoutes} factory. */
 export interface ChatRoutesOptions {
   /** Delegate a user message to the Loom agent. */
-  handleChat: (message: string) => Promise<ChatResult>;
+  handleChat?: (message: string) => Promise<ChatResult>;
   /** Return the current chat history. */
-  getChatHistory: () => ChatHistoryEntry[];
+  getChatHistory?: () => ChatHistoryEntry[];
   /** Append an entry to the chat history. */
-  addToHistory: (entry: ChatHistoryEntry) => void;
+  addToHistory?: (entry: ChatHistoryEntry) => void;
 }
 
 /** Shape of the POST /chat JSON response. */
@@ -65,8 +65,6 @@ const ChatMessageSchema = z.object({
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
-  const { handleChat, getChatHistory, addToHistory } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * POST /chat
@@ -88,19 +86,31 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
 
       const { message } = parseResult.data;
 
-      addToHistory({
-        role: "user",
-        content: message,
-        timestamp: new Date().toISOString(),
-      });
+      const handleChat = options.handleChat;
+      const addToHistory = options.addToHistory;
+
+      if (!handleChat) {
+        await reply.code(501).send({ error: "Chat not configured for this project" });
+        return;
+      }
+
+      if (addToHistory) {
+        addToHistory({
+          role: "user",
+          content: message,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       const result: ChatResult = await handleChat(message);
 
-      addToHistory({
-        role: "assistant",
-        content: result.response,
-        timestamp: new Date().toISOString(),
-      });
+      if (addToHistory) {
+        addToHistory({
+          role: "assistant",
+          content: result.response,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       const action: ChatResponse["action"] =
         result.modification !== null && result.modification.action !== "no_action"
@@ -125,7 +135,9 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
      * Returns the full chat history in chronological order.
      */
     fastify.get("/chat/history", async (_request, reply): Promise<void> => {
-      const response: ChatHistoryResponse = { messages: getChatHistory() };
+      const getChatHistory = options.getChatHistory;
+      const messages = getChatHistory ? getChatHistory() : [];
+      const response: ChatHistoryResponse = { messages };
       await reply.code(200).send(response);
     });
     return Promise.resolve();

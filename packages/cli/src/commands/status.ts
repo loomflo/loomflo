@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from "../client.js";
+import { resolveProject } from "../project-resolver.js";
+import { openClient } from "../client.js";
 
 // ============================================================================
 // Types
@@ -60,11 +61,6 @@ interface NodeEntry {
   agentCount: number;
   cost: number;
   retryCount: number;
-}
-
-/** Shape of an API error response. */
-interface ErrorResponse {
-  error: string;
 }
 
 // ============================================================================
@@ -196,63 +192,68 @@ function formatElapsed(createdAt: string): string {
  *
  * Usage: `loomflo status`
  *
- * Connects to the running daemon and fetches the current workflow state,
- * per-node cost breakdown, and node statuses. Displays a structured summary
+ * Resolves the current project from the working directory, connects to
+ * the running daemon, and fetches the current workflow state, per-node
+ * cost breakdown, and node statuses. Displays a structured summary
  * including workflow info, elapsed time, node summary, active nodes,
  * a per-node cost table with colored statuses, and budget information.
  *
  * @returns A configured commander Command instance.
  */
 export function createStatusCommand(): Command {
-  const cmd = new Command("status")
+  return new Command("status")
     .description("Show workflow status and costs")
     .action(async (): Promise<void> => {
       /* ------------------------------------------------------------------ */
-      /* Connect to daemon                                                  */
+      /* Resolve project and open scoped client                             */
       /* ------------------------------------------------------------------ */
 
-      let config;
+      let projectId: string;
       try {
-        config = await readDaemonConfig();
-      } catch {
-        console.error("Daemon is not running. Start with: loomflo start");
+        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+        projectId = identity.id;
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
         process.exit(1);
+        return; // unreachable, satisfies TypeScript control flow
       }
 
-      const client = new DaemonClient(config.port, config.token);
+      let client: Awaited<ReturnType<typeof openClient>>;
+      try {
+        client = await openClient(projectId);
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
+        process.exit(1);
+        return;
+      }
 
       /* ------------------------------------------------------------------ */
       /* Fetch workflow, costs, and nodes in parallel                        */
       /* ------------------------------------------------------------------ */
 
       const [workflowResult, costsResult, nodesResult] = await Promise.allSettled([
-        client.get<WorkflowResponse | ErrorResponse>("/workflow"),
-        client.get<CostsResponse | ErrorResponse>("/costs"),
-        client.get<NodeEntry[] | ErrorResponse>("/nodes"),
+        client.request<WorkflowResponse>("GET", "/workflow"),
+        client.request<CostsResponse>("GET", "/costs"),
+        client.request<NodeEntry[]>("GET", "/nodes"),
       ]);
 
       /* ------------------------------------------------------------------ */
-      /* Handle no workflow (404)                                            */
+      /* Handle no workflow (connection failure or 404)                     */
       /* ------------------------------------------------------------------ */
 
       if (workflowResult.status === "rejected") {
-        console.error("Failed to connect to daemon.");
-        process.exit(1);
-      }
-
-      const workflowRes = workflowResult.value;
-
-      if (!workflowRes.ok) {
-        if (workflowRes.status === 404) {
+        const msg = (workflowResult.reason as Error).message;
+        // A 404 means no active workflow; any other error is a connection problem.
+        if (msg.includes("HTTP 404")) {
           console.log("No active workflow. Start one with: loomflo start");
           return;
         }
-        const errorData = workflowRes.data as ErrorResponse;
-        console.error(`Failed to fetch workflow: ${errorData.error}`);
+        console.error("Failed to connect to daemon.");
         process.exit(1);
+        return;
       }
 
-      const workflow = workflowRes.data as WorkflowResponse;
+      const workflow = workflowResult.value;
 
       /* ------------------------------------------------------------------ */
       /* Workflow summary                                                    */
@@ -271,10 +272,7 @@ export function createStatusCommand(): Command {
 
       let nodes: NodeEntry[] = [];
       if (nodesResult.status === "fulfilled") {
-        const nodesRes = nodesResult.value;
-        if (nodesRes.ok) {
-          nodes = nodesRes.data as NodeEntry[];
-        }
+        nodes = nodesResult.value;
       }
 
       /* ------------------------------------------------------------------ */
@@ -364,22 +362,17 @@ export function createStatusCommand(): Command {
       /* ------------------------------------------------------------------ */
 
       if (costsResult.status === "fulfilled") {
-        const costsRes = costsResult.value;
-        if (costsRes.ok) {
-          const costs = costsRes.data as CostsResponse;
+        const costs = costsResult.value;
 
-          console.log(sectionHeader("Cost Summary"));
-          console.log(`  Total Cost:       ${formatCost(costs.total)}`);
-          console.log(
-            `  Budget Limit:     ${costs.budgetLimit !== null ? formatCost(costs.budgetLimit) : "None"}`,
-          );
-          console.log(
-            `  Budget Remaining: ${costs.budgetRemaining !== null ? formatCost(costs.budgetRemaining) : "N/A"}`,
-          );
-          console.log(`  Loom Overhead:    ${formatCost(costs.loomCost)}`);
-        }
+        console.log(sectionHeader("Cost Summary"));
+        console.log(`  Total Cost:       ${formatCost(costs.total)}`);
+        console.log(
+          `  Budget Limit:     ${costs.budgetLimit !== null ? formatCost(costs.budgetLimit) : "None"}`,
+        );
+        console.log(
+          `  Budget Remaining: ${costs.budgetRemaining !== null ? formatCost(costs.budgetRemaining) : "N/A"}`,
+        );
+        console.log(`  Loom Overhead:    ${formatCost(costs.loomCost)}`);
       }
     });
-
-  return cmd;
 }

@@ -2,8 +2,7 @@
  * Unit tests for packages/cli/src/commands/chat.ts — createChatCommand.
  *
  * Covers happy path with action, happy path without action, connection
- * error on DaemonClient.connect(), API error response, and network
- * error during POST /chat.
+ * error (openClient rejects), request error, and resolveProject fails.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -11,13 +10,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Module-level mocks (hoisted by vitest)
 // ---------------------------------------------------------------------------
 
-const mockPost = vi.fn();
-const mockConnect = vi.fn();
+const mockRequest = vi.fn();
+const mockResolveProject = vi.fn();
+const mockOpenClient = vi.fn();
+
+vi.mock("../../src/project-resolver.js", () => ({
+  resolveProject: (...a: unknown[]) => mockResolveProject(...a),
+}));
 
 vi.mock("../../src/client.js", () => ({
-  DaemonClient: {
-    connect: (...args: unknown[]) => mockConnect(...args),
-  },
+  openClient: (...a: unknown[]) => mockOpenClient(...a),
 }));
 
 // ---------------------------------------------------------------------------
@@ -29,6 +31,14 @@ import { createChatCommand } from "../../src/commands/chat.js";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Default project identity returned by resolveProject. */
+const IDENTITY = {
+  id: "proj_abc12345",
+  name: "test-proj",
+  providerProfileId: "default",
+  createdAt: "2026-04-15T00:00:00Z",
+};
 
 /**
  * Execute the chat command action with the given message argument.
@@ -58,10 +68,21 @@ beforeEach(() => {
   mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
   mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-  mockConnect.mockReset();
-  mockPost.mockReset();
+  mockRequest.mockReset();
+  mockResolveProject.mockReset();
+  mockOpenClient.mockReset();
 
-  mockConnect.mockResolvedValue({ post: mockPost });
+  mockResolveProject.mockResolvedValue({
+    identity: IDENTITY,
+    projectRoot: "/tmp/test",
+    created: false,
+  });
+
+  mockOpenClient.mockResolvedValue({
+    projectId: IDENTITY.id,
+    info: { port: 4000, token: "t", pid: 1234, version: "0.2.0" },
+    request: mockRequest,
+  });
 });
 
 afterEach(() => {
@@ -74,23 +95,23 @@ afterEach(() => {
 
 describe("chat command — happy path with action", () => {
   it("should display category, response text, and action details", async () => {
-    mockPost.mockResolvedValue({
-      ok: true,
-      status: 200,
-      data: {
-        response: "I will add a login page.",
-        action: {
-          type: "add_node",
-          details: { nodeId: "n3", title: "Login Page" },
-        },
-        category: "graph_modification",
+    mockRequest.mockResolvedValue({
+      response: "I will add a login page.",
+      action: {
+        type: "add_node",
+        details: { nodeId: "n3", title: "Login Page" },
       },
+      category: "graph_modification",
     });
 
     await runChat("Add a login page");
 
-    expect(mockConnect).toHaveBeenCalledOnce();
-    expect(mockPost).toHaveBeenCalledWith("/chat", { message: "Add a login page" });
+    expect(mockResolveProject).toHaveBeenCalledWith({
+      cwd: process.cwd(),
+      createIfMissing: false,
+    });
+    expect(mockOpenClient).toHaveBeenCalledWith(IDENTITY.id);
+    expect(mockRequest).toHaveBeenCalledWith("POST", "/chat", { message: "Add a login page" });
 
     expect(mockConsoleLog).toHaveBeenCalledWith("[graph_modification] I will add a login page.");
     expect(mockConsoleLog).toHaveBeenCalledWith("  Action: add_node");
@@ -107,14 +128,10 @@ describe("chat command — happy path with action", () => {
 
 describe("chat command — happy path without action", () => {
   it("should display category and response text without action section", async () => {
-    mockPost.mockResolvedValue({
-      ok: true,
-      status: 200,
-      data: {
-        response: "The workflow is running smoothly.",
-        action: null,
-        category: "informational",
-      },
+    mockRequest.mockResolvedValue({
+      response: "The workflow is running smoothly.",
+      action: null,
+      category: "informational",
     });
 
     await runChat("How is the workflow?");
@@ -128,51 +145,66 @@ describe("chat command — happy path without action", () => {
 });
 
 // ===========================================================================
-// DaemonClient.connect() fails
+// openClient rejects (daemon not running)
 // ===========================================================================
 
 describe("chat command — connection error", () => {
-  it("should log error and exit(1) when DaemonClient.connect() rejects", async () => {
-    mockConnect.mockRejectedValue(new Error("Daemon not running"));
+  it("should log error and exit(1) when openClient rejects", async () => {
+    mockOpenClient.mockRejectedValue(
+      new Error("Daemon is not running. Run 'loomflo start' first."),
+    );
 
     await expect(runChat("hello")).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Error: Daemon not running");
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error: Daemon is not running. Run 'loomflo start' first.",
+    );
     expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expect(mockPost).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });
 
 // ===========================================================================
-// API error response (non-ok)
+// Request throws (API error or network error)
 // ===========================================================================
 
-describe("chat command — API error response", () => {
-  it("should log the error message and exit(1) on non-ok response", async () => {
-    mockPost.mockResolvedValue({
-      ok: false,
-      status: 400,
-      data: { error: "Message is required" },
-    });
+describe("chat command — request error", () => {
+  it("should log error and exit(1) when request throws", async () => {
+    mockRequest.mockRejectedValue(new Error("POST /chat -> HTTP 400"));
 
     await expect(runChat("")).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Error: Message is required");
+    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /chat -> HTTP 400");
+    expect(mockProcessExit).toHaveBeenCalledWith(1);
+  });
+
+  it("should log error and exit(1) when request throws a network error", async () => {
+    mockRequest.mockRejectedValue(new Error("ECONNREFUSED"));
+
+    await expect(runChat("hello")).rejects.toThrow("process.exit");
+
+    expect(mockConsoleError).toHaveBeenCalledWith("Error: ECONNREFUSED");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 });
 
 // ===========================================================================
-// Network error during POST /chat
+// resolveProject fails (no .loomflo/project.json)
 // ===========================================================================
 
-describe("chat command — network error during POST", () => {
-  it("should log connection error and exit(1) when post() throws", async () => {
-    mockPost.mockRejectedValue(new Error("ECONNREFUSED"));
+describe("chat command — not a loomflo project", () => {
+  it("should log error and exit(1) when resolveProject rejects", async () => {
+    mockResolveProject.mockRejectedValue(
+      new Error("/tmp is not a loomflo project (no .loomflo/project.json found)."),
+    );
 
     await expect(runChat("hello")).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Failed to connect to daemon: ECONNREFUSED");
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error: /tmp is not a loomflo project (no .loomflo/project.json found).",
+    );
     expect(mockProcessExit).toHaveBeenCalledWith(1);
+    expect(mockOpenClient).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });

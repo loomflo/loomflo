@@ -1,9 +1,10 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { EventTypeSchema } from "../../types.js";
 import type { Event } from "../../types.js";
 import { queryEvents } from "../../persistence/events.js";
 import type { EventQueryFilters } from "../../persistence/events.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -12,7 +13,7 @@ import type { EventQueryFilters } from "../../persistence/events.js";
 /** Options accepted by the {@link eventsRoutes} factory. */
 export interface EventsRoutesOptions {
   /** Return the absolute path to the current project workspace. */
-  getProjectPath: () => string;
+  getProjectPath?: () => string;
 }
 
 /** Shape of the GET /events JSON response. */
@@ -48,8 +49,6 @@ const EventsQuerySchema = z.object({
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function eventsRoutes(options: EventsRoutesOptions): FastifyPluginAsync {
-  const { getProjectPath } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /events
@@ -79,7 +78,10 @@ export function eventsRoutes(options: EventsRoutesOptions): FastifyPluginAsync {
         filters.nodeId = nodeId;
       }
 
-      const projectPath = getProjectPath();
+      // Resolve projectPath: prefer req.runtime, fall back to option closure.
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+      const projectPath = rt ? rt.projectPath : (options.getProjectPath?.() ?? "");
+
       const allMatching: Event[] = await queryEvents(projectPath, filters);
 
       const total: number = allMatching.length;

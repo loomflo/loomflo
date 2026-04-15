@@ -1170,10 +1170,17 @@ export class LoomAgent {
   /**
    * Write a progress update to the PROGRESS.md shared memory file.
    *
+   * Errors are silently swallowed — progress writes are best-effort
+   * and must not disrupt spec generation on cleanup/race conditions.
+   *
    * @param content - Markdown content to append.
    */
   private async writeProgress(content: string): Promise<void> {
-    await this.config.sharedMemory.write("PROGRESS.md", content, LOOM_AGENT_ID);
+    try {
+      await this.config.sharedMemory.write("PROGRESS.md", content, LOOM_AGENT_ID);
+    } catch {
+      // Non-critical — progress writes are fire-and-forget
+    }
   }
 
   /**

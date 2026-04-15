@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
-import { DaemonClient } from "../client.js";
-import type { ApiError } from "../client.js";
+import { resolveProject } from "../project-resolver.js";
+import { openClient } from "../client.js";
 
 // ============================================================================
 // Types
@@ -26,35 +26,24 @@ interface ChatResponse {
  *
  * Usage: `loomflo chat "message"`
  *
- * Sends a chat message to the Loom architect agent via POST /chat and
- * displays the response text, message category, and any graph action taken.
+ * Resolves the current project from the working directory and sends a
+ * chat message to the Loom architect agent via POST /chat. Displays the
+ * response text, message category, and any graph action taken.
  *
  * @returns A configured commander Command instance.
  */
 export function createChatCommand(): Command {
-  const cmd = new Command("chat")
+  return new Command("chat")
     .description("Chat with the Loom architect agent")
     .argument("<message>", "Message to send to Loom")
     .action(async (message: string): Promise<void> => {
-      let client: DaemonClient;
       try {
-        client = await DaemonClient.connect();
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${msg}`);
-        process.exit(1);
-      }
+        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+        const client = await openClient(identity.id);
 
-      try {
-        const res = await client.post<ChatResponse>("/chat", { message });
-
-        if (!res.ok) {
-          const errData = res.data as unknown as ApiError;
-          console.error(`Error: ${errData.error}`);
-          process.exit(1);
-        }
-
-        const { response, action, category } = res.data;
+        const { response, action, category } = await client.request<ChatResponse>("POST", "/chat", {
+          message,
+        });
 
         console.log(`[${category}] ${response}`);
 
@@ -64,12 +53,9 @@ export function createChatCommand(): Command {
             console.log(`    ${key}: ${JSON.stringify(value)}`);
           }
         }
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to connect to daemon: ${msg}`);
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
         process.exit(1);
       }
     });
-
-  return cmd;
 }

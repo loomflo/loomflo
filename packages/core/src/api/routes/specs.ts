@@ -1,7 +1,8 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { Workflow } from "../../types.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -26,7 +27,7 @@ export interface ListSpecsResponse {
 /** Options accepted by the {@link specsRoutes} factory. */
 export interface SpecsRoutesOptions {
   /** Return the current active workflow, or null if none exists. */
-  getWorkflow: () => Workflow | null;
+  getWorkflow?: () => Workflow | null;
 }
 
 // ============================================================================
@@ -50,17 +51,22 @@ const SPECS_DIR = ".loomflo/specs";
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
-  const { getWorkflow } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
+    /** Resolve the current workflow from req.runtime or option closure. */
+    function getWorkflow(request: FastifyRequest): Workflow | null {
+      const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+      if (rt) return rt.workflow;
+      return options.getWorkflow?.() ?? null;
+    }
+
     /**
      * GET /specs
      *
      * Lists all spec artifact files in the project's `.loomflo/specs/` directory.
      * Returns 404 if no workflow is active.
      */
-    fastify.get("/specs", async (_request, reply): Promise<void> => {
-      const workflow = getWorkflow();
+    fastify.get("/specs", async (request, reply): Promise<void> => {
+      const workflow = getWorkflow(request);
 
       if (workflow === null) {
         await reply.code(404).send({ error: "No active workflow" });
@@ -83,7 +89,7 @@ export function specsRoutes(options: SpecsRoutesOptions): FastifyPluginAsync {
     fastify.get<{ Params: { name: string } }>(
       "/specs/:name",
       async (request, reply): Promise<void> => {
-        const workflow = getWorkflow();
+        const workflow = getWorkflow(request);
 
         if (workflow === null) {
           await reply.code(404).send({ error: "No active workflow" });

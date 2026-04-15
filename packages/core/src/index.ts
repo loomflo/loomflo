@@ -25,6 +25,8 @@ export * from "./config.js";
 // ============================================================================
 
 export * from "./daemon.js";
+export type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
+export { toProjectSummary } from "./daemon-types.js";
 
 // ============================================================================
 // Persistence
@@ -32,6 +34,14 @@ export * from "./daemon.js";
 
 export * from "./persistence/state.js";
 export * from "./persistence/events.js";
+export {
+  readProjectIdentity,
+  ensureProjectIdentity,
+  createProjectIdentity,
+  generateProjectId,
+} from "./persistence/project-identity.js";
+export type { ProjectIdentity } from "./persistence/project-identity.js";
+export { withFileLock, FileLockTimeoutError } from "./persistence/file-lock.js";
 
 // ============================================================================
 // LLM Providers

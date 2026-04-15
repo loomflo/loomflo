@@ -11,6 +11,7 @@ export MOONSHOT_API_KEY='sk-...'
 ```
 
 `.loomflo/config.json`:
+
 ```json
 { "provider": "moonshot" }
 ```
@@ -22,6 +23,7 @@ export NVIDIA_API_KEY='nvapi-...'
 ```
 
 `.loomflo/config.json`:
+
 ```json
 { "provider": "nvidia" }
 ```
@@ -33,6 +35,7 @@ export OPENAI_API_KEY='sk-...'
 ```
 
 `.loomflo/config.json`:
+
 ```json
 { "provider": "openai" }
 ```

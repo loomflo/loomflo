@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from "../client.js";
+import { resolveProject } from "../project-resolver.js";
+import { openClient } from "../client.js";
 
 // ============================================================================
 // Types
@@ -24,11 +25,6 @@ interface ResumeResponse {
   resumeInfo: ResumeInfo;
 }
 
-/** Shape of an API error response. */
-interface ErrorResponse {
-  error: string;
-}
-
 // ============================================================================
 // Command Factory
 // ============================================================================
@@ -38,77 +34,54 @@ interface ErrorResponse {
  *
  * Usage: `loomflo resume`
  *
- * Sends a resume request to the running daemon. The daemon reloads the
- * last workflow state, identifies completed and interrupted nodes, resets
- * interrupted nodes back to pending, recalculates scheduler delays, and
- * resumes execution.
+ * Resolves the current project from the working directory and sends a
+ * resume request to the running daemon. The daemon reloads the last
+ * workflow state, identifies completed and interrupted nodes, resets
+ * interrupted nodes back to pending, recalculates scheduler delays,
+ * and resumes execution.
  *
  * @returns A configured commander Command instance.
  */
 export function createResumeCommand(): Command {
-  const cmd = new Command("resume")
+  return new Command("resume")
     .description("Resume a paused or interrupted workflow")
     .action(async (): Promise<void> => {
-      /* ------------------------------------------------------------------ */
-      /* Connect to daemon                                                  */
-      /* ------------------------------------------------------------------ */
-
-      let config;
       try {
-        config = await readDaemonConfig();
-      } catch {
-        console.error("Daemon is not running. Start with: loomflo start");
-        process.exit(1);
-      }
+        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+        const client = await openClient(identity.id);
 
-      const client = new DaemonClient(config.port, config.token);
+        console.log("Resuming workflow...");
 
-      /* ------------------------------------------------------------------ */
-      /* Send resume request                                                */
-      /* ------------------------------------------------------------------ */
+        const data = await client.request<ResumeResponse>("POST", "/workflow/resume");
+        const info = data.resumeInfo;
 
-      console.log("Resuming workflow...");
+        console.log(`Workflow resumed. Status: ${data.status}`);
+        console.log("");
 
-      const response = await client.post<ResumeResponse | ErrorResponse>("/workflow/resume");
-
-      if (!response.ok) {
-        const errorData = response.data as ErrorResponse;
-        console.error(`Failed to resume: ${errorData.error}`);
-        process.exit(1);
-      }
-
-      const data = response.data as ResumeResponse;
-      const info = data.resumeInfo;
-
-      /* ------------------------------------------------------------------ */
-      /* Display resume summary                                             */
-      /* ------------------------------------------------------------------ */
-
-      console.log(`Workflow resumed. Status: ${data.status}`);
-      console.log("");
-
-      if (info.completedNodeIds.length > 0) {
-        console.log(`  Completed (skipped): ${String(info.completedNodeIds.length)} nodes`);
-      }
-
-      if (info.resetNodeIds.length > 0) {
-        console.log(`  Interrupted (reset): ${String(info.resetNodeIds.length)} nodes`);
-        for (const nodeId of info.resetNodeIds) {
-          console.log(`    - ${nodeId}`);
+        if (info.completedNodeIds.length > 0) {
+          console.log(`  Completed (skipped): ${String(info.completedNodeIds.length)} nodes`);
         }
-      }
 
-      if (info.rescheduledNodeIds.length > 0) {
-        console.log(`  Rescheduled: ${String(info.rescheduledNodeIds.length)} nodes`);
-      }
+        if (info.resetNodeIds.length > 0) {
+          console.log(`  Interrupted (reset): ${String(info.resetNodeIds.length)} nodes`);
+          for (const nodeId of info.resetNodeIds) {
+            console.log(`    - ${nodeId}`);
+          }
+        }
 
-      if (info.resumedFrom !== null) {
-        console.log(`  Resuming from: ${info.resumedFrom}`);
-      }
+        if (info.rescheduledNodeIds.length > 0) {
+          console.log(`  Rescheduled: ${String(info.rescheduledNodeIds.length)} nodes`);
+        }
 
-      console.log("");
-      console.log("Execution will continue from where it left off.");
+        if (info.resumedFrom !== null) {
+          console.log(`  Resuming from: ${info.resumedFrom}`);
+        }
+
+        console.log("");
+        console.log("Execution will continue from where it left off.");
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
+        process.exit(1);
+      }
     });
-
-  return cmd;
 }

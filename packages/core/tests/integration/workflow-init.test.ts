@@ -1,146 +1,92 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-
-import { createServer } from "../../src/api/server.js";
-import type { WorkflowRoutesOptions } from "../../src/api/routes/workflow.js";
-import type { LLMProvider, CompletionParams } from "../../src/providers/base.js";
-import type { LLMResponse, Workflow, Event } from "../../src/types.js";
-import type { CostTracker } from "../../src/costs/tracker.js";
-import type { SharedMemoryManager } from "../../src/memory/shared-memory.js";
-import type { FastifyInstance } from "fastify";
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/** Create a minimal LLMResponse with text content. */
-function textResponse(text: string): LLMResponse {
-  return {
-    content: [{ type: "text", text }],
-    model: "mock-model",
-    usage: { input: 100, output: 50 },
-    stopReason: "end_turn",
-  };
-}
-
-/** A valid graph JSON for the mock LLM's graph-building step. */
-const VALID_GRAPH_JSON = JSON.stringify({
-  nodes: [
-    {
-      id: "node-1",
-      title: "Setup",
-      instructions: "1. Create project",
-      dependencies: [],
-    },
-    {
-      id: "node-2",
-      title: "Feature",
-      instructions: "1. Implement feature",
-      dependencies: ["node-1"],
-    },
-  ],
-});
-
 /**
- * Build a mock LLM provider that returns text for spec steps
- * and JSON for the graph step. The spec engine calls 6 times:
- *   0: constitution, 1: spec, 2: plan, 3: tasks, 4: analysis, 5: graph
+ * Integration tests for /projects/:id/workflow/init and related routes.
+ *
+ * Starts a Daemon via startForTest(), registers a project, and exercises
+ * workflow init/get/start/start-rejection under the /projects/:id/* URL
+ * scheme (T11).
+ *
+ * Because the spec-generation background task runs against the registered
+ * project's provider, these tests use a real registered project. To keep
+ * tests fast and hermetic, provider calls are expected to fail (no real API
+ * key), so only the synchronous parts (request/response) are verified.
  */
-function createMockProvider(): LLMProvider {
-  let callIndex = 0;
-  return {
-    name: "mock",
-    complete: vi.fn(async (_params: CompletionParams): Promise<LLMResponse> => {
-      callIndex++;
-      if (callIndex === 6) {
-        return textResponse("```json\n" + VALID_GRAPH_JSON + "\n```");
-      }
-      return textResponse(`# Step ${String(callIndex)} Content\nGenerated content.`);
-    }),
-  };
-}
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdir, rm, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir, homedir } from "node:os";
 
-/** Create a minimal mock SharedMemoryManager. */
-function createMockSharedMemory(): SharedMemoryManager {
-  return {
-    initialize: vi.fn(async (): Promise<void> => undefined),
-    read: vi.fn(async (): Promise<string> => ""),
-    write: vi.fn(async (): Promise<void> => undefined),
-    list: vi.fn(
-      async (): Promise<
-        Array<{ name: string; lastModifiedBy: string; lastModifiedAt: string }>
-      > => [],
-    ),
-  } as unknown as SharedMemoryManager;
-}
+import { Daemon } from "../../src/daemon.js";
+import { ProviderProfiles } from "../../src/providers/profiles.js";
+import type { FastifyInstance } from "fastify";
+import type { Workflow } from "../../src/types.js";
 
-/** Create a minimal mock CostTracker. */
-function createMockCostTracker(): CostTracker {
-  return {
-    trackCall: vi.fn(),
-    getNodeCost: vi.fn((): number => 0),
-    getTotalCost: vi.fn((): number => 0),
-    isOverBudget: vi.fn((): boolean => false),
-    getBudgetRemaining: vi.fn((): number | null => null),
-    reset: vi.fn(),
-  } as unknown as CostTracker;
-}
+// ============================================================================
+// Constants
+// ============================================================================
+
+const AUTH_TOKEN = "test-token-12345";
+const AUTH = { authorization: `Bearer ${AUTH_TOKEN}` };
+const PROJECT_ID = "proj_wfinit01";
+const CREDS_PATH = join(homedir(), ".loomflo", "credentials.json");
+const PROJECTS_JSON = join(homedir(), ".loomflo", "projects.json");
 
 // ============================================================================
 // Test Suite
 // ============================================================================
 
-describe("POST /workflow/init (integration)", () => {
+describe("POST /projects/:id/workflow/init (integration)", () => {
   let projectPath: string;
+  let daemon: Daemon;
   let server: FastifyInstance;
-  const AUTH_TOKEN = "test-token-12345";
+  let credentialsBackup: string | null = null;
+  let registryBackup: string | null = null;
 
-  /** In-memory workflow state. */
-  let currentWorkflow: Workflow | null = null;
-
-  /** Captured events. */
-  const events: Event[] = [];
+  const BASE_URL = `/projects/${PROJECT_ID}`;
 
   beforeEach(async () => {
+    // Back up any existing credentials.json
+    try {
+      credentialsBackup = await readFile(CREDS_PATH, "utf-8");
+    } catch {
+      credentialsBackup = null;
+    }
+
+    // Back up any existing projects.json and start from an empty registry
+    try {
+      registryBackup = await readFile(PROJECTS_JSON, "utf-8");
+    } catch {
+      registryBackup = null;
+    }
+    await mkdir(join(homedir(), ".loomflo"), { recursive: true });
+    await writeFile(PROJECTS_JSON, "[]");
+
+    // Seed a 'default' profile so registerProject can build a provider
+    const profiles = new ProviderProfiles(CREDS_PATH);
+    await profiles.upsert("default", { type: "anthropic", apiKey: "sk-test-xxx" });
+
     projectPath = join(
       tmpdir(),
       `loomflo-integ-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     await mkdir(projectPath, { recursive: true });
 
-    currentWorkflow = null;
-    events.length = 0;
+    daemon = new Daemon({ port: 0, host: "127.0.0.1" });
+    await (daemon as unknown as { startForTest: (t: string) => Promise<void> }).startForTest(
+      AUTH_TOKEN,
+    );
 
-    const workflowOptions: WorkflowRoutesOptions = {
-      getWorkflow: (): Workflow | null => currentWorkflow,
-      setWorkflow: (wf: Workflow): void => {
-        currentWorkflow = wf;
-      },
-      getProvider: (): LLMProvider => createMockProvider(),
-      getEventLog: () => ({
-        append: async (event: Event): Promise<void> => {
-          events.push(event);
-        },
-        query: async (): Promise<Event[]> => events,
-      }),
-      getSharedMemory: (): SharedMemoryManager => createMockSharedMemory(),
-      getCostTracker: (): CostTracker => createMockCostTracker(),
-    };
-
-    const result = await createServer({
-      token: AUTH_TOKEN,
+    await daemon.registerProject({
+      id: PROJECT_ID,
+      name: "workflow-init-test",
       projectPath,
-      dashboardPath: null,
-      workflow: workflowOptions,
+      providerProfileId: "default",
     });
 
-    server = result.server;
+    server = (daemon as unknown as { server: FastifyInstance }).server;
   });
 
   afterEach(async () => {
-    await server.close();
+    await daemon.stop();
     /* Wait briefly for any background spec generation to settle before cleanup. */
     await new Promise<void>((resolve): void => {
       setTimeout(resolve, 100);
@@ -148,17 +94,32 @@ describe("POST /workflow/init (integration)", () => {
     await rm(projectPath, { recursive: true, force: true }).catch((): void => {
       /* Best-effort cleanup — ignore errors from background operations. */
     });
+
+    // Restore credentials.json
+    if (credentialsBackup !== null) {
+      await mkdir(join(homedir(), ".loomflo"), { recursive: true });
+      await writeFile(CREDS_PATH, credentialsBackup, { mode: 0o600 });
+    } else {
+      await rm(CREDS_PATH, { force: true });
+    }
+
+    // Restore projects.json
+    if (registryBackup !== null) {
+      await writeFile(PROJECTS_JSON, registryBackup);
+    } else {
+      await rm(PROJECTS_JSON, { force: true });
+    }
   });
 
   // --------------------------------------------------------------------------
-  // POST /workflow/init
+  // POST /projects/:id/workflow/init
   // --------------------------------------------------------------------------
 
   it("should create a workflow and return 201", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: {
         description: "Build a todo app",
         projectPath,
@@ -176,16 +137,16 @@ describe("POST /workflow/init (integration)", () => {
     /* First init */
     await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { description: "First project", projectPath },
     });
 
     /* Second init should fail */
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { description: "Second project", projectPath },
     });
 
@@ -197,8 +158,8 @@ describe("POST /workflow/init (integration)", () => {
   it("should reject missing description (400)", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { projectPath },
     });
 
@@ -208,8 +169,8 @@ describe("POST /workflow/init (integration)", () => {
   it("should reject missing projectPath (400)", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { description: "Build something" },
     });
 
@@ -219,7 +180,7 @@ describe("POST /workflow/init (integration)", () => {
   it("should reject unauthenticated requests (401)", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
+      url: `${BASE_URL}/workflow/init`,
       payload: { description: "Test", projectPath },
     });
 
@@ -229,7 +190,7 @@ describe("POST /workflow/init (integration)", () => {
   it("should reject wrong token (401)", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/init",
+      url: `${BASE_URL}/workflow/init`,
       headers: { authorization: "Bearer wrong-token" },
       payload: { description: "Test", projectPath },
     });
@@ -238,14 +199,14 @@ describe("POST /workflow/init (integration)", () => {
   });
 
   // --------------------------------------------------------------------------
-  // GET /workflow
+  // GET /projects/:id/workflow
   // --------------------------------------------------------------------------
 
   it("should return 404 when no workflow exists", async () => {
     const response = await server.inject({
       method: "GET",
-      url: "/workflow",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow`,
+      headers: AUTH,
     });
 
     expect(response.statusCode).toBe(404);
@@ -255,16 +216,16 @@ describe("POST /workflow/init (integration)", () => {
     /* Create a workflow */
     await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { description: "Build a todo app", projectPath },
     });
 
     /* Retrieve it */
     const response = await server.inject({
       method: "GET",
-      url: "/workflow",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow`,
+      headers: AUTH,
     });
 
     expect(response.statusCode).toBe(200);
@@ -281,14 +242,14 @@ describe("POST /workflow/init (integration)", () => {
   });
 
   // --------------------------------------------------------------------------
-  // POST /workflow/start
+  // POST /projects/:id/workflow/start
   // --------------------------------------------------------------------------
 
   it("should reject start when no workflow exists (404)", async () => {
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/start",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/start`,
+      headers: AUTH,
     });
 
     expect(response.statusCode).toBe(404);
@@ -298,16 +259,16 @@ describe("POST /workflow/init (integration)", () => {
     /* Create a workflow (starts in 'spec' status) */
     await server.inject({
       method: "POST",
-      url: "/workflow/init",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/init`,
+      headers: AUTH,
       payload: { description: "Build a todo app", projectPath },
     });
 
     /* Try to start immediately — workflow is in 'spec', not 'building' */
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/start",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/start`,
+      headers: AUTH,
     });
 
     expect(response.statusCode).toBe(400);
@@ -316,31 +277,34 @@ describe("POST /workflow/init (integration)", () => {
   });
 
   it("should start a workflow that is in building status", async () => {
-    /* Directly set a workflow in 'building' status to simulate
+    /* Directly set the runtime's workflow to 'building' status to simulate
      * spec generation completion without triggering the background process. */
+    const rt = daemon.getProject(PROJECT_ID);
+    expect(rt).not.toBeNull();
+
     const now = new Date().toISOString();
-    currentWorkflow = {
+    rt!.workflow = {
       id: "test-workflow-id",
       status: "building",
       description: "Build a todo app",
       projectPath,
       graph: { nodes: {}, edges: [], topology: "linear" },
-      config: {} as Workflow["config"],
+      config: rt!.config,
       createdAt: now,
       updatedAt: now,
       totalCost: 0,
-    };
+    } satisfies Workflow;
 
     const response = await server.inject({
       method: "POST",
-      url: "/workflow/start",
-      headers: { authorization: `Bearer ${AUTH_TOKEN}` },
+      url: `${BASE_URL}/workflow/start`,
+      headers: AUTH,
     });
 
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body) as { status: string };
     expect(body.status).toBe("running");
-    expect(currentWorkflow?.status).toBe("running");
+    expect(rt!.workflow?.status).toBe("running");
   });
 
   // --------------------------------------------------------------------------
@@ -356,5 +320,21 @@ describe("POST /workflow/init (integration)", () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body) as { status: string };
     expect(body.status).toBe("ok");
+  });
+
+  // --------------------------------------------------------------------------
+  // Unknown project returns 404
+  // --------------------------------------------------------------------------
+
+  it("should return 404 for unknown project id", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/projects/proj_unknown/workflow",
+      headers: AUTH,
+    });
+
+    expect(response.statusCode).toBe(404);
+    const body = JSON.parse(response.body) as { error: string };
+    expect(body.error).toBe("project_not_registered");
   });
 });

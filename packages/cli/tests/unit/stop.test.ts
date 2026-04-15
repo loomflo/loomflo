@@ -1,9 +1,8 @@
 /**
  * Unit tests for packages/cli/src/commands/stop.ts — createStopCommand.
  *
- * Covers daemon not running, graceful shutdown success, API error with --force,
- * API error without --force, network error with alive PID, network error with
- * dead process, and SIGTERM failure on network error.
+ * Covers success path, request error, daemon-not-running (openClient rejects),
+ * and resolveProject-fails path (no .loomflo/project.json found).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -11,44 +10,45 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Module-level mocks (hoisted by vitest)
 // ---------------------------------------------------------------------------
 
-const mockPost = vi.fn();
+const mockRequest = vi.fn();
+const mockResolveProject = vi.fn();
+const mockOpenClient = vi.fn();
+
+vi.mock("../../src/project-resolver.js", () => ({
+  resolveProject: (...a: unknown[]) => mockResolveProject(...a),
+}));
 
 vi.mock("../../src/client.js", () => ({
-  readDaemonConfig: vi.fn(),
-  DaemonClient: vi.fn().mockImplementation(() => ({ post: mockPost })),
+  openClient: (...a: unknown[]) => mockOpenClient(...a),
 }));
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { DaemonClient, readDaemonConfig } from "../../src/client.js";
 import { createStopCommand } from "../../src/commands/stop.js";
-
-// ---------------------------------------------------------------------------
-// Mock typecasts
-// ---------------------------------------------------------------------------
-
-const mockReadDaemonConfig = readDaemonConfig as ReturnType<typeof vi.fn>;
-const MockDaemonClient = DaemonClient as unknown as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Default valid daemon config for tests. */
-const DAEMON_CONFIG = { port: 4000, token: "test-token", pid: 1234 };
+/** Default project identity returned by resolveProject. */
+const IDENTITY = {
+  id: "proj_abc12345",
+  name: "test-proj",
+  providerProfileId: "default",
+  createdAt: "2026-04-15T00:00:00Z",
+};
 
 /**
- * Execute the stop command action with optional arguments.
+ * Execute the stop command action.
  *
- * @param args - Additional CLI arguments (e.g. "--force").
  * @returns A promise that resolves when the command completes.
  */
-async function runStop(args: string[] = []): Promise<void> {
+async function runStop(): Promise<void> {
   const cmd = createStopCommand();
   cmd.exitOverride();
-  await cmd.parseAsync(["node", "stop", ...args]);
+  await cmd.parseAsync(["node", "stop"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,6 @@ async function runStop(args: string[] = []): Promise<void> {
 let mockConsoleLog: ReturnType<typeof vi.fn>;
 let mockConsoleError: ReturnType<typeof vi.fn>;
 let mockProcessExit: ReturnType<typeof vi.fn>;
-let mockProcessKill: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mockProcessExit = vi.spyOn(process, "exit").mockImplementation((): never => {
@@ -68,234 +67,102 @@ beforeEach(() => {
   mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
   mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-  mockProcessKill = vi.spyOn(process, "kill").mockImplementation(() => true);
+  mockRequest.mockReset();
+  mockResolveProject.mockReset();
+  mockOpenClient.mockReset();
 
-  mockPost.mockReset();
-  mockReadDaemonConfig.mockReset();
-  MockDaemonClient.mockReset().mockImplementation(() => ({ post: mockPost }));
+  mockResolveProject.mockResolvedValue({
+    identity: IDENTITY,
+    projectRoot: "/tmp/test",
+    created: false,
+  });
 
-  mockReadDaemonConfig.mockResolvedValue(DAEMON_CONFIG);
-
-  vi.useFakeTimers();
+  mockOpenClient.mockResolvedValue({
+    projectId: IDENTITY.id,
+    info: { port: 4000, token: "t", pid: 1234, version: "0.2.0" },
+    request: mockRequest,
+  });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.useRealTimers();
 });
 
 // ===========================================================================
-// Daemon not running
+// Success path
 // ===========================================================================
 
-describe("stop command — daemon not running", () => {
-  it("should log 'not running' and return when readDaemonConfig rejects", async () => {
-    mockReadDaemonConfig.mockRejectedValue(new Error("ENOENT"));
+describe("stop command — success", () => {
+  it("should call POST /workflow/stop and log success message", async () => {
+    mockRequest.mockResolvedValue(undefined);
 
     await runStop();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon is not running.");
-    expect(mockProcessExit).not.toHaveBeenCalled();
-    expect(mockPost).not.toHaveBeenCalled();
-  });
-});
-
-// ===========================================================================
-// Graceful shutdown — success, process exits quickly
-// ===========================================================================
-
-describe("stop command — graceful shutdown success", () => {
-  it("should send shutdown request and report success when process exits", async () => {
-    mockPost.mockResolvedValue({ ok: true, status: 200, data: {} });
-
-    // process.kill(pid, 0) should throw on second call (process gone)
-    let killCallCount = 0;
-    mockProcessKill.mockImplementation((pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        killCallCount++;
-        if (killCallCount >= 2) {
-          throw new Error("ESRCH");
-        }
-        return true;
-      }
-      return true;
+    expect(mockResolveProject).toHaveBeenCalledWith({
+      cwd: process.cwd(),
+      createIfMissing: false,
     });
-
-    const promise = runStop();
-
-    // Advance past the poll intervals to let waitForProcessExit detect exit
-    await vi.advanceTimersByTimeAsync(1000);
-
-    await promise;
-
-    expect(mockPost).toHaveBeenCalledWith("/shutdown");
-    expect(mockConsoleLog).toHaveBeenCalledWith("Stopping Loomflo daemon...");
+    expect(mockOpenClient).toHaveBeenCalledWith(IDENTITY.id);
+    expect(mockRequest).toHaveBeenCalledWith("POST", "/workflow/stop");
     expect(mockConsoleLog).toHaveBeenCalledWith(
-      "Shutdown signal sent. Waiting for active calls to finish...",
+      `Project ${IDENTITY.name} (${IDENTITY.id}) stopped.`,
     );
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon stopped.");
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
 });
 
 // ===========================================================================
-// API error without --force
+// Request throws (workflow stop fails)
 // ===========================================================================
 
-describe("stop command — API error without --force", () => {
-  it("should log error and exit(1) when shutdown returns non-ok and no --force", async () => {
-    mockPost.mockResolvedValue({
-      ok: false,
-      status: 500,
-      data: { error: "Internal error" },
-    });
+describe("stop command — request error", () => {
+  it("should log error and exit(1) when request throws", async () => {
+    mockRequest.mockRejectedValue(new Error("POST /workflow/stop -> HTTP 500"));
 
-    // process.exit(1) throws inside a try block, so the catch block runs.
-    // Make isProcessAlive return false so the catch branch returns immediately.
-    mockProcessKill.mockImplementation((_pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        throw new Error("ESRCH");
-      }
-      return true;
-    });
+    await expect(runStop()).rejects.toThrow("process.exit");
 
-    await runStop();
-
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Daemon did not accept shutdown request. Use --force to send SIGTERM.",
-    );
+    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /workflow/stop -> HTTP 500");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 });
 
 // ===========================================================================
-// API error with --force
+// Daemon not running (openClient rejects)
 // ===========================================================================
 
-describe("stop command — API error with --force", () => {
-  it("should send SIGTERM when shutdown returns non-ok and --force is set", async () => {
-    mockPost.mockResolvedValue({
-      ok: false,
-      status: 500,
-      data: { error: "Internal error" },
-    });
-
-    // process.kill(pid, 0) should throw immediately (process gone after SIGTERM)
-    mockProcessKill.mockImplementation((pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        throw new Error("ESRCH");
-      }
-      return true;
-    });
-
-    const promise = runStop(["--force"]);
-
-    await vi.advanceTimersByTimeAsync(1000);
-
-    await promise;
-
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      "Graceful shutdown not available. Sending SIGTERM...",
+describe("stop command — daemon not running", () => {
+  it("should log error and exit(1) when openClient rejects", async () => {
+    mockOpenClient.mockRejectedValue(
+      new Error("Daemon is not running. Run 'loomflo start' first."),
     );
-    expect(mockProcessKill).toHaveBeenCalledWith(1234, "SIGTERM");
-  });
-});
 
-// ===========================================================================
-// Network error — process no longer running
-// ===========================================================================
+    await expect(runStop()).rejects.toThrow("process.exit");
 
-describe("stop command — network error, dead process", () => {
-  it("should log 'no longer running' when post throws and process is dead", async () => {
-    mockPost.mockRejectedValue(new Error("ECONNREFUSED"));
-
-    // process.kill(pid, 0) throws — process is dead
-    mockProcessKill.mockImplementation((_pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        throw new Error("ESRCH");
-      }
-      return true;
-    });
-
-    await runStop();
-
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon process is no longer running.");
-    expect(mockProcessExit).not.toHaveBeenCalled();
-  });
-});
-
-// ===========================================================================
-// Network error — process alive, SIGTERM sent
-// ===========================================================================
-
-describe("stop command — network error, alive process", () => {
-  it("should send SIGTERM when post throws but process is alive", async () => {
-    mockPost.mockRejectedValue(new Error("ECONNREFUSED"));
-
-    // First kill(pid, 0) succeeds (alive), then later throws (dead)
-    let killCount = 0;
-    mockProcessKill.mockImplementation((_pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        killCount++;
-        if (killCount >= 3) {
-          throw new Error("ESRCH");
-        }
-        return true;
-      }
-      return true;
-    });
-
-    const promise = runStop();
-
-    await vi.advanceTimersByTimeAsync(2000);
-
-    await promise;
-
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      "Cannot reach daemon API. Sending SIGTERM to process...",
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error: Daemon is not running. Run 'loomflo start' first.",
     );
-    expect(mockProcessKill).toHaveBeenCalledWith(1234, "SIGTERM");
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon stopped.");
+    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });
 
 // ===========================================================================
-// Network error — SIGTERM fails (process exited between check and kill)
+// resolveProject fails (no .loomflo/project.json)
 // ===========================================================================
 
-describe("stop command — network error, SIGTERM fails", () => {
-  it("should log 'no longer running' when kill(SIGTERM) throws", async () => {
-    mockPost.mockRejectedValue(new Error("ECONNREFUSED"));
+describe("stop command — not a loomflo project", () => {
+  it("should log error and exit(1) when resolveProject rejects", async () => {
+    mockResolveProject.mockRejectedValue(
+      new Error("/tmp is not a loomflo project (no .loomflo/project.json found)."),
+    );
 
-    // kill(pid, 0) succeeds (alive), but kill(pid, SIGTERM) throws
-    mockProcessKill.mockImplementation((_pid: number, signal?: string | number) => {
-      if (signal === 0) {
-        return true;
-      }
-      if (signal === "SIGTERM") {
-        throw new Error("ESRCH");
-      }
-      return true;
-    });
+    await expect(runStop()).rejects.toThrow("process.exit");
 
-    await runStop();
-
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon process is no longer running.");
-  });
-});
-
-// ===========================================================================
-// PID is 0 (no PID info) — graceful shutdown only
-// ===========================================================================
-
-describe("stop command — pid is 0", () => {
-  it("should skip PID-based waiting when pid is 0", async () => {
-    mockReadDaemonConfig.mockResolvedValue({ port: 4000, token: "test-token", pid: 0 });
-    mockPost.mockResolvedValue({ ok: true, status: 200, data: {} });
-
-    await runStop();
-
-    expect(mockConsoleLog).toHaveBeenCalledWith("Daemon stopped.");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error: /tmp is not a loomflo project (no .loomflo/project.json found).",
+    );
+    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    expect(mockOpenClient).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });

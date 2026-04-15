@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { LoomAgent } from "../../agents/loom.js";
@@ -6,11 +6,13 @@ import { loadConfig, PartialConfigSchema } from "../../config.js";
 import type { CostTracker } from "../../costs/tracker.js";
 import type { SharedMemoryManager } from "../../memory/shared-memory.js";
 import type { EventQueryFilters } from "../../persistence/events.js";
+import { appendEvent, queryEvents } from "../../persistence/events.js";
 import { saveWorkflowState } from "../../persistence/state.js";
 import type { LLMProvider } from "../../providers/base.js";
 import type { Event, Workflow } from "../../types.js";
 import { WorkflowExecutionEngine, type NodeExecutor } from "../../workflow/execution-engine.js";
 import { WorkflowManager, type ResumeInfo } from "../../workflow/workflow.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
 
 // ============================================================================
 // Types
@@ -27,25 +29,36 @@ export interface EventLog {
 /** Options accepted by the {@link workflowRoutes} factory. */
 export interface WorkflowRoutesOptions {
   /** Return the current active workflow, or null if none exists. */
-  getWorkflow: () => Workflow | null;
+  getWorkflow?: () => Workflow | null;
   /** Set the active workflow in memory. */
-  setWorkflow: (workflow: Workflow) => void;
+  setWorkflow?: (workflow: Workflow) => void;
   /** Return the configured LLM provider. */
-  getProvider: () => LLMProvider;
+  getProvider?: () => LLMProvider;
   /** Return the event log accessor for the current project. */
-  getEventLog: () => EventLog;
+  getEventLog?: () => EventLog;
   /** Return the shared memory manager. */
-  getSharedMemory: () => SharedMemoryManager;
+  getSharedMemory?: () => SharedMemoryManager;
   /** Return the cost tracker. */
-  getCostTracker: () => CostTracker;
+  getCostTracker?: () => CostTracker;
   /** Signal for aborting background tasks on server close. */
   signal?: AbortSignal;
   /**
-   * Factory that creates a NodeExecutor for a given workflow.
+   * Factory that creates a NodeExecutor for a given runtime and workflow.
    * Called once when /workflow/start is invoked.
    * Optional — if absent, nodes will not be executed (spec-only mode).
    */
-  createNodeExecutor?: (workflow: Workflow) => NodeExecutor;
+  createNodeExecutor?: (rt: ProjectRuntime, workflow: Workflow) => NodeExecutor;
+}
+
+/** Resolved per-request services for a route handler. */
+interface ResolvedServices {
+  getWorkflow: () => Workflow | null;
+  setWorkflow: (wf: Workflow) => void;
+  getProvider: () => LLMProvider;
+  getEventLog: () => EventLog;
+  getSharedMemory: () => SharedMemoryManager;
+  getCostTracker: () => CostTracker;
+  runtime: ProjectRuntime | undefined;
 }
 
 // ============================================================================
@@ -95,6 +108,63 @@ interface GetWorkflowResponse {
 }
 
 // ============================================================================
+// Service Resolution
+// ============================================================================
+
+/**
+ * Resolve per-request services from either the injected `req.runtime`
+ * (new multi-project path) or the option closures (legacy/unit-test path).
+ */
+function resolveServices(req: FastifyRequest, options: WorkflowRoutesOptions): ResolvedServices {
+  const rt = (req as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+
+  if (rt) {
+    return {
+      getWorkflow: () => rt.workflow,
+      setWorkflow: (wf: Workflow) => {
+        rt.workflow = wf;
+      },
+      getProvider: () => rt.provider,
+      getEventLog: () => ({
+        append: (e: Event) => appendEvent(rt.projectPath, e),
+        query: (f?: EventQueryFilters) => queryEvents(rt.projectPath, f),
+      }),
+      getSharedMemory: () => rt.sharedMemory,
+      getCostTracker: () => rt.costTracker,
+      runtime: rt,
+    };
+  }
+
+  // Legacy closure path (used by unit tests that register plugins directly).
+  return {
+    getWorkflow: options.getWorkflow ?? (() => null),
+    setWorkflow: options.setWorkflow ?? (() => undefined),
+    getProvider:
+      options.getProvider ??
+      (() => {
+        throw new Error("No LLM provider configured");
+      }),
+    getEventLog:
+      options.getEventLog ??
+      (() => ({
+        append: () => Promise.resolve(),
+        query: () => Promise.resolve([]),
+      })),
+    getSharedMemory:
+      options.getSharedMemory ??
+      (() => {
+        throw new Error("No shared memory configured");
+      }),
+    getCostTracker:
+      options.getCostTracker ??
+      (() => {
+        throw new Error("No cost tracker configured");
+      }),
+    runtime: undefined,
+  };
+}
+
+// ============================================================================
 // Plugin Factory
 // ============================================================================
 
@@ -109,8 +179,6 @@ interface GetWorkflowResponse {
  * @returns A Fastify plugin suitable for `server.register()`.
  */
 export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsync {
-  const { getWorkflow, setWorkflow } = options;
-
   const plugin: FastifyPluginAsync = (fastify): Promise<void> => {
     /**
      * GET /workflow
@@ -118,7 +186,8 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Returns the current workflow state including the execution graph.
      * Returns 404 if no workflow is active.
      */
-    fastify.get("/workflow", async (_request, reply): Promise<void> => {
+    fastify.get("/workflow", async (request, reply): Promise<void> => {
+      const { getWorkflow } = resolveServices(request, options);
       const workflow = getWorkflow();
 
       if (workflow === null) {
@@ -156,6 +225,8 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       }
 
       const body = parseResult.data;
+      const svc = resolveServices(request, options);
+      const { getWorkflow, setWorkflow } = svc;
 
       if (getWorkflow() !== null) {
         await reply.code(409).send({ error: "A workflow is already active" });
@@ -190,7 +261,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
 
       setWorkflow(workflow);
 
-      void runSpecGenerationBackground(workflow, options, options.signal);
+      void runSpecGenerationBackground(workflow, svc, options.signal);
 
       await reply.code(201).send({
         id: workflow.id,
@@ -205,7 +276,9 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Confirm the spec and transition the workflow from 'building' to 'running',
      * beginning Phase 2 (execution).
      */
-    fastify.post("/workflow/start", async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/start", async (request, reply): Promise<void> => {
+      const svc = resolveServices(request, options);
+      const { getWorkflow, setWorkflow } = svc;
       const workflow = getWorkflow();
 
       if (workflow === null) {
@@ -228,7 +301,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
       await saveWorkflowState(updated.projectPath, updated);
 
       // Fire-and-forget: engine runs in background, updates state via setWorkflow
-      void runExecutionBackground(updated, options, options.signal);
+      void runExecutionBackground(updated, svc, options);
 
       await reply.code(200).send({ status: "running" } satisfies StartResponse);
     });
@@ -239,7 +312,8 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * Pause a running workflow. In-progress nodes continue until their current
      * agent calls complete, but no new nodes are dispatched.
      */
-    fastify.post("/workflow/pause", async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/pause", async (request, reply): Promise<void> => {
+      const { getWorkflow, setWorkflow } = resolveServices(request, options);
       const workflow = getWorkflow();
 
       if (workflow === null) {
@@ -274,7 +348,9 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
      * to pending, recalculates scheduler delays, and transitions the
      * workflow back to running.
      */
-    fastify.post("/workflow/resume", async (_request, reply): Promise<void> => {
+    fastify.post("/workflow/resume", async (request, reply): Promise<void> => {
+      const svc = resolveServices(request, options);
+      const { getWorkflow, setWorkflow } = svc;
       const workflow = getWorkflow();
 
       if (workflow === null) {
@@ -301,7 +377,7 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
         setWorkflow(resumedWorkflow);
 
         // Fire execution engine in background (same as /workflow/start)
-        void runExecutionBackground(resumedWorkflow, options, options.signal);
+        void runExecutionBackground(resumedWorkflow, svc, options);
 
         await reply.code(200).send({
           status: resumedWorkflow.status,
@@ -335,24 +411,34 @@ export function workflowRoutes(options: WorkflowRoutesOptions): FastifyPluginAsy
  * No-ops silently if createNodeExecutor is not provided (spec-only mode).
  *
  * @param workflow - The workflow in 'running' status.
- * @param options - Route options providing access to services.
- * @param signal - Optional abort signal to stop the engine on server close.
+ * @param svc - Resolved per-request services.
+ * @param options - Route options (for createNodeExecutor and signal).
  */
 async function runExecutionBackground(
   workflow: Workflow,
+  svc: ResolvedServices,
   options: WorkflowRoutesOptions,
-  signal?: AbortSignal,
 ): Promise<void> {
-  const { setWorkflow, getCostTracker, createNodeExecutor } = options;
-  if (!createNodeExecutor) return; // spec-only mode, no-op
+  const { setWorkflow, getCostTracker, runtime } = svc;
+  if (!options.createNodeExecutor) return; // spec-only mode, no-op
 
   const manager = new WorkflowManager(workflow);
-  const executor = createNodeExecutor(workflow);
+
+  // Build executor — if a runtime is available (multi-project path), pass it;
+  // otherwise create a dummy runtime-less call (legacy path, no executor needed).
+  let executor: NodeExecutor;
+  if (runtime) {
+    executor = options.createNodeExecutor(runtime, workflow);
+  } else {
+    return; // no runtime in legacy closure path + createNodeExecutor present = no-op
+  }
+
   const costTracker = getCostTracker();
 
   const engine = new WorkflowExecutionEngine({ manager, executor, costTracker });
 
   // Wire abort signal → engine.stop()
+  const signal = options.signal;
   const onAbort = (): void => {
     engine.stop();
   };
@@ -374,7 +460,9 @@ async function runExecutionBackground(
     // Final sync: engine has already transitioned the manager to done/failed/paused
     const terminal = manager.toJSON();
     setWorkflow(terminal);
-    await saveWorkflowState(terminal.projectPath, terminal);
+    await saveWorkflowState(terminal.projectPath, terminal).catch(() => {
+      /* ignore disk errors if project path was cleaned up */
+    });
   } catch {
     clearInterval(syncInterval);
     if (signal) signal.removeEventListener("abort", onAbort);
@@ -384,7 +472,9 @@ async function runExecutionBackground(
     const current = manager.toJSON();
     const failed: Workflow = { ...current, status: "failed", updatedAt: new Date().toISOString() };
     setWorkflow(failed);
-    await saveWorkflowState(failed.projectPath, failed);
+    await saveWorkflowState(failed.projectPath, failed).catch(() => {
+      /* ignore disk errors if project path was cleaned up */
+    });
   }
 }
 
@@ -395,19 +485,40 @@ async function runExecutionBackground(
  * On failure: updates workflow status to 'failed', persists.
  *
  * @param workflow - The newly created workflow in 'spec' status.
- * @param options - Route options providing access to services.
+ * @param svc - Resolved per-request services.
  * @param signal - Optional abort signal to cancel disk writes on server close.
  */
 async function runSpecGenerationBackground(
   workflow: Workflow,
-  options: WorkflowRoutesOptions,
+  svc: ResolvedServices,
   signal?: AbortSignal,
 ): Promise<void> {
-  const { setWorkflow, getProvider, getSharedMemory, getCostTracker } = options;
+  const { setWorkflow, getProvider, getSharedMemory, getCostTracker } = svc;
 
-  // Ensure shared memory directory and standard files exist before spec generation
-  const sharedMemory = getSharedMemory();
-  await sharedMemory.initialize();
+  if (signal?.aborted) return;
+
+  let sharedMemory;
+  try {
+    // Ensure shared memory directory and standard files exist before spec generation
+    sharedMemory = getSharedMemory();
+    await sharedMemory.initialize();
+  } catch (error: unknown) {
+    if (signal?.aborted) return;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[workflow] Shared memory init failed for ${workflow.id}: ${message}`);
+    const updated: Workflow = {
+      ...workflow,
+      status: "failed",
+      updatedAt: new Date().toISOString(),
+    };
+    setWorkflow(updated);
+    if (!signal?.aborted) {
+      await saveWorkflowState(updated.projectPath, updated).catch(() => {
+        /* ignore disk errors during cleanup */
+      });
+    }
+    return;
+  }
 
   const loom = new LoomAgent({
     provider: getProvider(),
@@ -433,7 +544,9 @@ async function runSpecGenerationBackground(
 
     setWorkflow(updated);
     if (!signal?.aborted) {
-      await saveWorkflowState(updated.projectPath, updated);
+      await saveWorkflowState(updated.projectPath, updated).catch(() => {
+        /* ignore disk errors if project path was cleaned up */
+      });
     }
   } catch (error: unknown) {
     if (signal?.aborted) return;
@@ -449,7 +562,9 @@ async function runSpecGenerationBackground(
 
     setWorkflow(updated);
     if (!signal?.aborted) {
-      await saveWorkflowState(updated.projectPath, updated);
+      await saveWorkflowState(updated.projectPath, updated).catch(() => {
+        /* ignore disk errors if project path was cleaned up */
+      });
     }
   }
 }

@@ -85,17 +85,30 @@ packages/
 ## Quickstart
 
 ```bash
-# 1. Set your API key
+# From your project directory
 export ANTHROPIC_API_KEY=sk-ant-your-key-here
-
-# 2. Start the daemon
-loomflo start
-
-# 3. Initialize a project
-loomflo init "Build a REST API with auth, user management, and PostgreSQL"
+loomflo start       # auto-starts the daemon + registers the project + streams events
 ```
 
-The daemon generates a complete spec suite and execution graph. Review everything in the dashboard, confirm, and watch your project build itself.
+Running `loomflo start` in a second project works the same way — the daemon
+holds both projects in parallel. See **Multi-project** below.
+
+## Multi-project
+
+One Loomflo daemon runs per machine. Each project registers itself the first
+time you run `loomflo start` in its directory; it gets a stable ID in
+`.loomflo/project.json` and a per-project provider profile.
+
+- `loomflo start` — start this project's workflow.
+- `loomflo stop` — stop this project's workflow (daemon keeps running).
+- `loomflo project list` — see every project registered with the daemon.
+- `loomflo daemon stop` — stop the daemon entirely (refuses if any project is
+  active; pass `--force` to override).
+
+Each project keeps its workflow state under `./.loomflo/`. Provider credentials
+live in `~/.loomflo/credentials.json` as named profiles that projects reference
+by id. The registry of known projects is persisted in
+`~/.loomflo/projects.json` and reloaded when the daemon restarts.
 
 ## Installation
 
@@ -123,10 +136,11 @@ docker compose up -d
 ## Usage Example
 
 ```bash
-# Start the daemon
+# In your project directory — auto-starts the daemon + registers this project
+cd /path/to/project
 loomflo start
 
-# Generate specs for a new project
+# Or generate specs from scratch
 loomflo init "Build a todo app with React frontend, Express backend, and SQLite"
 
 # Open the dashboard to review the spec and execution graph
@@ -138,37 +152,38 @@ loomflo chat "use Tailwind for styling instead of plain CSS"
 # Check workflow status and costs
 loomflo status
 
-# Give instructions during execution
-loomflo chat "use bcrypt for password hashing, not argon2"
-
 # View agent logs for a specific node
 loomflo logs node-3
 
-# If the daemon is interrupted, resume from where it left off
+# Resume an interrupted workflow
 loomflo resume
 
-# Adjust configuration mid-execution
-loomflo config set reviewerEnabled false
-loomflo config set budgetLimit 20
-
-# Stop the daemon gracefully
+# Stop this project's workflow (the daemon keeps running)
 loomflo stop
+
+# List every project the daemon knows about
+loomflo project list
+
+# Stop the daemon itself
+loomflo daemon stop
 ```
 
 ## CLI Commands
 
-| Command                            | Description                                        |
-| ---------------------------------- | -------------------------------------------------- |
-| `loomflo start`                    | Start the daemon (detached)                        |
-| `loomflo stop`                     | Stop the daemon gracefully                         |
-| `loomflo init "description"`       | Generate spec + execution graph from a description |
-| `loomflo chat "message"`           | Chat with the Architect agent                      |
-| `loomflo status`                   | Show workflow state, active nodes, costs           |
-| `loomflo resume`                   | Resume an interrupted workflow                     |
-| `loomflo dashboard`                | Open the web dashboard in your browser             |
-| `loomflo logs [node-id]`           | View agent logs (optionally filtered by node)      |
-| `loomflo config set <key> <value>` | Set a configuration value                          |
-| `loomflo config get <key>`         | Get a configuration value                          |
+| Command                                       | Description                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `loomflo start`                               | Start this project's workflow (auto-starts the daemon + registers) |
+| `loomflo stop`                                | Stop this project's workflow (the daemon keeps running)            |
+| `loomflo init "description"`                  | Generate spec + execution graph from a description                 |
+| `loomflo chat "message"`                      | Chat with the Architect agent                                      |
+| `loomflo status`                              | Show workflow state, active nodes, costs                           |
+| `loomflo resume`                              | Resume an interrupted workflow                                     |
+| `loomflo dashboard`                           | Open the web dashboard in your browser                             |
+| `loomflo logs [node-id]`                      | View agent logs (optionally filtered by node)                      |
+| `loomflo config set <key> <value>`            | Set a configuration value                                          |
+| `loomflo config get <key>`                    | Get a configuration value                                          |
+| `loomflo daemon start\|stop\|status\|restart` | Control the daemon process lifecycle (independent of any project)  |
+| `loomflo project list\|remove\|prune`         | Inspect or clean up the daemon's project registry                  |
 
 ## Dashboard
 

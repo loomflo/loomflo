@@ -29,9 +29,7 @@ function toOpenAIMessages(
   messages: LLMMessage[],
   system: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
-  const result: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: system },
-  ];
+  const result: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: system }];
 
   for (const msg of messages) {
     if (typeof msg.content === "string") {

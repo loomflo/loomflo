@@ -149,8 +149,14 @@ export async function resolveCredentials(options?: {
   // Source 3: Claude Code credential store
   const claudeOAuth = await readClaudeCodeCredentials(options?.claudeCredentialsPath);
   if (claudeOAuth) {
+    const credPath = options?.claudeCredentialsPath;
     return {
-      config: { oauthToken: claudeOAuth.accessToken },
+      config: {
+        oauthToken: async () => {
+          const fresh = await readClaudeCodeCredentials(credPath);
+          return fresh?.accessToken ?? claudeOAuth.accessToken;
+        },
+      },
       source: "claude-code-oauth",
     };
   }

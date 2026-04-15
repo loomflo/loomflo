@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { getRunningDaemon, type DaemonInfo } from "./daemon-control.js";
 
 // ============================================================================
 // Types
@@ -590,4 +591,70 @@ export class DaemonClient {
 
     this.reconnectDelay = Math.min(this.reconnectDelay * RECONNECT_MULTIPLIER, RECONNECT_MAX_MS);
   }
+}
+
+// ============================================================================
+// ScopedClient — project-scoped HTTP client
+// ============================================================================
+
+/**
+ * A lightweight project-scoped HTTP client.
+ *
+ * All relative paths are automatically prefixed with `/projects/:projectId`.
+ * Paths that already start with `/projects/` are passed through unchanged.
+ */
+export interface ScopedClient {
+  /** The project ID this client is scoped to. */
+  projectId: string;
+  /** Information about the running daemon. */
+  info: DaemonInfo;
+  /**
+   * Send an HTTP request to the daemon.
+   *
+   * @typeParam T - The expected response type.
+   * @param method - HTTP method string (e.g. "GET", "POST").
+   * @param path - URL path. If it does not start with "/projects/", the
+   *   projectId prefix is added automatically.
+   * @param body - Optional JSON body for POST/PUT requests.
+   * @returns Parsed JSON response body, or undefined for 204 responses.
+   * @throws {Error} If the response status is not 2xx.
+   */
+  request: <T = unknown>(method: string, path: string, body?: unknown) => Promise<T>;
+}
+
+/**
+ * Open a project-scoped HTTP client against the running daemon.
+ *
+ * Reads the running daemon from `~/.loomflo/daemon.json` (via
+ * {@link getRunningDaemon}) and returns a {@link ScopedClient} that
+ * automatically prefixes all relative paths with `/projects/:projectId`.
+ *
+ * @param projectId - The project ID to scope requests to.
+ * @returns A configured ScopedClient.
+ * @throws {Error} If the daemon is not running.
+ */
+export async function openClient(projectId: string): Promise<ScopedClient> {
+  const info = await getRunningDaemon();
+  if (!info) throw new Error("Daemon is not running. Run 'loomflo start' first.");
+  const base = `http://127.0.0.1:${String(info.port)}`;
+  return {
+    projectId,
+    info,
+    async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+      const url = path.startsWith("/projects/")
+        ? `${base}${path}`
+        : `${base}/projects/${projectId}${path}`;
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${info.token}`,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`${method} ${path} -> HTTP ${String(res.status)}`);
+      if (res.status === 204) return undefined as T;
+      return (await res.json()) as T;
+    },
+  };
 }

@@ -11,26 +11,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Module-level mocks (hoisted by vitest)
 // ---------------------------------------------------------------------------
 
-const mockGet = vi.fn();
+const mockRequest = vi.fn();
+const mockResolveProject = vi.fn();
+const mockOpenClient = vi.fn();
+
+vi.mock("../../src/project-resolver.js", () => ({
+  resolveProject: (...a: unknown[]) => mockResolveProject(...a),
+}));
 
 vi.mock("../../src/client.js", () => ({
-  readDaemonConfig: vi.fn(),
-  DaemonClient: vi.fn().mockImplementation(() => ({ get: mockGet })),
+  openClient: (...a: unknown[]) => mockOpenClient(...a),
 }));
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { DaemonClient, readDaemonConfig } from "../../src/client.js";
 import { createStatusCommand } from "../../src/commands/status.js";
-
-// ---------------------------------------------------------------------------
-// Mock typecasts
-// ---------------------------------------------------------------------------
-
-const mockReadDaemonConfig = readDaemonConfig as ReturnType<typeof vi.fn>;
-const MockDaemonClient = DaemonClient as unknown as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------
 // Types (mirror internal types from status.ts for test data)
@@ -71,84 +68,74 @@ interface NodeData {
   retryCount: number;
 }
 
-/** Typed API response wrapper used in test factories. */
-interface ApiResponse<T> {
-  ok: boolean;
-  status: number;
-  data: T;
-}
-
 // ---------------------------------------------------------------------------
 // Test data factories
 // ---------------------------------------------------------------------------
 
 /**
- * Create a successful workflow API response.
+ * Create a successful workflow response (raw data, no envelope).
  *
  * @param overrides - Partial workflow fields to override defaults.
- * @returns A mock ApiResponse with ok=true and status=200.
+ * @returns A WorkflowData object.
  */
-function makeWorkflowOk(overrides?: Partial<WorkflowData>): ApiResponse<WorkflowData> {
+function makeWorkflow(overrides?: Partial<WorkflowData>): WorkflowData {
   return {
-    ok: true,
-    status: 200,
-    data: {
-      id: "wf-abc123",
-      status: "running",
-      description: "Build a todo app",
-      projectPath: "/tmp/project",
-      totalCost: 1.5,
-      createdAt: "2026-03-30T00:00:00Z",
-      updatedAt: "2026-03-30T01:00:00Z",
-      graph: {
-        nodes: [
-          { id: "n1", title: "Planning", type: "task" },
-          { id: "n2", title: "Implementation", type: "task" },
-        ],
-        edges: [{ source: "n1", target: "n2" }],
-        topology: "linear",
-      },
-      ...overrides,
+    id: "wf-abc123",
+    status: "running",
+    description: "Build a todo app",
+    projectPath: "/tmp/project",
+    totalCost: 1.5,
+    createdAt: "2026-03-30T00:00:00Z",
+    updatedAt: "2026-03-30T01:00:00Z",
+    graph: {
+      nodes: [
+        { id: "n1", title: "Planning", type: "task" },
+        { id: "n2", title: "Implementation", type: "task" },
+      ],
+      edges: [{ source: "n1", target: "n2" }],
+      topology: "linear",
     },
+    ...overrides,
   };
 }
 
 /**
- * Create a successful costs API response.
+ * Create a successful costs response.
  *
  * @param overrides - Partial cost fields to override defaults.
- * @returns A mock ApiResponse with ok=true and status=200.
+ * @returns A CostsData object.
  */
-function makeCostsOk(overrides?: Partial<CostsData>): ApiResponse<CostsData> {
+function makeCosts(overrides?: Partial<CostsData>): CostsData {
   return {
-    ok: true,
-    status: 200,
-    data: {
-      total: 2.5,
-      budgetLimit: 10.0,
-      budgetRemaining: 7.5,
-      nodes: [
-        { id: "n1", title: "Planning", cost: 0.8, retries: 0 },
-        { id: "n2", title: "Implementation", cost: 1.7, retries: 1 },
-      ],
-      loomCost: 0.3,
-      ...overrides,
-    },
+    total: 2.5,
+    budgetLimit: 10.0,
+    budgetRemaining: 7.5,
+    nodes: [
+      { id: "n1", title: "Planning", cost: 0.8, retries: 0 },
+      { id: "n2", title: "Implementation", cost: 1.7, retries: 1 },
+    ],
+    loomCost: 0.3,
+    ...overrides,
   };
 }
 
 /**
- * Create a successful nodes API response.
+ * Create a successful nodes response.
  *
  * @param nodes - Custom node entries. Defaults to two active nodes (running, review).
- * @returns A mock ApiResponse with ok=true and status=200.
+ * @returns An array of NodeData objects.
  */
-function makeNodesOk(nodes?: NodeData[]): ApiResponse<NodeData[]> {
-  return {
-    ok: true,
-    status: 200,
-    data: nodes ?? [
-      { id: "n1", title: "Planning", status: "running", agentCount: 2, cost: 0.8, retryCount: 0 },
+function makeNodes(nodes?: NodeData[]): NodeData[] {
+  return (
+    nodes ?? [
+      {
+        id: "n1",
+        title: "Planning",
+        status: "running",
+        agentCount: 2,
+        cost: 0.8,
+        retryCount: 0,
+      },
       {
         id: "n2",
         title: "Implementation",
@@ -157,16 +144,21 @@ function makeNodesOk(nodes?: NodeData[]): ApiResponse<NodeData[]> {
         cost: 1.7,
         retryCount: 1,
       },
-    ],
-  };
+    ]
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Default valid daemon config for tests. */
-const DAEMON_CONFIG = { port: 4000, token: "test-token", pid: 1234 };
+/** Default project identity returned by resolveProject. */
+const IDENTITY = {
+  id: "proj_abc12345",
+  name: "test-proj",
+  providerProfileId: "default",
+  createdAt: "2026-04-15T00:00:00Z",
+};
 
 /**
  * Execute the status command action.
@@ -181,17 +173,19 @@ async function runStatus(): Promise<void> {
 }
 
 /**
- * Set up mockGet to return path-based responses.
+ * Set up mockRequest to return path-based responses.
  *
- * Each key is an API path (e.g. "/workflow"). Values that are Error
- * instances cause the corresponding get() call to reject; all other
- * values resolve normally.
+ * Keys are API paths relative to the project (e.g. "/workflow").
+ * Values that are Error instances cause the corresponding request() call
+ * to reject; all other values resolve normally.
  *
  * @param responses - Map of API path to resolved value or Error (for rejection).
  */
-function setupGetResponses(responses: Record<string, unknown>): void {
-  mockGet.mockImplementation((path: string): Promise<unknown> => {
-    const value = responses[path];
+function setupRequestResponses(responses: Record<string, unknown>): void {
+  mockRequest.mockImplementation((_method: string, path: string): Promise<unknown> => {
+    // Strip query string for matching
+    const basePath = path.split("?")[0] ?? path;
+    const value = responses[basePath];
     if (value instanceof Error) {
       return Promise.reject(value);
     }
@@ -224,11 +218,21 @@ beforeEach(() => {
   mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
   mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-  mockGet.mockReset();
-  mockReadDaemonConfig.mockReset();
-  MockDaemonClient.mockReset().mockImplementation(() => ({ get: mockGet }));
+  mockRequest.mockReset();
+  mockResolveProject.mockReset();
+  mockOpenClient.mockReset();
 
-  mockReadDaemonConfig.mockResolvedValue(DAEMON_CONFIG);
+  mockResolveProject.mockResolvedValue({
+    identity: IDENTITY,
+    projectRoot: "/tmp/test",
+    created: false,
+  });
+
+  mockOpenClient.mockResolvedValue({
+    projectId: IDENTITY.id,
+    info: { port: 4000, token: "t", pid: 1234, version: "0.2.0" },
+    request: mockRequest,
+  });
 });
 
 afterEach(() => {
@@ -242,10 +246,10 @@ afterEach(() => {
 /** Tests for successful status display with running workflow, active nodes, and costs. */
 describe("status command — happy path", () => {
   it("should display workflow ID, status, description, active nodes, cost table, and cost summary", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": makeCostsOk(),
-      "/nodes": makeNodesOk(),
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": makeCosts(),
+      "/nodes": makeNodes(),
     });
 
     await runStatus();
@@ -287,21 +291,23 @@ describe("status command — happy path", () => {
 });
 
 // ===========================================================================
-// Daemon not running
+// Daemon not running (openClient rejects)
 // ===========================================================================
 
-/** Tests for when readDaemonConfig rejects (daemon not running). */
+/** Tests for when openClient rejects (daemon not running). */
 describe("status command — daemon not running", () => {
-  it("should log error and exit(1) when readDaemonConfig rejects", async () => {
-    mockReadDaemonConfig.mockRejectedValue(new Error("ENOENT"));
+  it("should log error and exit(1) when openClient rejects", async () => {
+    mockOpenClient.mockRejectedValue(
+      new Error("Daemon is not running. Run 'loomflo start' first."),
+    );
 
     await expect(runStatus()).rejects.toThrow("process.exit");
 
     expect(mockConsoleError).toHaveBeenCalledWith(
-      "Daemon is not running. Start with: loomflo start",
+      "Error: Daemon is not running. Run 'loomflo start' first.",
     );
     expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expect(mockGet).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });
 
@@ -312,10 +318,10 @@ describe("status command — daemon not running", () => {
 /** Tests for when GET /workflow returns 404 (no active workflow). */
 describe("status command — no active workflow (404)", () => {
   it("should log 'No active workflow' message and NOT exit with error", async () => {
-    setupGetResponses({
-      "/workflow": { ok: false, status: 404, data: { error: "Not found" } },
-      "/costs": makeCostsOk(),
-      "/nodes": makeNodesOk(),
+    setupRequestResponses({
+      "/workflow": new Error("GET /workflow -> HTTP 404"),
+      "/costs": makeCosts(),
+      "/nodes": makeNodes(),
     });
 
     await runStatus();
@@ -329,16 +335,16 @@ describe("status command — no active workflow (404)", () => {
 });
 
 // ===========================================================================
-// Failed to connect (workflow request rejects)
+// Failed to connect (workflow request rejects with non-404)
 // ===========================================================================
 
-/** Tests for when GET /workflow itself throws (promise rejected via allSettled). */
+/** Tests for when GET /workflow rejects with a non-404 error. */
 describe("status command — failed to connect", () => {
-  it("should log 'Failed to connect' error and exit(1) when GET /workflow rejects", async () => {
-    setupGetResponses({
-      "/workflow": new Error("ECONNREFUSED"),
-      "/costs": makeCostsOk(),
-      "/nodes": makeNodesOk(),
+  it("should log 'Failed to connect' error and exit(1) when GET /workflow rejects with non-404", async () => {
+    setupRequestResponses({
+      "/workflow": new Error("GET /workflow -> HTTP 500"),
+      "/costs": makeCosts(),
+      "/nodes": makeNodes(),
     });
 
     await expect(runStatus()).rejects.toThrow("process.exit");
@@ -346,26 +352,17 @@ describe("status command — failed to connect", () => {
     expect(mockConsoleError).toHaveBeenCalledWith("Failed to connect to daemon.");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
-});
 
-// ===========================================================================
-// Workflow fetch error (non-404)
-// ===========================================================================
-
-/** Tests for non-404 error responses from GET /workflow (e.g. 500 server error). */
-describe("status command — workflow fetch error (non-404)", () => {
-  it("should log error message from response body and exit(1) on 500", async () => {
-    setupGetResponses({
-      "/workflow": { ok: false, status: 500, data: { error: "Internal server error" } },
-      "/costs": makeCostsOk(),
-      "/nodes": makeNodesOk(),
+  it("should log 'Failed to connect' when request rejects with a network error", async () => {
+    setupRequestResponses({
+      "/workflow": new Error("ECONNREFUSED"),
+      "/costs": makeCosts(),
+      "/nodes": makeNodes(),
     });
 
     await expect(runStatus()).rejects.toThrow("process.exit");
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Failed to fetch workflow: Internal server error",
-    );
+    expect(mockConsoleError).toHaveBeenCalledWith("Failed to connect to daemon.");
     expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 });
@@ -382,10 +379,10 @@ describe("status command — no active nodes", () => {
       { id: "n2", title: "Setup", status: "pending", agentCount: 0, cost: 0.0, retryCount: 0 },
     ];
 
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": makeCostsOk(),
-      "/nodes": makeNodesOk(inactiveNodes),
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": makeCosts(),
+      "/nodes": makeNodes(inactiveNodes),
     });
 
     await runStatus();
@@ -411,10 +408,10 @@ describe("status command — no active nodes", () => {
 /** Tests for when the /costs request fails — workflow summary still displays. */
 describe("status command — no cost data", () => {
   it("should show workflow summary without cost section when /costs rejects", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": new Error("ECONNRESET"),
-      "/nodes": makeNodesOk(),
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": new Error("GET /costs -> HTTP 503"),
+      "/nodes": makeNodes(),
     });
 
     await runStatus();
@@ -429,23 +426,6 @@ describe("status command — no cost data", () => {
 
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
-
-  it("should show workflow summary without cost section when /costs returns non-ok", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": { ok: false, status: 500, data: { error: "service unavailable" } },
-      "/nodes": makeNodesOk(),
-    });
-
-    await runStatus();
-
-    expect(mockConsoleLog).toHaveBeenCalledWith("\x1b[1m\x1b[4mWorkflow\x1b[0m");
-
-    const lines = logLines();
-    expect(lines).not.toContain("\x1b[1m\x1b[4mCost Summary\x1b[0m");
-
-    expect(mockProcessExit).not.toHaveBeenCalled();
-  });
 });
 
 // ===========================================================================
@@ -455,10 +435,10 @@ describe("status command — no cost data", () => {
 /** Tests for when budgetLimit is null in the costs response. */
 describe("status command — budget limit null", () => {
   it("should display 'None' for budget limit when budgetLimit is null", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": makeCostsOk({ budgetLimit: null }),
-      "/nodes": makeNodesOk(),
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": makeCosts({ budgetLimit: null }),
+      "/nodes": makeNodes(),
     });
 
     await runStatus();
@@ -475,10 +455,10 @@ describe("status command — budget limit null", () => {
 /** Tests for when budgetRemaining is null in the costs response. */
 describe("status command — budget remaining null", () => {
   it("should display 'N/A' for budget remaining when budgetRemaining is null", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": makeCostsOk({ budgetRemaining: null }),
-      "/nodes": makeNodesOk(),
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": makeCosts({ budgetRemaining: null }),
+      "/nodes": makeNodes(),
     });
 
     await runStatus();
@@ -495,15 +475,15 @@ describe("status command — budget remaining null", () => {
 /** Tests for the formatCost helper — verified through rendered cost output. */
 describe("status command — formatCost formatting", () => {
   it("should format costs with $ prefix and exactly 2 decimal places", async () => {
-    setupGetResponses({
-      "/workflow": makeWorkflowOk(),
-      "/costs": makeCostsOk({
+    setupRequestResponses({
+      "/workflow": makeWorkflow(),
+      "/costs": makeCosts({
         total: 1234.5,
         loomCost: 0.1,
         budgetLimit: 5000,
         budgetRemaining: 3765.5,
       }),
-      "/nodes": makeNodesOk([
+      "/nodes": makeNodes([
         { id: "n1", title: "Node-A", status: "done", agentCount: 1, cost: 0, retryCount: 0 },
       ]),
     });
@@ -521,5 +501,26 @@ describe("status command — formatCost formatting", () => {
     const nodeRow = lines.find((l) => l.includes("Node-A") && l.includes("done"));
     expect(nodeRow).toBeDefined();
     expect(nodeRow).toContain("$0.00");
+  });
+});
+
+// ===========================================================================
+// resolveProject fails (no .loomflo/project.json)
+// ===========================================================================
+
+/** Tests for when resolveProject rejects (not in a loomflo project directory). */
+describe("status command — not a loomflo project", () => {
+  it("should log error and exit(1) when resolveProject rejects", async () => {
+    mockResolveProject.mockRejectedValue(
+      new Error("/tmp is not a loomflo project (no .loomflo/project.json found)."),
+    );
+
+    await expect(runStatus()).rejects.toThrow("process.exit");
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error: /tmp is not a loomflo project (no .loomflo/project.json found).",
+    );
+    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    expect(mockOpenClient).not.toHaveBeenCalled();
   });
 });

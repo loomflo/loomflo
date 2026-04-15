@@ -1,6 +1,6 @@
 {
   "name": "loomflo-sdk",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Loomflo SDK — programmatic client for the Loomflo daemon API",
   "type": "module",
   "main": "./dist/index.js",
