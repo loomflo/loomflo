@@ -238,11 +238,6 @@ export class Daemon {
         const nodeConfig = await loadConfig({ projectPath: workflow.projectPath });
         const messageBus = new MessageBus();
 
-        if (!rt.provider)
-          throw new Error(
-            "No LLM credentials configured. Set ANTHROPIC_API_KEY or ANTHROPIC_OAUTH_TOKEN.",
-          );
-
         const result = await runLoomi({
           nodeId: node.id,
           nodeTitle: node.title,

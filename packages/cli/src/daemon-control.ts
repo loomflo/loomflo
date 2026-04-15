@@ -106,5 +106,5 @@ async function waitForDaemonFile(timeoutMs: number): Promise<void> {
     }
     await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  throw new Error(`Daemon did not start within ${timeoutMs}ms`);
+  throw new Error(`Daemon did not start within ${String(timeoutMs)}ms`);
 }

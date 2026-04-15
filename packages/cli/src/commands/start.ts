@@ -60,15 +60,15 @@ function defaultDeps(): StartDeps {
   return {
     ensureDaemon: ensureDaemonRunning,
     fetchProject: async (info, id) => {
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects/${id}`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects/${id}`, {
         headers: { authorization: `Bearer ${info.token}` },
       });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
       return (await res.json()) as { id: string; status: string };
     },
     postProject: async (info, body) => {
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -76,16 +76,16 @@ function defaultDeps(): StartDeps {
         },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`register failed: HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`register failed: HTTP ${String(res.status)}`);
       return (await res.json()) as { id: string; status: string };
     },
     streamEvents: async (info, projectId) => {
       // Minimal streaming via polling /projects/:id/events until SIGINT.
       // A proper WebSocket stream is wired up in S3/S4.
       process.once("SIGINT", () => process.exit(0));
-      while (true) {
+      for (;;) {
         const res = await fetch(
-          `http://127.0.0.1:${info.port}/projects/${projectId}/events`,
+          `http://127.0.0.1:${String(info.port)}/projects/${projectId}/events`,
           { headers: { authorization: `Bearer ${info.token}` } },
         );
         if (!res.ok) break;

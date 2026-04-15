@@ -3,7 +3,7 @@ import lockfile from "proper-lockfile";
 /** Thrown when the lock cannot be acquired within the configured timeout. */
 export class FileLockTimeoutError extends Error {
   constructor(path: string, timeoutMs: number) {
-    super(`Could not acquire file lock on ${path} within ${timeoutMs}ms`);
+    super(`Could not acquire file lock on ${path} within ${String(timeoutMs)}ms`);
     this.name = "FileLockTimeoutError";
   }
 }
@@ -45,6 +45,6 @@ export async function withFileLock<T>(
   try {
     return await fn();
   } finally {
-    if (release) await release().catch(() => undefined);
+    await release().catch(() => undefined);
   }
 }

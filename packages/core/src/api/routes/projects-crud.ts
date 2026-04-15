@@ -19,7 +19,7 @@ export interface ProjectsCrudOptions {
   deregisterProject: (id: string) => Promise<boolean>;
 }
 
-export const projectsCrudRoutes: FastifyPluginAsync<ProjectsCrudOptions> = async (app, opts) => {
+export const projectsCrudRoutes: FastifyPluginAsync<ProjectsCrudOptions> = (app, opts) => {
   app.get("/projects", async (_req, reply) => {
     return reply.send(opts.listProjects());
   });
@@ -35,7 +35,7 @@ export const projectsCrudRoutes: FastifyPluginAsync<ProjectsCrudOptions> = async
     }
     try {
       const rt = await opts.registerProject(parsed.data);
-      return reply.code(201).send(toProjectSummary(rt));
+      return await reply.code(201).send(toProjectSummary(rt));
     } catch (err) {
       const message = (err as Error).message;
       if (message.includes("provider_missing_credentials")) {
@@ -58,4 +58,5 @@ export const projectsCrudRoutes: FastifyPluginAsync<ProjectsCrudOptions> = async
     if (!removed) return reply.code(404).send({ error: "project_not_registered", id });
     return reply.code(204).send();
   });
+  return Promise.resolve();
 };

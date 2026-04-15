@@ -32,7 +32,7 @@ export class ProjectsRegistry {
       throw new Error("projects.json is not an array");
     } catch {
       // Corrupt — quarantine and start empty.
-      const quarantine = `${this.filePath}.corrupt.${Date.now()}`;
+      const quarantine = `${this.filePath}.corrupt.${String(Date.now())}`;
       await rename(this.filePath, quarantine).catch(() => undefined);
       await this.writeRaw([]);
       return [];
@@ -60,7 +60,7 @@ export class ProjectsRegistry {
 
   private async writeRaw(list: ProjectEntry[]): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tmp = `${this.filePath}.tmp.${process.pid}.${Date.now()}`;
+    const tmp = `${this.filePath}.tmp.${String(process.pid)}.${String(Date.now())}`;
     await writeFile(tmp, JSON.stringify(list, null, 2), { mode: REGISTRY_MODE });
     await rename(tmp, this.filePath);
     // ensure mode even if the file pre-existed with different mode

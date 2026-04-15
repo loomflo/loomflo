@@ -40,7 +40,7 @@ export async function resolveProject(opts: ResolveOptions): Promise<ResolveResul
 async function findProjectRoot(dir: string): Promise<string> {
   const root = parse(dir).root;
   let current = dir;
-  while (true) {
+  for (;;) {
     try {
       await readFile(`${current}/.loomflo/project.json`, "utf-8");
       return current;

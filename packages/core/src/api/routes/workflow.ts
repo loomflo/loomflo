@@ -147,8 +147,8 @@ function resolveServices(req: FastifyRequest, options: WorkflowRoutesOptions): R
     getEventLog:
       options.getEventLog ??
       (() => ({
-        append: async () => undefined,
-        query: async () => [],
+        append: () => Promise.resolve(),
+        query: () => Promise.resolve([]),
       })),
     getSharedMemory:
       options.getSharedMemory ??

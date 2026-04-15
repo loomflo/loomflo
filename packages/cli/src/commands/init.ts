@@ -74,25 +74,25 @@ function defaultDeps(): InitDeps {
   return {
     ensureDaemon: ensureDaemonRunning,
     fetchProject: async (info, id) => {
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects/${id}`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects/${id}`, {
         headers: { authorization: `Bearer ${info.token}` },
       });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
       return (await res.json()) as { id: string; status: string };
     },
     postProject: async (info, body) => {
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${info.token}` },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`register failed: HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`register failed: HTTP ${String(res.status)}`);
       return (await res.json()) as { id: string; status: string };
     },
     initWorkflow: async (info, projectId, body) => {
       const res = await fetch(
-        `http://127.0.0.1:${info.port}/projects/${projectId}/workflow/init`,
+        `http://127.0.0.1:${String(info.port)}/projects/${projectId}/workflow/init`,
         {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${info.token}` },
@@ -101,7 +101,7 @@ function defaultDeps(): InitDeps {
       );
       if (!res.ok) {
         const err = (await res.json().catch(() => ({ error: "unknown" }))) as { error?: string };
-        throw new Error(err.error ?? `HTTP ${res.status}`);
+        throw new Error(err.error ?? `HTTP ${String(res.status)}`);
       }
       return (await res.json()) as { id: string; status: string };
     },

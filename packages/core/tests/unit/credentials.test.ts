@@ -83,7 +83,10 @@ describe("credentials", () => {
       });
 
       expect(result.source).toBe("claude-code-oauth");
-      expect(result.config.oauthToken).toBe("cc-oauth-access-token");
+      const token = typeof result.config.oauthToken === "function"
+        ? await result.config.oauthToken()
+        : result.config.oauthToken;
+      expect(token).toBe("cc-oauth-access-token");
       expect(result.config.apiKey).toBeUndefined();
     });
 

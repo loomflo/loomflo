@@ -38,7 +38,9 @@ export class ProviderProfiles {
 
   async remove(name: string): Promise<void> {
     const file = await this.read();
-    delete file.profiles[name];
+    file.profiles = Object.fromEntries(
+      Object.entries(file.profiles).filter(([k]) => k !== name),
+    ) as Record<string, ProviderProfile>;
     await this.writeRaw(file);
   }
 
@@ -64,7 +66,7 @@ export class ProviderProfiles {
       /* fall through */
     }
     // Corrupt — quarantine and start empty.
-    const quarantine = `${this.filePath}.corrupt.${Date.now()}`;
+    const quarantine = `${this.filePath}.corrupt.${String(Date.now())}`;
     await rename(this.filePath, quarantine).catch(() => undefined);
     const empty: CredentialsFile = { profiles: {} };
     await this.writeRaw(empty);
@@ -73,7 +75,7 @@ export class ProviderProfiles {
 
   private async writeRaw(file: CredentialsFile): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tmp = `${this.filePath}.tmp.${process.pid}.${Date.now()}`;
+    const tmp = `${this.filePath}.tmp.${String(process.pid)}.${String(Date.now())}`;
     await writeFile(tmp, JSON.stringify(file, null, 2), { mode: FILE_MODE });
     await rename(tmp, this.filePath);
     await chmod(this.filePath, FILE_MODE);

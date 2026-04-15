@@ -18,8 +18,8 @@ export function createProjectCommand(): Command {
     .description("List projects known to the daemon")
     .action(async () => {
       const info = await getRunningDaemon();
-      if (!info) return void console.log("Daemon is not running.");
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects`, {
+      if (!info) { console.log("Daemon is not running."); return; }
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects`, {
         headers: { authorization: `Bearer ${info.token}` },
       });
       const projects = (await res.json()) as ProjectSummary[];
@@ -34,11 +34,11 @@ export function createProjectCommand(): Command {
     .action(async (id: string) => {
       const info = await getRunningDaemon();
       if (!info) throw new Error("Daemon is not running.");
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects/${id}`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects/${id}`, {
         method: "DELETE",
         headers: { authorization: `Bearer ${info.token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
       console.log(`Removed ${id}.`);
     });
 
@@ -48,7 +48,7 @@ export function createProjectCommand(): Command {
     .action(async () => {
       const info = await getRunningDaemon();
       if (!info) throw new Error("Daemon is not running.");
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects`, {
+      const res = await fetch(`http://127.0.0.1:${String(info.port)}/projects`, {
         headers: { authorization: `Bearer ${info.token}` },
       });
       const projects = (await res.json()) as ProjectSummary[];
@@ -56,14 +56,14 @@ export function createProjectCommand(): Command {
       for (const p of projects) {
         const exists = await stat(p.projectPath).then(() => true).catch(() => false);
         if (!exists) {
-          await fetch(`http://127.0.0.1:${info.port}/projects/${p.id}`, {
+          await fetch(`http://127.0.0.1:${String(info.port)}/projects/${p.id}`, {
             method: "DELETE",
             headers: { authorization: `Bearer ${info.token}` },
           });
           removed++;
         }
       }
-      console.log(`Pruned ${removed} orphan project(s).`);
+      console.log(`Pruned ${String(removed)} orphan project(s).`);
     });
 
   return root;

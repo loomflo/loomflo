@@ -9,7 +9,7 @@ export interface DaemonRoutesOptions {
   startedAtMs: number;
 }
 
-export const daemonRoutes: FastifyPluginAsync<DaemonRoutesOptions> = async (app, opts) => {
+export const daemonRoutes: FastifyPluginAsync<DaemonRoutesOptions> = (app, opts) => {
   app.get("/daemon/status", async (_req, reply) => {
     return reply.send({
       port: opts.daemonPort,
@@ -19,4 +19,5 @@ export const daemonRoutes: FastifyPluginAsync<DaemonRoutesOptions> = async (app,
       projectCount: opts.listProjects().length,
     });
   });
+  return Promise.resolve();
 };

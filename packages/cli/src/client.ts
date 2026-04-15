@@ -652,7 +652,7 @@ export async function openClient(projectId: string): Promise<ScopedClient> {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`${method} ${path} -> HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`${method} ${path} -> HTTP ${String(res.status)}`);
       if (res.status === 204) return undefined as T;
       return (await res.json()) as T;
     },

@@ -19,7 +19,7 @@ export function generateProjectId(): string {
 export async function readProjectIdentity(dir: string): Promise<ProjectIdentity | null> {
   const root = parse(dir).root;
   let current = dir;
-  while (true) {
+  for (;;) {
     const candidate = join(current, ".loomflo", "project.json");
     try {
       const raw = await readFile(candidate, "utf-8");

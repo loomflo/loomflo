@@ -13,7 +13,7 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["GET",  "/config",          "/projects/:id/config"],
 ];
 
-export const legacyGoneRoutes: FastifyPluginAsync = async (app) => {
+export const legacyGoneRoutes: FastifyPluginAsync = (app) => {
   for (const [method, url, newRoute] of MIGRATIONS) {
     app.route({
       method: method as "GET" | "POST",
@@ -23,4 +23,5 @@ export const legacyGoneRoutes: FastifyPluginAsync = async (app) => {
       },
     });
   }
+  return Promise.resolve();
 };
