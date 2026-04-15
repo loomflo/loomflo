@@ -231,3 +231,69 @@ export async function isOAuthTokenValid(credentialsPath?: string): Promise<boole
 
   return expiresAt > Date.now() + TOKEN_EXPIRY_BUFFER_MS;
 }
+
+// ============================================================================
+// OpenAI-compatible Credential Resolution
+// ============================================================================
+
+export const OPENAI_COMPAT_BASE_URLS: Record<string, string> = {
+  moonshot: "https://api.moonshot.cn/v1",
+  nvidia: "https://integrate.api.nvidia.com/v1",
+  openai: "",
+};
+
+export const OPENAI_COMPAT_DEFAULT_MODELS: Record<string, string> = {
+  moonshot: "moonshot-v1-8k",
+  nvidia: "meta/llama-3.1-8b-instruct",
+  openai: "gpt-4o-mini",
+};
+
+export interface OpenAICompatCredentials {
+  apiKey: string;
+  baseUrl?: string;
+  defaultModel?: string;
+  providerName: string;
+}
+
+export function resolveOpenAICompatCredentials(options?: {
+  env?: Record<string, string | undefined>;
+}): OpenAICompatCredentials {
+  const env = options?.env ?? process.env;
+
+  const moonshotKey = env["MOONSHOT_API_KEY"];
+  if (moonshotKey) {
+    return {
+      apiKey: moonshotKey,
+      baseUrl: env["OPENAI_BASE_URL"] ?? OPENAI_COMPAT_BASE_URLS["moonshot"],
+      defaultModel: env["OPENAI_COMPAT_MODEL"] ?? OPENAI_COMPAT_DEFAULT_MODELS["moonshot"],
+      providerName: "moonshot",
+    };
+  }
+
+  const nvidiaKey = env["NVIDIA_API_KEY"];
+  if (nvidiaKey) {
+    return {
+      apiKey: nvidiaKey,
+      baseUrl: env["OPENAI_BASE_URL"] ?? OPENAI_COMPAT_BASE_URLS["nvidia"],
+      defaultModel: env["OPENAI_COMPAT_MODEL"] ?? OPENAI_COMPAT_DEFAULT_MODELS["nvidia"],
+      providerName: "nvidia",
+    };
+  }
+
+  const openaiKey = env["OPENAI_API_KEY"] ?? env["OPENAI_COMPAT_API_KEY"];
+  if (openaiKey) {
+    return {
+      apiKey: openaiKey,
+      baseUrl: env["OPENAI_BASE_URL"],
+      defaultModel: env["OPENAI_COMPAT_MODEL"] ?? OPENAI_COMPAT_DEFAULT_MODELS["openai"],
+      providerName: "openai",
+    };
+  }
+
+  throw new Error(
+    "No OpenAI-compatible credentials found. Set one of:\n" +
+      "  - MOONSHOT_API_KEY (Moonshot/Kimi)\n" +
+      "  - NVIDIA_API_KEY (Nvidia NIM)\n" +
+      "  - OPENAI_API_KEY (OpenAI)",
+  );
+}

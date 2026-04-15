@@ -202,8 +202,8 @@ La version `2.1.75` est hardcodée. Si Anthropic change les exigences de version
 - [x] Tests d'intégration : pass
 - [x] E2E OAuth live : 3/3 pass
 - [x] OAuth implementation : validée et commitée
-- [ ] Commit fix lint `credentials.ts` + OAuth headers
-- [ ] Tag `v0.1.0`
+- [x] Commit fix lint `credentials.ts` + OAuth headers (done 2026-04-03)
+- [ ] Tag `v0.1.0` (pending Adrien validation)
 
 ---
 

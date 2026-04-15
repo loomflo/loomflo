@@ -76,3 +76,51 @@ describe("isOAuthTokenValid", () => {
     expect(valid).toBe(false);
   });
 });
+
+// ============================================================================
+// resolveOpenAICompatCredentials
+// ============================================================================
+
+import { resolveOpenAICompatCredentials } from "../../../src/providers/credentials.js";
+
+describe("resolveOpenAICompatCredentials", () => {
+  // T-P3.5
+  it("T-P3.5 — MOONSHOT_API_KEY → providerName 'moonshot', correct baseUrl", async () => {
+    const result = await resolveOpenAICompatCredentials({
+      env: { MOONSHOT_API_KEY: "sk-moonshot-test" },
+    });
+    expect(result.providerName).toBe("moonshot");
+    expect(result.apiKey).toBe("sk-moonshot-test");
+    expect(result.baseUrl).toBe("https://api.moonshot.cn/v1");
+    expect(result.defaultModel).toBe("moonshot-v1-8k");
+  });
+
+  // T-P3.6
+  it("T-P3.6 — NVIDIA_API_KEY → providerName 'nvidia', correct baseUrl", async () => {
+    const result = await resolveOpenAICompatCredentials({
+      env: { NVIDIA_API_KEY: "nvapi-test" },
+    });
+    expect(result.providerName).toBe("nvidia");
+    expect(result.apiKey).toBe("nvapi-test");
+    expect(result.baseUrl).toBe("https://integrate.api.nvidia.com/v1");
+    expect(result.defaultModel).toBe("meta/llama-3.1-8b-instruct");
+  });
+
+  // T-P3.7
+  it("T-P3.7 — No keys set → throws with helpful error", () => {
+    expect(() => resolveOpenAICompatCredentials({ env: {} })).toThrow(
+      "No OpenAI-compatible credentials found",
+    );
+  });
+
+  // T-P3.8
+  it("T-P3.8 — OPENAI_COMPAT_MODEL overrides defaultModel", async () => {
+    const result = await resolveOpenAICompatCredentials({
+      env: {
+        MOONSHOT_API_KEY: "sk-moonshot-test",
+        OPENAI_COMPAT_MODEL: "moonshot-v1-128k",
+      },
+    });
+    expect(result.defaultModel).toBe("moonshot-v1-128k");
+  });
+});

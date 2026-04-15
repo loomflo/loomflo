@@ -12,7 +12,9 @@ import { CostTracker } from "./costs/tracker.js";
 import { SharedMemoryManager } from "./memory/shared-memory.js";
 import { MessageBus } from "./agents/message-bus.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
-import { resolveCredentials } from "./providers/credentials.js";
+import { OpenAIProvider } from "./providers/openai.js";
+import type { LLMProvider } from "./providers/base.js";
+import { resolveCredentials, resolveOpenAICompatCredentials } from "./providers/credentials.js";
 import { readFileTool } from "./tools/file-read.js";
 import { writeFileTool } from "./tools/file-write.js";
 import { editFileTool } from "./tools/file-edit.js";
@@ -183,10 +185,24 @@ export class Daemon {
     const projectPath = this.projectPath ?? process.cwd();
 
     // Resolve credentials and build provider — optional, only needed for agent execution
-    let provider: AnthropicProvider | null = null;
+    const config = await loadConfig({ projectPath });
+    const providerType = config.provider;
+    let provider: LLMProvider | null = null;
     try {
-      const credentials = await resolveCredentials();
-      provider = new AnthropicProvider(credentials.config);
+      if (providerType === "anthropic") {
+        const credentials = await resolveCredentials();
+        provider = new AnthropicProvider(credentials.config);
+      } else {
+        const creds = resolveOpenAICompatCredentials();
+        provider = new OpenAIProvider({
+          apiKey: creds.apiKey,
+          baseUrl: creds.baseUrl,
+          defaultModel: creds.defaultModel,
+        });
+        console.log(
+          `LoomFlo: using OpenAI-compat provider '${creds.providerName}' (${creds.defaultModel ?? "default model"})`,
+        );
+      }
     } catch {
       // No credentials found — spec-only mode (no agent execution)
     }
