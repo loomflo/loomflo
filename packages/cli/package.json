@@ -31,6 +31,7 @@
     "zod": "^3.0.0"
   },
   "devDependencies": {
+    "strip-ansi": "^7",
     "tsup": "^8.0.0"
   },
   "engines": {
