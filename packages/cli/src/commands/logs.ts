@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
-import { DaemonClient, readDaemonConfig } from "../client.js";
+import { resolveProject } from "../project-resolver.js";
+import { openClient } from "../client.js";
 
 // ============================================================================
 // Types
@@ -19,11 +20,6 @@ interface Event {
 interface EventsResponse {
   events: Event[];
   total: number;
-}
-
-/** Shape of an API error response. */
-interface ErrorResponse {
-  error: string;
 }
 
 /** Parsed CLI options for the logs command. */
@@ -77,156 +73,82 @@ function formatEvent(event: Event): string {
  *   `loomflo logs <node-id>` — show events for a specific node
  *   `loomflo logs --type agent_created` — filter by event type
  *   `loomflo logs --limit 100` — fetch more events
- *   `loomflo logs -f` — stream events in real time via WebSocket
+ *   `loomflo logs -f` — (temporarily disabled, see note below)
+ *
+ * Note: --follow is temporarily disabled pending WebSocket multiplexing
+ * (S3/S4). When enabled, it will stream live events via the multiplexed
+ * WS endpoint with a subscribe protocol.
  *
  * @returns A configured commander Command instance.
  */
 export function createLogsCommand(): Command {
-  const cmd = new Command("logs")
+  return new Command("logs")
     .description("Fetch and display agent logs")
     .argument("[node-id]", "Filter events by node ID")
     .option("--type <type>", "Filter by event type")
     .option("--limit <n>", "Maximum number of events to fetch", "50")
     .option("-f, --follow", "Stream new events in real time via WebSocket", false)
     .action(async (nodeId: string | undefined, opts: LogsOptions): Promise<void> => {
-      /* ------------------------------------------------------------------ */
-      /* Connect to daemon                                                  */
-      /* ------------------------------------------------------------------ */
-
-      let config;
       try {
-        config = await readDaemonConfig();
-      } catch {
-        console.error("Daemon is not running. Start with: loomflo start");
-        process.exit(1);
-      }
+        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+        const client = await openClient(identity.id);
 
-      const client = new DaemonClient(config.port, config.token);
+        /* ---------------------------------------------------------------- */
+        /* Build query string                                               */
+        /* ---------------------------------------------------------------- */
 
-      /* ------------------------------------------------------------------ */
-      /* Build query string                                                 */
-      /* ------------------------------------------------------------------ */
+        const params = new URLSearchParams();
 
-      const params = new URLSearchParams();
-
-      if (nodeId !== undefined) {
-        params.set("nodeId", nodeId);
-      }
-      if (opts.type !== undefined) {
-        params.set("type", opts.type);
-      }
-
-      const limit = parseInt(opts.limit, 10);
-      params.set("limit", String(Number.isFinite(limit) && limit > 0 ? limit : 50));
-
-      const queryString = params.toString();
-      const path = queryString.length > 0 ? `/events?${queryString}` : "/events";
-
-      /* ------------------------------------------------------------------ */
-      /* Fetch historical events                                            */
-      /* ------------------------------------------------------------------ */
-
-      const result = await client.get<EventsResponse | ErrorResponse>(path);
-
-      if (!result.ok) {
-        const errorData = result.data as ErrorResponse;
-        console.error(`Failed to fetch events: ${errorData.error}`);
-        process.exit(1);
-      }
-
-      const { events, total } = result.data as EventsResponse;
-
-      if (events.length === 0 && !opts.follow) {
-        console.log("No events found.");
-        return;
-      }
-
-      /* Print events in chronological order (API returns most recent first). */
-      const chronological = [...events].reverse();
-      for (const event of chronological) {
-        console.log(formatEvent(event));
-      }
-
-      if (events.length < total) {
-        console.log(
-          `\nShowing ${String(events.length)} of ${String(total)} events. Use --limit to see more.`,
-        );
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* Follow mode: stream live events via WebSocket                      */
-      /* ------------------------------------------------------------------ */
-
-      if (!opts.follow) {
-        return;
-      }
-
-      console.log("\n--- streaming live events (Ctrl+C to stop) ---\n");
-
-      client.connectWebSocket();
-
-      /** Handle an incoming WebSocket event and print it if it matches filters. */
-      const handleWsEvent = (wsEvent: Record<string, unknown>): void => {
-        const event: Event = {
-          ts:
-            typeof wsEvent["timestamp"] === "string"
-              ? wsEvent["timestamp"]
-              : new Date().toISOString(),
-          type: typeof wsEvent["type"] === "string" ? wsEvent["type"] : "unknown",
-          nodeId: typeof wsEvent["nodeId"] === "string" ? wsEvent["nodeId"] : null,
-          agentId: typeof wsEvent["agentId"] === "string" ? wsEvent["agentId"] : null,
-          details: {},
-        };
-
-        /* Apply the same filters as the historical query. */
-        if (nodeId !== undefined && event.nodeId !== nodeId) {
-          return;
+        if (nodeId !== undefined) {
+          params.set("nodeId", nodeId);
         }
-        if (opts.type !== undefined && event.type !== opts.type) {
+        if (opts.type !== undefined) {
+          params.set("type", opts.type);
+        }
+
+        const limit = parseInt(opts.limit, 10);
+        params.set("limit", String(Number.isFinite(limit) && limit > 0 ? limit : 50));
+
+        const queryString = params.toString();
+        const path = queryString.length > 0 ? `/events?${queryString}` : "/events";
+
+        /* ---------------------------------------------------------------- */
+        /* Fetch historical events                                          */
+        /* ---------------------------------------------------------------- */
+
+        const { events, total } = await client.request<EventsResponse>("GET", path);
+
+        if (events.length === 0 && !opts.follow) {
+          console.log("No events found.");
           return;
         }
 
-        console.log(formatEvent(event));
-      };
-
-      /* Subscribe to all relevant event types via a catch-all approach:
-         the DaemonClient dispatches by `type` field, so we listen on common types. */
-      const eventTypes = [
-        "node_status",
-        "agent_status",
-        "agent_message",
-        "review_verdict",
-        "graph_modified",
-        "cost_update",
-        "memory_updated",
-        "workflow_status",
-      ] as const;
-
-      const removers: Array<() => void> = [];
-      for (const eventType of eventTypes) {
-        const remover = client.on(eventType, (payload) => {
-          handleWsEvent(payload as unknown as Record<string, unknown>);
-        });
-        removers.push(remover);
-      }
-
-      /* Keep the process alive until interrupted. */
-      const cleanup = (): void => {
-        for (const remove of removers) {
-          remove();
+        /* Print events in chronological order (API returns most recent first). */
+        const chronological = [...events].reverse();
+        for (const event of chronological) {
+          console.log(formatEvent(event));
         }
-        client.disconnect();
-        process.exit(0);
-      };
 
-      process.on("SIGINT", cleanup);
-      process.on("SIGTERM", cleanup);
+        if (events.length < total) {
+          console.log(
+            `\nShowing ${String(events.length)} of ${String(total)} events. Use --limit to see more.`,
+          );
+        }
 
-      /* Prevent Node from exiting while streaming. */
-      await new Promise<never>(() => {
-        /* Intentionally never resolves — process exits via signal handler. */
-      });
+        /* ---------------------------------------------------------------- */
+        /* Follow mode: temporarily disabled                                */
+        /* TODO(S3/S4): wire up multiplexed WebSocket subscribe protocol   */
+        /* ---------------------------------------------------------------- */
+
+        if (opts.follow) {
+          console.warn(
+            "--follow is temporarily disabled pending WebSocket multiplexing (S3/S4)",
+          );
+          return;
+        }
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`);
+        process.exit(1);
+      }
     });
-
-  return cmd;
 }
