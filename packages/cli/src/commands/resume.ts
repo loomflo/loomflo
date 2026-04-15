@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { resolveProject } from "../project-resolver.js";
 import { openClient } from "../client.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 // ============================================================================
 // Types
@@ -43,45 +45,50 @@ interface ResumeResponse {
  * @returns A configured commander Command instance.
  */
 export function createResumeCommand(): Command {
-  return new Command("resume")
+  const cmd = new Command("resume")
     .description("Resume a paused or interrupted workflow")
-    .action(async (): Promise<void> => {
+    .action(async (options: { json?: boolean }): Promise<void> => {
+      const json = isJsonMode(options);
+      const sp = json ? null : theme.spinner("resuming workflow\u2026");
+      sp?.start();
+
       try {
         const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
         const client = await openClient(identity.id);
-
-        console.log("Resuming workflow...");
-
         const data = await client.request<ResumeResponse>("POST", "/workflow/resume");
+        sp?.succeed();
         const info = data.resumeInfo;
 
-        console.log(`Workflow resumed. Status: ${data.status}`);
-        console.log("");
+        if (json) {
+          writeJson({ status: data.status, resumeInfo: info });
+          return;
+        }
+
+        process.stdout.write(
+          `${theme.line(theme.glyph.check, "accent", `workflow resumed`, data.status)}\n`,
+        );
 
         if (info.completedNodeIds.length > 0) {
-          console.log(`  Completed (skipped): ${String(info.completedNodeIds.length)} nodes`);
+          process.stdout.write(`${theme.kv("skipped", `${String(info.completedNodeIds.length)} completed nodes`)}\n`);
         }
-
         if (info.resetNodeIds.length > 0) {
-          console.log(`  Interrupted (reset): ${String(info.resetNodeIds.length)} nodes`);
+          process.stdout.write(`${theme.kv("reset", `${String(info.resetNodeIds.length)} interrupted nodes`)}\n`);
           for (const nodeId of info.resetNodeIds) {
-            console.log(`    - ${nodeId}`);
+            process.stdout.write(`${theme.line(theme.glyph.arrow, "muted", nodeId)}\n`);
           }
         }
-
         if (info.rescheduledNodeIds.length > 0) {
-          console.log(`  Rescheduled: ${String(info.rescheduledNodeIds.length)} nodes`);
+          process.stdout.write(`${theme.kv("resched.", `${String(info.rescheduledNodeIds.length)} nodes`)}\n`);
         }
-
         if (info.resumedFrom !== null) {
-          console.log(`  Resuming from: ${info.resumedFrom}`);
+          process.stdout.write(`${theme.kv("from", info.resumedFrom)}\n`);
         }
-
-        console.log("");
-        console.log("Execution will continue from where it left off.");
       } catch (err) {
-        console.error(`Error: ${(err as Error).message}`);
-        process.exit(1);
+        sp?.fail();
+        writeError(options, err instanceof Error ? err.message : String(err), "E_RESUME");
+        process.exitCode = 1;
       }
     });
+
+  return withJsonSupport(cmd);
 }

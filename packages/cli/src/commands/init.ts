@@ -3,6 +3,8 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { resolveProject } from "../project-resolver.js";
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 import type { ProjectIdentity } from "@loomflo/core";
 
 // ============================================================================
@@ -113,7 +115,7 @@ function defaultDeps(): InitDeps {
 // ============================================================================
 
 export function createInitCommand(): Command {
-  return new Command("init")
+  const cmd = new Command("init")
     .description("Initialize a new workflow from a project description")
     .argument("<description>", "Natural language description of the project")
     .option("--project-path <path>", "Project directory path")
@@ -132,35 +134,41 @@ export function createInitCommand(): Command {
           budget?: string;
           reviewer?: boolean;
           delay?: string;
+          json?: boolean;
         },
       ) => {
-        // Validate description length
+        const json = isJsonMode(options);
+
         const trimmed = description.trim();
         if (trimmed.length < 10 || trimmed.length > 2000) {
-          console.error("Error: Description must be between 10 and 2000 characters.");
-          process.exit(1);
+          writeError(options, "Description must be between 10 and 2000 characters.", "E_INIT_DESC");
+          process.exitCode = 1;
+          return;
         }
 
-        // Build config from flags
         const config: Record<string, unknown> = {};
         if (options.budget !== undefined) {
           const budgetLimit = Number(options.budget);
           if (Number.isNaN(budgetLimit) || budgetLimit <= 0) {
-            console.error("Error: --budget must be a positive number");
-            process.exit(1);
+            writeError(options, "--budget must be a positive number", "E_INIT_BUDGET");
+            process.exitCode = 1;
+            return;
           }
           config["budgetLimit"] = budgetLimit;
         }
         if (options.reviewer === true) config["reviewerEnabled"] = true;
         if (options.delay !== undefined) {
           if (!/^(0|\d+[mhd])$/.test(options.delay)) {
-            console.error('Error: --delay must be "0" or a duration like "10m", "1h", "1d"');
-            process.exit(1);
+            writeError(options, '--delay must be "0" or a duration like "10m", "1h", "1d"', "E_INIT_DELAY");
+            process.exitCode = 1;
+            return;
           }
           config["defaultDelay"] = options.delay;
         }
 
         const cwd = options.projectPath ? resolve(options.projectPath) : process.cwd();
+        const sp = json ? null : theme.spinner("initializing workflow\u2026");
+        sp?.start();
 
         try {
           const result = await runInit({
@@ -170,14 +178,29 @@ export function createInitCommand(): Command {
             ...(options.name !== undefined && { projectName: options.name }),
             ...(Object.keys(config).length > 0 && { config }),
           });
-          console.log("Workflow initialized successfully.");
-          console.log(`  Project: ${result.identity.name} (${result.identity.id})`);
-          console.log(`  Workflow: ${result.workflow.id}`);
-          console.log(`  Status:   ${result.workflow.status}`);
+          sp?.succeed();
+
+          if (json) {
+            writeJson({
+              project: { id: result.identity.id, name: result.identity.name },
+              workflow: { id: result.workflow.id, status: result.workflow.status },
+            });
+            return;
+          }
+
+          process.stdout.write(
+            `${theme.line(theme.glyph.check, "accent", "workflow initialized")}\n`,
+          );
+          process.stdout.write(`${theme.kv("project", `${result.identity.name} (${result.identity.id})`)}\n`);
+          process.stdout.write(`${theme.kv("workflow", result.workflow.id)}\n`);
+          process.stdout.write(`${theme.kv("status", result.workflow.status)}\n`);
         } catch (err) {
-          console.error(`Error: ${(err as Error).message}`);
-          process.exit(1);
+          sp?.fail();
+          writeError(options, err instanceof Error ? err.message : String(err), "E_INIT");
+          process.exitCode = 1;
         }
       },
     );
+
+  return withJsonSupport(cmd);
 }

@@ -3,9 +3,11 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { resolveProject } from "../project-resolver.js";
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 import type { ProjectIdentity } from "@loomflo/core";
 
-interface StartDeps {
+export interface StartDeps {
   ensureDaemon: () => Promise<DaemonInfo>;
   fetchProject: (info: DaemonInfo, id: string) => Promise<{ id: string; status: string } | null>;
   postProject: (
@@ -17,7 +19,6 @@ interface StartDeps {
       providerProfileId: string;
     },
   ) => Promise<{ id: string; status: string }>;
-  streamEvents: (info: DaemonInfo, projectId: string) => Promise<void>;
 }
 
 export interface RunStartOptions {
@@ -30,6 +31,7 @@ export interface RunStartOptions {
 export interface RunStartResult {
   identity: ProjectIdentity;
   created: boolean;
+  daemonInfo: DaemonInfo;
 }
 
 export async function runStart(opts: RunStartOptions): Promise<RunStartResult> {
@@ -49,8 +51,7 @@ export async function runStart(opts: RunStartOptions): Promise<RunStartResult> {
       providerProfileId: opts.providerProfileId,
     });
   }
-  await deps.streamEvents(info, identity.id);
-  return { identity, created };
+  return { identity, created, daemonInfo: info };
 }
 
 function defaultDeps(): StartDeps {
@@ -76,41 +77,49 @@ function defaultDeps(): StartDeps {
       if (!res.ok) throw new Error(`register failed: HTTP ${String(res.status)}`);
       return (await res.json()) as { id: string; status: string };
     },
-    streamEvents: async (info, projectId) => {
-      // Minimal streaming via polling /projects/:id/events until SIGINT.
-      // A proper WebSocket stream is wired up in S3/S4.
-      process.once("SIGINT", () => process.exit(0));
-      for (;;) {
-        const res = await fetch(
-          `http://127.0.0.1:${String(info.port)}/projects/${projectId}/events`,
-          { headers: { authorization: `Bearer ${info.token}` } },
-        );
-        if (!res.ok) break;
-        const events = (await res.json()) as unknown[];
-        for (const ev of events) console.log(JSON.stringify(ev));
-        await new Promise<void>((r) => setTimeout(r, 1000));
-      }
-    },
   };
 }
 
 export function createStartCommand(): Command {
-  return new Command("start")
+  const cmd = new Command("start")
     .description("Start this project's workflow (auto-starts the daemon)")
     .option("--project-path <path>", "Project directory path")
     .option("--provider <id>", "Provider profile id", "default")
     .option("--name <name>", "Project name (first run only)")
-    .action(async (options: { projectPath?: string; provider?: string; name?: string }) => {
+    .action(async (options: { projectPath?: string; provider?: string; name?: string; json?: boolean }) => {
       const cwd = options.projectPath ? resolve(options.projectPath) : process.cwd();
+      const json = isJsonMode(options);
+      const sp = json ? null : theme.spinner("starting\u2026");
+      sp?.start();
+
       try {
-        await runStart({
+        const result = await runStart({
           cwd,
           providerProfileId: options.provider ?? "default",
           projectName: options.name,
         });
+        sp?.succeed();
+
+        if (json) {
+          writeJson({
+            daemon: { port: result.daemonInfo.port, up: true },
+            project: { id: result.identity.id, name: result.identity.name },
+          });
+          return;
+        }
+
+        process.stdout.write(
+          `${theme.line(theme.glyph.check, "accent", "daemon running", `port ${String(result.daemonInfo.port)}`)}\n`,
+        );
+        process.stdout.write(
+          `${theme.line(theme.glyph.check, "accent", `project ${result.identity.name} registered`, result.identity.id)}\n`,
+        );
       } catch (err) {
-        console.error(`Error: ${(err as Error).message}`);
-        process.exit(1);
+        sp?.fail();
+        writeError(options, err instanceof Error ? err.message : String(err), "E_START");
+        process.exitCode = 1;
       }
     });
+
+  return withJsonSupport(cmd);
 }

@@ -20,7 +20,6 @@ describe("runStart", () => {
       ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.2.0" })),
       fetchProject: vi.fn(async () => null),
       postProject: vi.fn(async () => ({ id: "proj_xxxxxxxx", status: "idle" })),
-      streamEvents: vi.fn(async () => undefined),
     };
     const result = await runStart({ cwd: tmp, providerProfileId: "default", deps });
     expect(deps.ensureDaemon).toHaveBeenCalledTimes(1);
@@ -29,6 +28,7 @@ describe("runStart", () => {
       expect.objectContaining({ projectPath: tmp, providerProfileId: "default" }),
     );
     expect(result.identity.id).toMatch(/^proj_[0-9a-f]{8}$/);
+    expect(result.daemonInfo.port).toBe(1234);
   });
 
   it("skips registration if project is already known", async () => {
@@ -36,10 +36,9 @@ describe("runStart", () => {
       ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.2.0" })),
       fetchProject: vi.fn(async () => ({ id: "proj_aaaaaaaa", status: "running" })),
       postProject: vi.fn(),
-      streamEvents: vi.fn(async () => undefined),
     };
-    await runStart({ cwd: tmp, providerProfileId: "default", deps });
+    const result = await runStart({ cwd: tmp, providerProfileId: "default", deps });
     expect(deps.postProject).not.toHaveBeenCalled();
-    expect(deps.streamEvents).toHaveBeenCalled();
+    expect(result.daemonInfo.port).toBe(1234);
   });
 });
