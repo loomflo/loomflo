@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — Unreleased
+
+### Added
+
+- Pastel-green CLI theme (Mint palette) with truecolor + 256-color fallback.
+- `--json` flag on every user-facing command for machine-readable output.
+- `loomflo theme:preview` manual QA script (dev-only).
+
+### Changed
+
+- All CLI output routed through the shared `theme` module; `console.log` is
+  no longer allowed inside `src/commands/` (enforced by ESLint).
+
 ## 0.2.0 — 2026-04-14
 
 ### Breaking changes

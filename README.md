@@ -168,6 +168,16 @@ loomflo project list
 loomflo daemon stop
 ```
 
+## CLI Output
+
+loomflo uses a pastel-green palette by default. Respect the standard
+environment signals:
+
+- `NO_COLOR=1` or `FORCE_COLOR=0` disables colours.
+- Piping / non-TTY stdout disables colours automatically.
+- `--json` on any command emits a single machine-readable JSON object
+  (or NDJSON for streams like `logs -f` and `watch`).
+
 ## CLI Commands
 
 | Command                                       | Description                                                        |
