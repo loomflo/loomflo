@@ -24,7 +24,10 @@
   },
   "dependencies": {
     "@loomflo/core": "workspace:*",
+    "chalk": "^5",
+    "cli-table3": "^0.6",
     "commander": "^13.0.0",
+    "ora": "^8",
     "zod": "^3.0.0"
   },
   "devDependencies": {
