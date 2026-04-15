@@ -57,13 +57,23 @@ describe("withFileLock", () => {
   });
 
   it("throws FileLockTimeoutError when the lock cannot be acquired in time", async () => {
+    // Signal when the holder has actually acquired the lock before we try the second one.
+    let lockAcquiredResolve!: () => void;
+    const lockAcquired = new Promise<void>((r) => {
+      lockAcquiredResolve = r;
+    });
+
     const holder = withFileLock(
       lockFile,
       async () => {
+        lockAcquiredResolve();
         await new Promise((r) => setTimeout(r, 500));
       },
       { timeoutMs: 2000 },
     );
+
+    await lockAcquired; // ensure holder holds the lock before we race
+
     await expect(withFileLock(lockFile, async () => 1, { timeoutMs: 50 })).rejects.toBeInstanceOf(
       FileLockTimeoutError,
     );
