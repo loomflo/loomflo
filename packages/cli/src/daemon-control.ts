@@ -22,6 +22,7 @@ export function isCompatibleVersion(version: string | undefined): boolean {
   if (!version) return false;
   const [major, minor] = version.split(".").map((n) => Number(n));
   const [reqMajor, reqMinor] = MIN_DAEMON_VERSION.split(".").map((n) => Number(n));
+  if (major === undefined || minor === undefined || reqMajor === undefined || reqMinor === undefined) return false;
   if (Number.isNaN(major) || Number.isNaN(minor)) return false;
   if (major !== reqMajor) return false;
   return minor >= reqMinor;
