@@ -34,6 +34,13 @@ export { toProjectSummary } from "./daemon-types.js";
 
 export * from "./persistence/state.js";
 export * from "./persistence/events.js";
+export {
+  readProjectIdentity,
+  ensureProjectIdentity,
+  createProjectIdentity,
+  generateProjectId,
+} from "./persistence/project-identity.js";
+export type { ProjectIdentity } from "./persistence/project-identity.js";
 
 // ============================================================================
 // LLM Providers
