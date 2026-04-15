@@ -1,72 +1,122 @@
 // packages/cli/src/commands/daemon.ts
 import { Command } from "commander";
 import { ensureDaemonRunning, getRunningDaemon } from "../daemon-control.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 export function createDaemonCommand(): Command {
   const root = new Command("daemon").description("Manage the Loomflo daemon");
 
-  root
+  const startCmd = root
     .command("start")
-    .description("Start the Loomflo daemon (no project)")
-    .action(async () => {
-      const info = await ensureDaemonRunning();
-      console.log(
-        `Daemon v${info.version ?? "?"} running on port ${String(info.port)} (pid ${String(info.pid)})`,
+    .description("Start the Loomflo daemon (no project)");
+  withJsonSupport(startCmd);
+  startCmd.action(async (options: { json?: boolean }) => {
+    const info = await ensureDaemonRunning();
+    const port = String(info.port);
+    const pid = String(info.pid);
+    const version = info.version ?? "?";
+    if (isJsonMode(options)) {
+      writeJson({ action: "start", port: info.port, pid: info.pid, version });
+    } else {
+      process.stdout.write(
+        theme.line(theme.glyph.check, "accent", `daemon v${version} running`, `port ${port}, pid ${pid}`) + "\n",
       );
-    });
+    }
+  });
 
-  root
+  const stopCmd = root
     .command("stop")
     .description("Stop the Loomflo daemon gracefully")
-    .option("--force", "Skip confirmation and use SIGKILL")
-    .action(async (opts: { force?: boolean }) => {
-      const info = await getRunningDaemon();
-      if (!info) {
-        console.log("Daemon is not running.");
-        return;
-      }
-      const running = await fetchActiveProjects(info);
-      if (running.length > 0 && !opts.force) {
-        console.error(
-          `${String(running.length)} project(s) active: ${running.join(", ")}. ` +
-            `Re-run with --force to stop anyway.`,
+    .option("--force", "Skip confirmation and use SIGKILL");
+  withJsonSupport(stopCmd);
+  stopCmd.action(async (opts: { force?: boolean; json?: boolean }) => {
+    const info = await getRunningDaemon();
+    if (!info) {
+      if (isJsonMode(opts)) {
+        writeJson({ action: "stop", status: "not_running" });
+      } else {
+        process.stdout.write(
+          theme.line(theme.glyph.dot, "dim", "daemon is not running") + "\n",
         );
-        process.exit(2);
       }
-      const signal = opts.force ? "SIGKILL" : "SIGTERM";
-      process.kill(info.pid, signal);
-      console.log(`Sent ${signal} to daemon (pid ${String(info.pid)}).`);
-    });
-
-  root
-    .command("status")
-    .description("Show daemon status")
-    .action(async () => {
-      const info = await getRunningDaemon();
-      if (!info) {
-        console.log("Daemon is not running.");
-        return;
-      }
-      const res = await fetchJson(
-        `http://127.0.0.1:${String(info.port)}/daemon/status`,
-        info.token,
+      return;
+    }
+    const running = await fetchActiveProjects(info);
+    if (running.length > 0 && !opts.force) {
+      writeError(
+        opts,
+        `${String(running.length)} project(s) active: ${running.join(", ")}. Re-run with --force to stop anyway.`,
       );
-      console.log(JSON.stringify(res, null, 2));
-    });
+      process.exitCode = 1;
+      return;
+    }
+    const signal = opts.force ? "SIGKILL" : "SIGTERM";
+    process.kill(info.pid, signal);
+    if (isJsonMode(opts)) {
+      writeJson({ action: "stop", pid: info.pid, signal });
+    } else {
+      process.stdout.write(
+        theme.line(theme.glyph.check, "accent", `sent ${signal} to daemon`, `pid ${String(info.pid)}`) + "\n",
+      );
+    }
+  });
 
-  root
+  const statusCmd = root
+    .command("status")
+    .description("Show daemon status");
+  withJsonSupport(statusCmd);
+  statusCmd.action(async (options: { json?: boolean }) => {
+    const info = await getRunningDaemon();
+    if (!info) {
+      if (isJsonMode(options)) {
+        writeJson({ status: "not_running" });
+      } else {
+        process.stdout.write(
+          theme.line(theme.glyph.dot, "dim", "daemon is not running") + "\n",
+        );
+      }
+      return;
+    }
+    const res = await fetchJson<Record<string, unknown>>(
+      `http://127.0.0.1:${String(info.port)}/daemon/status`,
+      info.token,
+    );
+    if (isJsonMode(options)) {
+      writeJson(res);
+    } else {
+      process.stdout.write(theme.heading("Daemon Status") + "\n");
+      for (const [key, value] of Object.entries(res)) {
+        process.stdout.write(theme.kv(key, String(value)) + "\n");
+      }
+    }
+  });
+
+  const restartCmd = root
     .command("restart")
     .description("Stop then start the daemon")
-    .option("--force", "Force stop")
-    .action(async (opts: { force?: boolean }) => {
-      const info = await getRunningDaemon();
-      if (info) {
-        process.kill(info.pid, opts.force ? "SIGKILL" : "SIGTERM");
-        await waitUntilStopped(info.pid, 15_000);
-      }
-      const started = await ensureDaemonRunning();
-      console.log(`Daemon restarted: v${started.version ?? "?"} pid ${String(started.pid)}`);
-    });
+    .option("--force", "Force stop");
+  withJsonSupport(restartCmd);
+  restartCmd.action(async (opts: { force?: boolean; json?: boolean }) => {
+    const info = await getRunningDaemon();
+    if (info) {
+      process.kill(info.pid, opts.force ? "SIGKILL" : "SIGTERM");
+      await waitUntilStopped(info.pid, 15_000);
+    }
+    const started = await ensureDaemonRunning();
+    if (isJsonMode(opts)) {
+      writeJson({ action: "restart", pid: started.pid, version: started.version ?? "?" });
+    } else {
+      process.stdout.write(
+        theme.line(
+          theme.glyph.check,
+          "accent",
+          `daemon restarted`,
+          `v${started.version ?? "?"} pid ${String(started.pid)}`,
+        ) + "\n",
+      );
+    }
+  });
 
   return root;
 }

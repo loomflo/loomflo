@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { resolveProject } from "../project-resolver.js";
 import { openClient } from "../client.js";
+import { withJsonSupport, isJsonMode, writeJsonStream, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 // ============================================================================
 // Types
@@ -27,6 +29,7 @@ interface LogsOptions {
   type?: string;
   limit: string;
   follow: boolean;
+  json?: boolean;
 }
 
 // ============================================================================
@@ -42,23 +45,6 @@ interface LogsOptions {
 function formatTimestamp(ts: string): string {
   const date = new Date(ts);
   return date.toLocaleTimeString("en-US", { hour12: false });
-}
-
-/**
- * Format a single event as a human-readable log line.
- *
- * @param event - The event to format.
- * @returns A formatted string suitable for console output.
- */
-function formatEvent(event: Event): string {
-  const time = formatTimestamp(event.ts);
-  const node = event.nodeId !== null ? ` [${event.nodeId}]` : "";
-  const agent = event.agentId !== null ? ` agent=${event.agentId}` : "";
-
-  const detailKeys = Object.keys(event.details);
-  const detail = detailKeys.length > 0 ? " " + JSON.stringify(event.details) : "";
-
-  return `${time}${node} ${event.type}${agent}${detail}`;
 }
 
 // ============================================================================
@@ -82,7 +68,7 @@ function formatEvent(event: Event): string {
  * @returns A configured commander Command instance.
  */
 export function createLogsCommand(): Command {
-  return new Command("logs")
+  const cmd = new Command("logs")
     .description("Fetch and display agent logs")
     .argument("[node-id]", "Filter events by node ID")
     .option("--type <type>", "Filter by event type")
@@ -118,20 +104,30 @@ export function createLogsCommand(): Command {
 
         const { events, total } = await client.request<EventsResponse>("GET", path);
 
-        if (events.length === 0 && !opts.follow) {
-          console.log("No events found.");
+        /* Print events in chronological order (API returns most recent first). */
+        const chronological = [...events].reverse();
+
+        if (isJsonMode(opts)) {
+          writeJsonStream(chronological);
           return;
         }
 
-        /* Print events in chronological order (API returns most recent first). */
-        const chronological = [...events].reverse();
+        if (events.length === 0 && !opts.follow) {
+          process.stdout.write(
+            `${theme.line(theme.glyph.arrow, "dim", "No events found.")}\n`,
+          );
+          return;
+        }
+
         for (const event of chronological) {
-          console.log(formatEvent(event));
+          process.stdout.write(
+            `${theme.line(theme.glyph.arrow, "muted", `${event.type}  ${theme.dim(formatTimestamp(event.ts))}`, event.nodeId ?? undefined)}\n`,
+          );
         }
 
         if (events.length < total) {
-          console.log(
-            `\nShowing ${String(events.length)} of ${String(total)} events. Use --limit to see more.`,
+          process.stdout.write(
+            `${theme.line(theme.glyph.arrow, "dim", `Showing ${String(events.length)} of ${String(total)}. Use --limit to see more.`)}\n`,
           );
         }
 
@@ -141,12 +137,16 @@ export function createLogsCommand(): Command {
         /* ---------------------------------------------------------------- */
 
         if (opts.follow) {
-          console.warn("--follow is temporarily disabled pending WebSocket multiplexing (S3/S4)");
+          process.stderr.write(
+            `${theme.line(theme.glyph.warn, "warn", "--follow is temporarily disabled pending WebSocket multiplexing")}\n`,
+          );
           return;
         }
       } catch (err) {
-        console.error(`Error: ${(err as Error).message}`);
-        process.exit(1);
+        writeError(opts, (err as Error).message, "E_LOGS");
+        process.exitCode = 1;
       }
     });
+
+  return withJsonSupport(cmd);
 }

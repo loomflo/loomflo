@@ -4,6 +4,8 @@ import { platform } from "node:os";
 import { Command } from "commander";
 
 import { readDaemonConfig } from "../client.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 // ============================================================================
 // Helpers
@@ -47,54 +49,70 @@ export function createDashboardCommand(): Command {
   const cmd = new Command("dashboard")
     .description("Open the web dashboard in the default browser")
     .option("-p, --port <port>", "Override the dashboard port (defaults to daemon port)")
-    .option("--no-open", "Print the URL without opening the browser")
-    .action(async (options: { port?: string; open?: boolean }): Promise<void> => {
-      /* ------------------------------------------------------------------ */
-      /* Read daemon config to get port                                     */
-      /* ------------------------------------------------------------------ */
+    .option("--no-open", "Print the URL without opening the browser");
+  withJsonSupport(cmd);
+  cmd.action(async (options: { port?: string; open?: boolean; json?: boolean }): Promise<void> => {
+    /* ------------------------------------------------------------------ */
+    /* Read daemon config to get port                                     */
+    /* ------------------------------------------------------------------ */
 
-      let port: number;
+    let port: number;
 
-      if (options.port !== undefined) {
-        port = parseInt(options.port, 10);
-        if (isNaN(port) || port < 1 || port > 65535) {
-          console.error(`Invalid port: ${options.port}`);
-          process.exit(1);
-        }
-      } else {
-        try {
-          const config = await readDaemonConfig();
-          port = config.port;
-        } catch {
-          console.error("Daemon is not running. Start with: loomflo start");
-          process.exit(1);
-        }
-      }
-
-      const url = `http://127.0.0.1:${String(port)}`;
-
-      /* ------------------------------------------------------------------ */
-      /* Open browser or print URL                                          */
-      /* ------------------------------------------------------------------ */
-
-      // Always print the URL so the user can copy it regardless of whether
-      // the browser opens successfully. This is especially important for
-      // remote/headless environments and when --no-open is passed.
-      console.log(url);
-
-      if (options.open === false) {
+    if (options.port !== undefined) {
+      port = parseInt(options.port, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        writeError(options, `Invalid port: ${options.port}`);
+        process.exitCode = 1;
         return;
       }
+    } else {
+      try {
+        const config = await readDaemonConfig();
+        port = config.port;
+      } catch {
+        writeError(options, "Daemon is not running. Start with: loomflo start");
+        process.exitCode = 1;
+        return;
+      }
+    }
 
-      console.log(`Opening dashboard at ${url}`);
+    const url = `http://127.0.0.1:${String(port)}`;
 
-      const command = openCommand(url);
-      exec(command, (error: Error | null): void => {
-        if (error !== null) {
-          console.error(`Failed to open browser automatically. Visit ${url} in your browser.`);
-        }
-      });
+    /* ------------------------------------------------------------------ */
+    /* Open browser or print URL                                          */
+    /* ------------------------------------------------------------------ */
+
+    if (isJsonMode(options)) {
+      writeJson({ url });
+      return;
+    }
+
+    // Always print the URL so the user can copy it regardless of whether
+    // the browser opens successfully. This is especially important for
+    // remote/headless environments and when --no-open is passed.
+    process.stdout.write(
+      theme.line(theme.glyph.check, "accent", "dashboard available", url) + "\n",
+    );
+
+    if (options.open === false) {
+      return;
+    }
+
+    process.stdout.write(
+      theme.line(theme.glyph.arrow, "muted", "opening browser") + "\n",
+    );
+
+    // exec is used intentionally here — the URL is constructed from a
+    // validated port number, not user-supplied shell input.
+    const command = openCommand(url);
+    exec(command, (error: Error | null): void => {
+      if (error !== null) {
+        process.stderr.write(
+          theme.line(theme.glyph.warn, "warn", `Failed to open browser automatically. Visit ${url} in your browser.`) + "\n",
+        );
+      }
     });
+  });
 
   return cmd;
 }

@@ -5,6 +5,7 @@
  * running, explicit --port override, invalid port, and browser open failure.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import stripAnsi from "strip-ansi";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks (hoisted by vitest)
@@ -62,17 +63,22 @@ async function runDashboard(args: string[] = []): Promise<void> {
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
-let mockConsoleLog: ReturnType<typeof vi.fn>;
-let mockConsoleError: ReturnType<typeof vi.fn>;
-let mockProcessExit: ReturnType<typeof vi.fn>;
+let stdoutWrites: string[];
+let stderrWrites: string[];
 
 beforeEach(() => {
-  mockProcessExit = vi.spyOn(process, "exit").mockImplementation((): never => {
-    throw new Error("process.exit");
-  }) as unknown as ReturnType<typeof vi.fn>;
+  stdoutWrites = [];
+  stderrWrites = [];
 
-  mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-  mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(process.stdout, "write").mockImplementation((c) => {
+    stdoutWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
+
+  vi.spyOn(process.stderr, "write").mockImplementation((c) => {
+    stderrWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
 
   mockReadDaemonConfig.mockReset();
   mockExec.mockReset();
@@ -83,6 +89,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  process.exitCode = undefined;
   vi.restoreAllMocks();
 });
 
@@ -94,9 +101,10 @@ describe("dashboard command — --no-open flag", () => {
   it("should print the URL without opening the browser", async () => {
     await runDashboard(["--no-open"]);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("http://127.0.0.1:4000");
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("http://127.0.0.1:4000");
     expect(mockExec).not.toHaveBeenCalled();
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
   });
 });
 
@@ -108,7 +116,8 @@ describe("dashboard command — default browser open", () => {
   it("should open the browser with xdg-open on linux", async () => {
     await runDashboard();
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("Opening dashboard at http://127.0.0.1:4000");
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("opening browser");
     expect(mockExec).toHaveBeenCalledOnce();
     const [command] = mockExec.mock.calls[0] as [string];
     expect(command).toBe('xdg-open "http://127.0.0.1:4000"');
@@ -138,15 +147,14 @@ describe("dashboard command — default browser open", () => {
 // ===========================================================================
 
 describe("dashboard command — daemon not running", () => {
-  it("should log error and exit(1) when readDaemonConfig rejects", async () => {
+  it("should write error to stderr and set exitCode=1 when readDaemonConfig rejects", async () => {
     mockReadDaemonConfig.mockRejectedValue(new Error("ENOENT"));
 
-    await expect(runDashboard()).rejects.toThrow("process.exit");
+    await runDashboard();
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Daemon is not running. Start with: loomflo start",
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrWrites.map(stripAnsi).join("");
+    expect(plain).toContain("Daemon is not running. Start with: loomflo start");
+    expect(process.exitCode).toBe(1);
     expect(mockExec).not.toHaveBeenCalled();
   });
 });
@@ -160,7 +168,8 @@ describe("dashboard command — explicit port", () => {
     await runDashboard(["--port", "8080"]);
 
     expect(mockReadDaemonConfig).not.toHaveBeenCalled();
-    expect(mockConsoleLog).toHaveBeenCalledWith("Opening dashboard at http://127.0.0.1:8080");
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("http://127.0.0.1:8080");
   });
 });
 
@@ -169,18 +178,20 @@ describe("dashboard command — explicit port", () => {
 // ===========================================================================
 
 describe("dashboard command — invalid port", () => {
-  it("should log error and exit(1) for non-numeric port", async () => {
-    await expect(runDashboard(["--port", "abc"])).rejects.toThrow("process.exit");
+  it("should write error to stderr and set exitCode=1 for non-numeric port", async () => {
+    await runDashboard(["--port", "abc"]);
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Invalid port: abc");
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrWrites.map(stripAnsi).join("");
+    expect(plain).toContain("Invalid port: abc");
+    expect(process.exitCode).toBe(1);
   });
 
-  it("should log error and exit(1) for port out of range", async () => {
-    await expect(runDashboard(["--port", "99999"])).rejects.toThrow("process.exit");
+  it("should write error to stderr and set exitCode=1 for port out of range", async () => {
+    await runDashboard(["--port", "99999"]);
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Invalid port: 99999");
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrWrites.map(stripAnsi).join("");
+    expect(plain).toContain("Invalid port: 99999");
+    expect(process.exitCode).toBe(1);
   });
 });
 
@@ -189,14 +200,15 @@ describe("dashboard command — invalid port", () => {
 // ===========================================================================
 
 describe("dashboard command — browser open failure", () => {
-  it("should log fallback message when exec callback receives an error", async () => {
+  it("should write fallback message to stderr when exec callback receives an error", async () => {
     mockExec.mockImplementation((_cmd: string, callback: (error: Error | null) => void): void => {
       callback(new Error("xdg-open not found"));
     });
 
     await runDashboard();
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    const plain = stderrWrites.map(stripAnsi).join("");
+    expect(plain).toContain(
       "Failed to open browser automatically. Visit http://127.0.0.1:4000 in your browser.",
     );
   });

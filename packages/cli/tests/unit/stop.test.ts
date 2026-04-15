@@ -5,6 +5,7 @@
  * and resolveProject-fails path (no .loomflo/project.json found).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import stripAnsi from "strip-ansi";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks (hoisted by vitest)
@@ -45,27 +46,31 @@ const IDENTITY = {
  *
  * @returns A promise that resolves when the command completes.
  */
-async function runStop(): Promise<void> {
+async function runStop(args: string[] = ["node", "stop"]): Promise<void> {
   const cmd = createStopCommand();
   cmd.exitOverride();
-  await cmd.parseAsync(["node", "stop"]);
+  await cmd.parseAsync(args);
 }
 
 // ---------------------------------------------------------------------------
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
-let mockConsoleLog: ReturnType<typeof vi.fn>;
-let mockConsoleError: ReturnType<typeof vi.fn>;
-let mockProcessExit: ReturnType<typeof vi.fn>;
+let stdoutWrites: string[];
+let stderrWrites: string[];
 
 beforeEach(() => {
-  mockProcessExit = vi.spyOn(process, "exit").mockImplementation((): never => {
-    throw new Error("process.exit");
-  }) as unknown as ReturnType<typeof vi.fn>;
+  stdoutWrites = [];
+  stderrWrites = [];
 
-  mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-  mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(process.stdout, "write").mockImplementation((c) => {
+    stdoutWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
+  vi.spyOn(process.stderr, "write").mockImplementation((c) => {
+    stderrWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
 
   mockRequest.mockReset();
   mockResolveProject.mockReset();
@@ -88,12 +93,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stdoutPlain(): string {
+  return stdoutWrites.map(stripAnsi).join("");
+}
+
+function stderrPlain(): string {
+  return stderrWrites.map(stripAnsi).join("");
+}
+
 // ===========================================================================
 // Success path
 // ===========================================================================
 
 describe("stop command — success", () => {
-  it("should call POST /workflow/stop and log success message", async () => {
+  it("should call POST /workflow/stop and write themed success message to stdout", async () => {
     mockRequest.mockResolvedValue(undefined);
 
     await runStop();
@@ -104,10 +121,11 @@ describe("stop command — success", () => {
     });
     expect(mockOpenClient).toHaveBeenCalledWith(IDENTITY.id);
     expect(mockRequest).toHaveBeenCalledWith("POST", "/workflow/stop");
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      `Project ${IDENTITY.name} (${IDENTITY.id}) stopped.`,
-    );
-    expect(mockProcessExit).not.toHaveBeenCalled();
+
+    const plain = stdoutPlain();
+    expect(plain).toContain("\u2713");
+    expect(plain).toContain(`project ${IDENTITY.name} stopped`);
+    expect(plain).toContain(IDENTITY.id);
   });
 });
 
@@ -116,13 +134,15 @@ describe("stop command — success", () => {
 // ===========================================================================
 
 describe("stop command — request error", () => {
-  it("should log error and exit(1) when request throws", async () => {
+  it("should write error to stderr and set exitCode when request throws", async () => {
     mockRequest.mockRejectedValue(new Error("POST /workflow/stop -> HTTP 500"));
 
-    await expect(runStop()).rejects.toThrow("process.exit");
+    await runStop();
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /workflow/stop -> HTTP 500");
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("POST /workflow/stop -> HTTP 500");
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
   });
 });
 
@@ -131,18 +151,18 @@ describe("stop command — request error", () => {
 // ===========================================================================
 
 describe("stop command — daemon not running", () => {
-  it("should log error and exit(1) when openClient rejects", async () => {
+  it("should write error to stderr and set exitCode when openClient rejects", async () => {
     mockOpenClient.mockRejectedValue(
       new Error("Daemon is not running. Run 'loomflo start' first."),
     );
 
-    await expect(runStop()).rejects.toThrow("process.exit");
+    await runStop();
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: Daemon is not running. Run 'loomflo start' first.",
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("Daemon is not running");
+    expect(process.exitCode).toBe(1);
     expect(mockRequest).not.toHaveBeenCalled();
+    process.exitCode = undefined;
   });
 });
 
@@ -151,18 +171,18 @@ describe("stop command — daemon not running", () => {
 // ===========================================================================
 
 describe("stop command — not a loomflo project", () => {
-  it("should log error and exit(1) when resolveProject rejects", async () => {
+  it("should write error to stderr and set exitCode when resolveProject rejects", async () => {
     mockResolveProject.mockRejectedValue(
       new Error("/tmp is not a loomflo project (no .loomflo/project.json found)."),
     );
 
-    await expect(runStop()).rejects.toThrow("process.exit");
+    await runStop();
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: /tmp is not a loomflo project (no .loomflo/project.json found).",
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("not a loomflo project");
+    expect(process.exitCode).toBe(1);
     expect(mockOpenClient).not.toHaveBeenCalled();
     expect(mockRequest).not.toHaveBeenCalled();
+    process.exitCode = undefined;
   });
 });
