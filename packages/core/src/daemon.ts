@@ -44,6 +44,12 @@ export interface DaemonConfig {
   projectPath?: string;
   /** Absolute path to the dashboard static files directory. */
   dashboardPath?: string;
+  /**
+   * Override the Loomflo home directory (where credentials.json and projects.json
+   * live). Defaults to `~/.loomflo`. Primarily intended for tests so they can
+   * exercise daemon start/stop against an isolated directory.
+   */
+  loomfloHome?: string;
 }
 
 /**
@@ -114,6 +120,7 @@ export class Daemon {
   private readonly host: string;
   private readonly projectPath: string | undefined;
   private readonly dashboardPath: string | undefined;
+  private readonly loomfloHome: string;
   private server: FastifyInstance | null = null;
   private broadcast: ((event: Record<string, unknown>) => void) | null = null;
   /** Broadcast a project-scoped event to subscribed WebSocket clients. */
@@ -124,10 +131,8 @@ export class Daemon {
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
   private readonly projects: Map<string, ProjectRuntime> = new Map();
-  private readonly profiles = new ProviderProfiles(join(homedir(), ".loomflo", "credentials.json"));
-  private readonly projectsRegistry = new ProjectsRegistry(
-    join(homedir(), ".loomflo", "projects.json"),
-  );
+  private readonly profiles: ProviderProfiles;
+  private readonly projectsRegistry: ProjectsRegistry;
 
   /** Register or replace a project runtime. */
   upsertProject(rt: ProjectRuntime): void {
@@ -155,6 +160,20 @@ export class Daemon {
   }
 
   /**
+   * Ensure a stub `default` provider profile exists in credentials.json.
+   *
+   * When credentials.json is absent or contains no profiles, seed a single
+   * `default` profile of type `anthropic-oauth`. This makes cold-start of the
+   * daemon compatible with the S2 wizard's assumption that at least one
+   * profile is resolvable by name. Existing profiles are never overwritten.
+   */
+  private async ensureDefaultProfileStub(): Promise<void> {
+    const existing = await this.profiles.list();
+    if (Object.keys(existing).length > 0) return;
+    await this.profiles.upsert("default", { type: "anthropic-oauth" });
+  }
+
+  /**
    * Create a new Daemon instance.
    *
    * @param config - Daemon configuration options.
@@ -164,6 +183,9 @@ export class Daemon {
     this.host = config.host ?? DEFAULT_HOST;
     this.projectPath = config.projectPath;
     this.dashboardPath = config.dashboardPath;
+    this.loomfloHome = config.loomfloHome ?? join(homedir(), LOOMFLO_HOME_DIR);
+    this.profiles = new ProviderProfiles(join(this.loomfloHome, "credentials.json"));
+    this.projectsRegistry = new ProjectsRegistry(join(this.loomfloHome, "projects.json"));
 
     const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost", "0.0.0.0"]);
 
@@ -302,6 +324,12 @@ export class Daemon {
       throw error;
     }
 
+    // Ensure the cold-start stub profile `default` exists before anything else.
+    // Spec §87 (S1 FR-9): when credentials.json is absent or empty, the daemon
+    // seeds a single `default` profile so the S2 onboarding wizard has a usable
+    // starting point out of the box.
+    await this.ensureDefaultProfileStub();
+
     // Reload projects persisted from a previous daemon session.
     const persisted = await this.projectsRegistry.list();
     for (const entry of persisted) {
@@ -320,7 +348,7 @@ export class Daemon {
       version: DAEMON_VERSION,
     };
 
-    await writeDaemonFile(this.info);
+    await writeDaemonFile(this.info, this.loomfloHome);
 
     return this.info;
   }
@@ -340,7 +368,7 @@ export class Daemon {
       this.server = null;
     }
 
-    await removeDaemonFile();
+    await removeDaemonFile(this.loomfloHome);
     this.info = null;
     this.shuttingDown = false;
   }
@@ -383,7 +411,7 @@ export class Daemon {
       await this.server.close();
       this.server = null;
     }
-    await removeDaemonFile();
+    await removeDaemonFile(this.loomfloHome);
     this.info = null;
     this.shuttingDown = false;
   }
@@ -550,39 +578,42 @@ export class Daemon {
 // ============================================================================
 
 /**
- * Get the path to `~/.loomflo/daemon.json`.
+ * Get the path to `daemon.json` under the given Loomflo home directory.
  *
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  * @returns Absolute path to the daemon info file.
  */
-function getDaemonFilePath(): string {
-  return join(homedir(), LOOMFLO_HOME_DIR, DAEMON_FILE);
+function getDaemonFilePath(loomfloHome: string): string {
+  return join(loomfloHome, DAEMON_FILE);
 }
 
 /**
- * Write daemon runtime info to `~/.loomflo/daemon.json`.
+ * Write daemon runtime info to `<loomfloHome>/daemon.json`.
  *
- * Creates the `~/.loomflo/` directory if it does not exist.
- * The file is written with mode 0o600 (owner read/write only).
+ * Creates the directory if it does not exist. The file is written with
+ * mode 0o600 (owner read/write only).
  *
  * @param info - The daemon runtime info to persist.
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  */
-async function writeDaemonFile(info: DaemonInfo): Promise<void> {
-  const dir = join(homedir(), LOOMFLO_HOME_DIR);
-  await mkdir(dir, { recursive: true });
-  await writeFile(getDaemonFilePath(), JSON.stringify(info, null, 2), {
+async function writeDaemonFile(info: DaemonInfo, loomfloHome: string): Promise<void> {
+  await mkdir(loomfloHome, { recursive: true });
+  await writeFile(getDaemonFilePath(loomfloHome), JSON.stringify(info, null, 2), {
     encoding: "utf-8",
     mode: 0o600,
   });
 }
 
 /**
- * Remove `~/.loomflo/daemon.json` from disk.
+ * Remove `<loomfloHome>/daemon.json` from disk.
  *
  * Silently ignores if the file does not exist.
+ *
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  */
-async function removeDaemonFile(): Promise<void> {
+async function removeDaemonFile(loomfloHome: string): Promise<void> {
   try {
-    await unlink(getDaemonFilePath());
+    await unlink(getDaemonFilePath(loomfloHome));
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
     if (code !== "ENOENT") {
@@ -604,7 +635,7 @@ async function removeDaemonFile(): Promise<void> {
  * @throws If the file contains invalid JSON.
  */
 export async function loadDaemonInfo(): Promise<DaemonInfo | null> {
-  const filePath = getDaemonFilePath();
+  const filePath = getDaemonFilePath(join(homedir(), LOOMFLO_HOME_DIR));
 
   let content: string;
   try {
