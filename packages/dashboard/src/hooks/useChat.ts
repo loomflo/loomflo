@@ -55,10 +55,9 @@ export function useChat(projectId: string): UseChatReturn {
   const fetchHistory = useCallback(async (): Promise<void> => {
     try {
       const response = await client.postChat(projectId, { messages: [] });
-      if (response.message) {
-        // postChat returns a single response; history may not be available
-        // via a GET endpoint in the new API, so we start fresh.
-      }
+      // postChat returns a single response; history may not be available
+      // via a GET endpoint in the new API, so we start fresh.
+      void response;
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("404")) {
         setMessages([]);
@@ -124,8 +123,8 @@ export function useChat(projectId: string): UseChatReturn {
       if (type === "chat_response") {
         const wsMessage: ChatMessage = {
           role: "assistant",
-          content: (frame["message"] as string) ?? "",
-          timestamp: (frame["timestamp"] as string) ?? new Date().toISOString(),
+          content: (frame["message"] as string | undefined) ?? "",
+          timestamp: (frame["timestamp"] as string | undefined) ?? new Date().toISOString(),
           action:
             frame["action"] !== null && frame["action"] !== undefined
               ? { type: frame["action"] as string, details: {} }

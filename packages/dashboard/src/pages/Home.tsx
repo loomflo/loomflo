@@ -111,11 +111,12 @@ function computeNodeCounts(nodes: readonly Node[]): Map<NodeStatus, number> {
  *
  * @returns Rendered home page element.
  */
-export const HomePage = memo(function HomePage(): ReactElement {
+export const HomePage = memo(function HomePage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
   const { client, baseUrl, token } = useProject();
 
-  const { workflow, nodes, loading, error } = useWorkflow(projectId!);
+  const { workflow, nodes, loading, error } = useWorkflow(projectId);
 
   const [costs, setCosts] = useState<CostSummary | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -127,7 +128,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
   /** Fetch costs from the REST API. */
   const refetchCosts = useCallback(async (): Promise<void> => {
     try {
-      const data = await client.getCosts(projectId!);
+      const data = await client.getCosts(projectId);
       setCosts(data);
     } catch {
       // Silently ignore -- costs card will show workflow.totalCost fallback
@@ -137,7 +138,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
   /** Fetch recent events from the REST API. */
   const refetchEvents = useCallback(async (): Promise<void> => {
     try {
-      const data = await client.getEvents(projectId!, { limit: 20 });
+      const data = await client.getEvents(projectId, { limit: 20 });
       setEvents(data);
     } catch {
       // Silently ignore -- events section will show empty state
@@ -160,7 +161,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
   useWebSocket({
     baseUrl,
     token,
-    subscribe: { projectIds: [projectId!] },
+    subscribe: { projectIds: [projectId] },
     onMessage: (frame): void => {
       const type = frame["type"] as string | undefined;
 

@@ -28,10 +28,11 @@ import { useCosts } from "../hooks/useCosts.js";
  *
  * @returns Rendered costs page element.
  */
-export const CostsPage = memo(function CostsPage(): ReactElement {
+export const CostsPage = memo(function CostsPage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
 
-  const { entries, totalCost, loading, error } = useCosts(projectId!);
+  const { entries, totalCost, loading, error } = useCosts(projectId);
 
   /** Aggregate CostEntry[] into per-node NodeCostEntry[] for CostTracker. */
   const nodeCostEntries = useMemo((): NodeCostEntry[] => {

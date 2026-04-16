@@ -396,20 +396,21 @@ function useSpecPhase(projectId: string, isSpecPhase: boolean): UseSpecPhaseRetu
  *
  * @returns Rendered graph page filling the parent container.
  */
-export const GraphPage = memo(function GraphPage(): ReactElement {
+export const GraphPage = memo(function GraphPage(): ReactElement | null {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
 
-  const { workflow, nodes, loading, error } = useWorkflow(projectId!);
+  const { workflow, nodes, loading, error } = useWorkflow(projectId);
 
   const isSpecPhase = workflow?.status === "spec";
 
-  const { artifacts, wsNodes, wsEdges } = useSpecPhase(projectId!, isSpecPhase);
+  const { artifacts, wsNodes, wsEdges } = useSpecPhase(projectId, isSpecPhase);
 
   /** Navigate to the node detail page when a graph node is clicked. */
   const handleNodeClick = useCallback(
     (nodeId: string): void => {
-      void navigate(`/projects/${encodeURIComponent(projectId!)}/node/${encodeURIComponent(nodeId)}`);
+      void navigate(`/projects/${encodeURIComponent(projectId)}/node/${encodeURIComponent(nodeId)}`);
     },
     [navigate, projectId],
   );

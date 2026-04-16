@@ -101,7 +101,6 @@ function ProjectProviderInner(props: {
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
   const value: ProjectContextValue = {
@@ -125,7 +124,7 @@ function ProjectProviderInner(props: {
 function MissingTokenGate(): ReactElement {
   const [pasted, setPasted] = useState("");
 
-  const onSubmit = (e: React.FormEvent): void => {
+  const onSubmit = (e: React.SyntheticEvent): void => {
     e.preventDefault();
     sessionStorage.setItem("loomflo.token", pasted);
     window.location.reload();
@@ -147,7 +146,7 @@ function MissingTokenGate(): ReactElement {
           className="w-full bg-loom-panel-2 text-loom-muted p-2 rounded"
           placeholder="daemon token"
           value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
+          onChange={(e) => { setPasted((e.target as HTMLInputElement).value); }}
         />
         <button
           className="bg-loom-accent text-loom-bg px-4 py-2 rounded"

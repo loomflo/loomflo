@@ -30,9 +30,10 @@ import { useChat } from "../hooks/useChat.js";
  *
  * @returns Rendered chat page element.
  */
-export const ChatPage = memo(function ChatPage(): ReactElement {
+export const ChatPage = memo(function ChatPage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
-  const { messages, sendMessage, isLoading, error } = useChat(projectId!);
+  if (projectId === undefined) return null;
+  const { messages, sendMessage, isLoading, error } = useChat(projectId);
 
   return (
     <div className="flex h-full flex-col">

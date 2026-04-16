@@ -58,8 +58,9 @@ function formatFileSize(bytes: number): string {
  *
  * @returns Rendered specs page element.
  */
-export const SpecsPage = memo(function SpecsPage(): ReactElement {
+export const SpecsPage = memo(function SpecsPage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
   const { client, baseUrl, token } = useProject();
 
   const [artifacts, setArtifacts] = useState<SpecArtifact[]>([]);
@@ -83,7 +84,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
   const fetchArtifacts = useCallback(async (): Promise<SpecArtifact[] | null> => {
     try {
       setListError(null);
-      const data = await client.getSpecs(projectId!);
+      const data = await client.getSpecs(projectId);
       setArtifacts(data.artifacts);
       return data.artifacts;
     } catch (err) {
@@ -110,7 +111,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
       try {
         // The new API returns artifacts with name/path/size but content
         // fetching is done by the artifact path. Use a simple fetch.
-        const data = await client.getSpecs(projectId!);
+        const data = await client.getSpecs(projectId);
         const artifact = data.artifacts.find((a) => a.name === name);
         if (artifact) {
           setContent(`# ${artifact.name}\n\nPath: \`${artifact.path}\`\nSize: ${formatFileSize(artifact.size)}`);
@@ -168,7 +169,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
   useWebSocket({
     baseUrl,
     token,
-    subscribe: { projectIds: [projectId!] },
+    subscribe: { projectIds: [projectId] },
     onMessage: (frame): void => {
       const type = frame["type"] as string | undefined;
       if (type === "spec_artifact_ready") {

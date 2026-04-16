@@ -16,7 +16,7 @@ export function ProjectSwitcher(): ReactElement {
   const onPick = (id: string): void => {
     setOpen(false);
     const subPath = location.pathname.replace(/^\/projects\/[^/]+/, "");
-    navigate(`/projects/${id}${subPath}`);
+    void navigate(`/projects/${id}${subPath}`);
   };
 
   return (
@@ -24,7 +24,7 @@ export function ProjectSwitcher(): ReactElement {
       <button
         type="button"
         className="bg-loom-panel-2 text-loom-accent px-3 py-1 rounded flex items-center gap-2"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setOpen((v) => !v); }}
       >
         <span>{current?.name ?? projectId ?? "select"}</span>
         <span className="text-loom-muted text-xs">▾</span>
@@ -34,7 +34,7 @@ export function ProjectSwitcher(): ReactElement {
           {allProjects.map((p) => (
             <div
               key={p.id}
-              onClick={() => onPick(p.id)}
+              onClick={() => { onPick(p.id); }}
               className={`px-3 py-2 cursor-pointer hover:bg-loom-panel-2 ${p.id === projectId ? "text-loom-accent" : "text-loom-muted"}`}
             >
               {p.name}

@@ -11,8 +11,6 @@ import type { ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import type {
-  AgentRole,
-  AgentStatus as AgentStatusType,
   Event,
   Node,
   NodeStatus,
@@ -87,8 +85,9 @@ function formatUsd(value: number): string {
  *
  * @returns Rendered node detail page element.
  */
-export const NodePage = memo(function NodePage(): ReactElement {
+export const NodePage = memo(function NodePage(): ReactElement | null {
   const { projectId, id } = useParams<{ projectId: string; id: string }>();
+  if (projectId === undefined || id === undefined) return null;
   const { client, baseUrl, token } = useProject();
 
   const [node, setNode] = useState<Node | null>(null);
@@ -188,7 +187,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
   useWebSocket({
     baseUrl,
     token,
-    subscribe: { projectIds: [projectId!] },
+    subscribe: { projectIds: [projectId] },
     onMessage: (frame): void => {
       const type = frame["type"] as string | undefined;
       const frameNodeId = frame["nodeId"] as string | undefined;
@@ -224,7 +223,7 @@ export const NodePage = memo(function NodePage(): ReactElement {
   // Derived values
   // --------------------------------------------------------------------------
 
-  const backUrl = `/projects/${encodeURIComponent(projectId!)}/graph`;
+  const backUrl = `/projects/${encodeURIComponent(projectId)}/graph`;
 
   // --------------------------------------------------------------------------
   // Loading state
@@ -351,8 +350,8 @@ export const NodePage = memo(function NodePage(): ReactElement {
               <AgentStatusCard
                 key={agent.id}
                 id={agent.id}
-                role={agent.role as AgentRole}
-                status={agent.status as AgentStatusType}
+                role={agent.role}
+                status={agent.status}
                 taskDescription={agent.taskDescription}
                 tokenUsage={agent.tokenUsage}
                 cost={agent.cost}

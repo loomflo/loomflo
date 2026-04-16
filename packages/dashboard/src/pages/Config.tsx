@@ -333,8 +333,9 @@ const NullableNumberField = memo(function NullableNumberField({
  *
  * @returns Rendered config page element.
  */
-export const ConfigPage = memo(function ConfigPage(): ReactElement {
+export const ConfigPage = memo(function ConfigPage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
   const { client } = useProject();
 
   const [config, setConfig] = useState<Config | null>(null);
@@ -384,9 +385,10 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
    * @param patch - Partial config to send to the server.
    */
   const handleUpdate = useCallback(
-    async (field: string, _patch: Partial<Config>): Promise<void> => {
+    async (field: string, _patch?: Partial<Config>): Promise<void> => {
+      void _patch;
       try {
-        const updated = await client.getConfig(projectId!);
+        const updated = await client.getConfig(projectId);
         setConfig(updated as unknown as Config);
         showFeedback(field, { type: "success", message: "Saved" });
       } catch (err) {
@@ -404,7 +406,7 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
   useEffect((): void => {
     void (async (): Promise<void> => {
       try {
-        const data = await client.getConfig(projectId!);
+        const data = await client.getConfig(projectId);
         setConfig(data as unknown as Config);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load config";

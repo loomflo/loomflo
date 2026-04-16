@@ -62,8 +62,9 @@ function formatTimestamp(iso: string): string {
  *
  * @returns Rendered memory page element.
  */
-export const MemoryPage = memo(function MemoryPage(): ReactElement {
+export const MemoryPage = memo(function MemoryPage(): ReactElement | null {
   const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) return null;
   const { client, baseUrl, token } = useProject();
 
   const [files, setFiles] = useState<MemoryFile[]>([]);
@@ -90,7 +91,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
   const fetchFiles = useCallback(async (): Promise<MemoryFile[] | null> => {
     try {
       setListError(null);
-      const data = await client.getMemory(projectId!);
+      const data = await client.getMemory(projectId);
       setFiles(data.files);
       return data.files;
     } catch (err) {
@@ -114,7 +115,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
       setContentLoading(true);
       setContentError(null);
       try {
-        const data = await client.getMemory(projectId!);
+        const data = await client.getMemory(projectId);
         const file = data.files.find((f) => f.name === name);
         if (file) {
           setContent(
@@ -174,7 +175,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
   useWebSocket({
     baseUrl,
     token,
-    subscribe: { projectIds: [projectId!] },
+    subscribe: { projectIds: [projectId] },
     onMessage: (frame): void => {
       const type = frame["type"] as string | undefined;
       if (type === "memory_updated") {
