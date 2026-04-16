@@ -30,9 +30,11 @@
     "cli-table3": "^0.6",
     "commander": "^13.0.0",
     "ora": "^8",
+    "ws": "^8.20.0",
     "zod": "^3.0.0"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "nock": "^14",
     "strip-ansi": "^7",
     "tsup": "^8.0.0",

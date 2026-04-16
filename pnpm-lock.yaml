@@ -62,10 +62,16 @@ importers:
       ora:
         specifier: ^8
         version: 8.2.0
+      ws:
+        specifier: ^8.20.0
+        version: 8.20.0
       zod:
         specifier: ^3.0.0
         version: 3.25.76
     devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       nock:
         specifier: ^14
         version: 14.0.12
