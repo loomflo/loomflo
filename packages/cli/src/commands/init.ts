@@ -1,6 +1,6 @@
 // packages/cli/src/commands/init.ts
 import { Command } from "commander";
-import { writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
@@ -122,6 +122,35 @@ export function createInitCommand(): Command {
         const cwd = opts.projectPath ? join(process.cwd(), opts.projectPath) : process.cwd();
         const { identity } = await resolveProject({ cwd, createIfMissing: true });
 
+        // Re-run detection: if project is already configured, show recap.
+        const alreadyConfigured = await readConfigSafely(join(cwd, ".loomflo", "config.json"));
+        if (alreadyConfigured) {
+          const prior = alreadyConfigured as { level?: number; budgetLimit?: number; defaultDelay?: number; retryDelay?: number };
+          const budgetLabel = prior.budgetLimit === 0 ? "\u221E" : `$${String(prior.budgetLimit ?? "?")}`;
+          process.stdout.write(
+            `${theme.line(
+              theme.glyph.arrow,
+              "muted",
+              `${identity.name}`,
+              `${identity.providerProfileId ?? "?"}, level ${String(prior.level ?? "?")}, budget ${budgetLabel}, delay ${String(prior.defaultDelay ?? "?")}ms`,
+            )}\n`,
+          );
+          if (json) {
+            writeJson({
+              rerun: true,
+              project: { id: identity.id, name: identity.name },
+              config: alreadyConfigured,
+            });
+            return;
+          }
+          if (!opts.yes && process.stdin.isTTY) {
+            const proceed = await inquirerBackend.confirm({ message: "Re-run wizard?", default: false });
+            if (!proceed) return;
+          } else {
+            return;
+          }
+        }
+
         const result = await runWizard({
           prompt: inquirerBackend,
           flags,
@@ -188,4 +217,13 @@ export function createInitCommand(): Command {
     });
 
   return withJsonSupport(cmd);
+}
+
+async function readConfigSafely(path: string): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await readFile(path, "utf-8");
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
