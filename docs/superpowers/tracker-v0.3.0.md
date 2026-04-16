@@ -1,6 +1,6 @@
 # loomflo v0.3.0 Implementation Tracker
 
-**Last updated**: 2026-04-15
+**Last updated**: 2026-04-16
 **Scope**: S1 finalisation + S2 + S3 + S4 + S5 (everything in the CLI+daemon overview except post-v0.3 items).
 
 ## Status at a glance
@@ -11,7 +11,7 @@
 | S3 — Visual CLI theme | `006-cli-theme` | `plans/2026-04-15-s3-cli-theme.md` | **Complete** — T1–T9 done, PR pending |
 | S2 — Onboarding wizard | `005-onboarding-wizard` | `plans/2026-04-15-s2-onboarding-wizard.md` | Not started (depends on S3) |
 | S4 — Observation CLI | `007-observation-cli` | `plans/2026-04-15-s4-observation-cli.md` | Not started (depends on S1+S3) |
-| S5 — Multi-project dashboard | `008-multiproject-dashboard` | `plans/2026-04-15-s5-multiproject-dashboard.md` | Not started (depends on S1+S3) |
+| S5 — Multi-project dashboard | `008-multiproject-dashboard` | `plans/2026-04-15-s5-multiproject-dashboard.md` | **Complete** — T1–T13 done, review fixes applied |
 
 **Recommended execution order**: finish S3 → S2 → S4 → S5 → S1 PR merge → v0.3.0 release PR.
 S2 and S4 can run in parallel once S3 lands. S5 is independent of S2/S4 but also needs S3 (Tailwind tokens reuse) + S1 (scoped routes).
@@ -98,19 +98,19 @@ S2 and S4 can run in parallel once S3 lands. S5 is independent of S2/S4 but also
 **Branch**: `008-multiproject-dashboard`
 **Blocked by**: S1 merged + S3 merged.
 
-- [ ] T1 — Tailwind palette CSS variables (`@theme` block)
-- [ ] T2 — Token parsing (URL fragment → sessionStorage; strip `#token=` from URL)
-- [ ] T3 — `lib/api.ts` rewrite — scoped `/projects/:id/*`; surface 410 as `DashboardOutdatedError`
-- [ ] T4 — `ProjectContext` — `{ token, projectId, allProjects, client }` + missing-token gate
-- [ ] T5 — `useWebSocket` — subscribe protocol `{ all | projectIds }`
-- [ ] T6 — Route tree — `/` landing + `/projects/:projectId/*` guarded children + `NotFound`
-- [ ] T7 — Landing page — project cards + solo auto-redirect + empty state
-- [ ] T8 — `TopBar` + `ProjectSwitcher` + `Layout`
-- [ ] T9 — Migrate hooks + pages to consume `projectId` from `useParams`
-- [ ] T10 — `loomflo dashboard` passes daemon token via URL fragment `#token=…`
-- [ ] T11 — Routing integration test (`/`, `/projects/:id`, unknown id → redirect)
-- [ ] T12 — Extend E2E smoke with dashboard SPA + scoped workflow route
-- [ ] T13 — Full verification + README + CHANGELOG + PR
+- [x] T1 — Tailwind palette CSS variables (`@theme` block)
+- [x] T2 — Token parsing (URL fragment → sessionStorage; strip `#token=` from URL)
+- [x] T3 — `lib/api.ts` rewrite — scoped `/projects/:id/*`; surface 410 as `DashboardOutdatedError`
+- [x] T4 — `ProjectContext` — `{ token, projectId, allProjects, client }` + missing-token gate
+- [x] T5 — `useWebSocket` — subscribe protocol `{ all | projectIds }`
+- [x] T6 — Route tree — `/` landing + `/projects/:projectId/*` guarded children + `NotFound`
+- [x] T7 — Landing page — project cards + solo auto-redirect + empty state
+- [x] T8 — `TopBar` + `ProjectSwitcher` + `Layout`
+- [x] T9 — Migrate hooks + pages to consume `projectId` from `useParams`
+- [x] T10 — `loomflo dashboard` passes daemon token via URL fragment `#token=…`
+- [x] T11 — Routing integration test (`/`, `/projects/:id`, unknown id → redirect)
+- [x] T12 — Extend E2E smoke with dashboard SPA + scoped workflow route
+- [x] T13 — Full verification + README + CHANGELOG + PR
 
 ---
 
