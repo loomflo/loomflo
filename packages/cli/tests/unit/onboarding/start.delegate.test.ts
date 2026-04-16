@@ -12,7 +12,7 @@ vi.mock("../../../src/commands/init.js", () => ({
 }));
 
 vi.mock("../../../src/daemon-control.js", () => ({
-  ensureDaemonRunning: vi.fn().mockResolvedValue({ port: 42000, token: "t", pid: 9, version: "0.2.0" }),
+  ensureDaemonRunning: vi.fn().mockResolvedValue({ port: 42000, token: "t", pid: 9, version: "0.3.0" }),
 }));
 
 const mockFetch = vi.fn();

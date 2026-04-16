@@ -17,7 +17,7 @@ describe("runStart", () => {
 
   it("creates project.json, ensures daemon, registers project, returns identity", async () => {
     const deps = {
-      ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.2.0" })),
+      ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.3.0" })),
       fetchProject: vi.fn(async () => null),
       postProject: vi.fn(async () => ({ id: "proj_xxxxxxxx", status: "idle" })),
     };
@@ -33,7 +33,7 @@ describe("runStart", () => {
 
   it("skips registration if project is already known", async () => {
     const deps = {
-      ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.2.0" })),
+      ensureDaemon: vi.fn(async () => ({ port: 1234, token: "t", pid: 99, version: "0.3.0" })),
       fetchProject: vi.fn(async () => ({ id: "proj_aaaaaaaa", status: "running" })),
       postProject: vi.fn(),
     };

@@ -22,7 +22,7 @@ import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 // ============================================================================
 
 /** Version string sent in the WebSocket welcome message. */
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 /** WebSocket close code for unauthorized connections. */
 const WS_CLOSE_UNAUTHORIZED = 4001;

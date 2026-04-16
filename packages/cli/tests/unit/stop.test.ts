@@ -84,7 +84,7 @@ beforeEach(() => {
 
   mockOpenClient.mockResolvedValue({
     projectId: IDENTITY.id,
-    info: { port: 4000, token: "t", pid: 1234, version: "0.2.0" },
+    info: { port: 4000, token: "t", pid: 1234, version: "0.3.0" },
     request: mockRequest,
   });
 });

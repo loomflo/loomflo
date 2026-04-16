@@ -9,7 +9,7 @@ vi.mock("../../src/daemon-control.js", () => ({
     port: 41234,
     token: "t",
     pid: 99,
-    version: "0.2.0",
+    version: "0.3.0",
   }),
   getRunningDaemon: vi.fn(),
 }));
@@ -36,7 +36,7 @@ beforeEach(async () => {
     port: 41234,
     token: "t",
     pid: 99,
-    version: "0.2.0",
+    version: "0.3.0",
   });
 
   mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {

@@ -188,7 +188,7 @@ describe("GET /health", () => {
     const body: Record<string, unknown> = res.json();
     expect(body.status).toBe("ok");
     expect(body.uptime).toBe(42);
-    expect(body.version).toBe("0.2.0");
+    expect(body.version).toBe("0.3.0");
     expect(body.workflow).toEqual(workflowSummary);
   });
 

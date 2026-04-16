@@ -1,21 +1,32 @@
 # Changelog
 
-## 0.3.0 — Unreleased
+## 0.3.0 — 2026-04-16
+
+Five sub-projects shipping together: S1 multi-project daemon (finalised from
+v0.2.0), S2 onboarding wizard, S3 visual CLI theme, S4 observation CLI, and
+S5 multi-project dashboard.
 
 ### Added
 
+#### S3 — Visual CLI theme
+- Pastel-green CLI theme (Mint palette) with truecolor + 256-color fallback.
+- `--json` flag on every user-facing command for machine-readable output.
+- `loomflo theme:preview` manual QA script (dev-only).
+
+#### S2 — Onboarding wizard
 - Interactive onboarding wizard: provider selection (with live validation), workflow preset, budget, delays, advanced tuning.
 - Non-interactive flag path for CI (`--non-interactive`, implicit when no TTY / CI=true).
 - Re-run recap line on already-configured projects.
 - `start` delegates to `init` on virgin projects (no `.loomflo/project.json`).
-- Pastel-green CLI theme (Mint palette) with truecolor + 256-color fallback.
-- `--json` flag on every user-facing command for machine-readable output.
-- `loomflo theme:preview` manual QA script (dev-only).
+
+#### S4 — Observation CLI
 - `loomflo ps` — list all registered projects with runtime state.
 - `loomflo watch` — live auto-refresh of `ps` (or single-project nodes) via WebSocket subscribe.
 - `loomflo nodes` / `loomflo inspect <id>` — per-project node table + detail.
 - `loomflo tree` — ASCII workflow DAG.
 - `loomflo logs -f` now streams events over WebSocket (previously stubbed).
+
+#### S5 — Multi-project dashboard
 - Landing page at `/` listing all registered projects as cards.
 - Top-bar project switcher preserving the current sub-page when switching.
 - Daemon token passed via URL fragment; cleared from the address bar on load.
@@ -27,12 +38,12 @@
 
 - Dashboard: all pages were silently empty after S1's route refactor because
   the frontend still called `/workflow`, `/nodes`, `/events`. Every endpoint
-  is now scoped under `/projects/:id/*`.
+  is now scoped under `/projects/:id/*`. (S5)
 
 ### Changed
 
 - All CLI output routed through the shared `theme` module; `console.log` is
-  no longer allowed inside `src/commands/` (enforced by ESLint).
+  no longer allowed inside `src/commands/` (enforced by ESLint). (S3)
 
 ## 0.2.0 — 2026-04-14
 

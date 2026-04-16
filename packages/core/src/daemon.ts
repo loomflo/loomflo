@@ -81,7 +81,7 @@ export interface DaemonInfo {
 // ============================================================================
 
 /** Current daemon version — written to daemon.json so clients can verify compatibility. */
-const DAEMON_VERSION = "0.2.0";
+const DAEMON_VERSION = "0.3.0";
 
 /** Directory name for global Loomflo config/state. */
 const LOOMFLO_HOME_DIR = ".loomflo";

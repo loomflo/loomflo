@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 vi.mock("../../../src/daemon-control.js", () => ({
-  ensureDaemonRunning: vi.fn().mockResolvedValue({ port: 42000, token: "t", pid: 9, version: "0.2.0" }),
+  ensureDaemonRunning: vi.fn().mockResolvedValue({ port: 42000, token: "t", pid: 9, version: "0.3.0" }),
 }));
 
 const mockFetch = vi.fn().mockImplementation(async () => ({ ok: true, json: async () => ({}) }));

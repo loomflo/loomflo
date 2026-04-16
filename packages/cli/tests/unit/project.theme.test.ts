@@ -28,7 +28,7 @@ const DAEMON_INFO = {
   port: 41234,
   token: "t",
   pid: 99,
-  version: "0.2.0",
+  version: "0.3.0",
 };
 
 const PROJECTS = [
