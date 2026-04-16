@@ -110,6 +110,17 @@ live in `~/.loomflo/credentials.json` as named profiles that projects reference
 by id. The registry of known projects is persisted in
 `~/.loomflo/projects.json` and reloaded when the daemon restarts.
 
+## Observing projects
+
+- `loomflo ps` — table of every registered project: status, current node, uptime, cost
+- `loomflo watch [projectId]` — same data, auto-refresh every 2s (configurable with `-n`)
+- `loomflo logs -f [--project <id>]` — follow events via WebSocket
+- `loomflo nodes [--project <id>] [--all]` — per-project node table
+- `loomflo inspect <nodeId>` — detail view of a node (agents, files, review, cost)
+- `loomflo tree [--project <id>]` — ASCII view of the workflow DAG
+
+Every command supports `--json` for machine-readable output.
+
 ## Installation
 
 ### From npm
@@ -208,6 +219,12 @@ environment signals:
 | `loomflo resume`                              | Resume an interrupted workflow                                     |
 | `loomflo dashboard`                           | Open the web dashboard in your browser                             |
 | `loomflo logs [node-id]`                      | View agent logs (optionally filtered by node)                      |
+| `loomflo logs -f`                             | Stream live events via WebSocket                                   |
+| `loomflo ps`                                  | List all registered projects with runtime state                    |
+| `loomflo watch [projectId]`                   | Auto-refresh runtime view (Ctrl-C to quit)                         |
+| `loomflo nodes [--project <id>] [--all]`      | Per-project node table (status, duration, cost, retries)           |
+| `loomflo inspect <nodeId> [--project <id>]`   | Detail view of a node (agents, files, review, cost)                |
+| `loomflo tree [--project <id>]`               | ASCII view of the workflow DAG                                     |
 | `loomflo config set <key> <value>`            | Set a configuration value                                          |
 | `loomflo config get <key>`                    | Get a configuration value                                          |
 | `loomflo daemon start\|stop\|status\|restart` | Control the daemon process lifecycle (independent of any project)  |

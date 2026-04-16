@@ -11,6 +11,11 @@
 - Pastel-green CLI theme (Mint palette) with truecolor + 256-color fallback.
 - `--json` flag on every user-facing command for machine-readable output.
 - `loomflo theme:preview` manual QA script (dev-only).
+- `loomflo ps` — list all registered projects with runtime state.
+- `loomflo watch` — live auto-refresh of `ps` (or single-project nodes) via WebSocket subscribe.
+- `loomflo nodes` / `loomflo inspect <id>` — per-project node table + detail.
+- `loomflo tree` — ASCII workflow DAG.
+- `loomflo logs -f` now streams events over WebSocket (previously stubbed).
 
 ### Changed
 

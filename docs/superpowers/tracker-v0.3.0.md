@@ -10,7 +10,7 @@
 | S1 — Multi-project daemon | `004-multi-project-daemon` | `plans/2026-04-14-s1-multi-project-daemon.md` | Implementation complete; **PR pending** |
 | S3 — Visual CLI theme | `006-cli-theme` | `plans/2026-04-15-s3-cli-theme.md` | **Complete** — T1–T9 done, PR pending |
 | S2 — Onboarding wizard | `005-onboarding-wizard` | `plans/2026-04-15-s2-onboarding-wizard.md` | **Complete** — T1–T13 done, PR pending |
-| S4 — Observation CLI | `007-observation-cli` | `plans/2026-04-15-s4-observation-cli.md` | Not started (depends on S1+S3) |
+| S4 — Observation CLI | `007-observation-cli` | `plans/2026-04-15-s4-observation-cli.md` | **Complete** — T1–T9 done |
 | S5 — Multi-project dashboard | `008-multiproject-dashboard` | `plans/2026-04-15-s5-multiproject-dashboard.md` | Not started (depends on S1+S3) |
 
 **Recommended execution order**: finish S3 → S2 → S4 → S5 → S1 PR merge → v0.3.0 release PR.
@@ -80,15 +80,15 @@ S2 and S4 can run in parallel once S3 lands. S5 is independent of S2/S4 but also
 **Branch**: `007-observation-cli`
 **Blocked by**: S1 merged + S3 merged.
 
-- [ ] T1 — `observation/api.ts` + `observation/ws.ts` (cross-project fetch + subscribe helper)
-- [ ] T2 — `loomflo ps` — cross-project runtime table
-- [ ] T3 — `loomflo nodes [--project <id>] [--all]`
-- [ ] T4 — `loomflo inspect <nodeId>` — detail view
-- [ ] T5 — `loomflo tree [--project <id>]` — ASCII DAG
-- [ ] T6 — `loomflo watch [projectId]` — live refresh via WS
-- [ ] T7 — `loomflo logs -f` — unblock WS subscribe
-- [ ] T8 — Extend E2E smoke (`LOOMFLO_E2E=1`) with `ps` / `nodes` / `tree`
-- [ ] T9 — Full verification + README + CHANGELOG + PR
+- [x] T1 — `observation/api.ts` + `observation/ws.ts` (cross-project fetch + subscribe helper)
+- [x] T2 — `loomflo ps` — cross-project runtime table
+- [x] T3 — `loomflo nodes [--project <id>] [--all]`
+- [x] T4 — `loomflo inspect <nodeId>` — detail view
+- [x] T5 — `loomflo tree [--project <id>]` — ASCII DAG
+- [x] T6 — `loomflo watch [projectId]` — live refresh via WS
+- [x] T7 — `loomflo logs -f` — unblock WS subscribe
+- [x] T8 — Extend E2E smoke (`LOOMFLO_E2E=1`) with `ps` / `nodes` / `tree`
+- [x] T9 — Full verification + README + CHANGELOG + PR
 
 ---
 
