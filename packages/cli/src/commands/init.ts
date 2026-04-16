@@ -1,7 +1,7 @@
 // packages/cli/src/commands/init.ts
 import { Command } from "commander";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
 import { inquirerBackend } from "../onboarding/prompts.inquirer.js";
@@ -37,6 +37,7 @@ interface InitFlags {
   budget?: string;
   defaultDelay?: string;
   retryDelay?: string;
+  apiKey?: string;
   advanced?: boolean;
   yes?: boolean;
   nonInteractive?: boolean;
@@ -99,6 +100,7 @@ export function createInitCommand(): Command {
     .option("--budget <usd>", "Budget limit (0 = unlimited)")
     .option("--default-delay <ms>", "Delay between nodes in ms")
     .option("--retry-delay <ms>", "Delay between retries in ms")
+    .option("--api-key <key>", "Provider API key (avoids interactive prompt)")
     .option("--advanced", "Prompt for advanced settings", false)
     .option("--yes", "Skip the final confirmation", false)
     .option("--non-interactive", "Fail instead of prompting when values are missing", false)
@@ -113,13 +115,14 @@ export function createInitCommand(): Command {
         budget: opts.budget,
         defaultDelay: opts.defaultDelay,
         retryDelay: opts.retryDelay,
+        apiKey: opts.apiKey,
         advanced: opts.advanced,
         yes: opts.yes,
         nonInteractive: opts.nonInteractive === true || inferNonInteractive,
       });
 
       try {
-        const cwd = opts.projectPath ? join(process.cwd(), opts.projectPath) : process.cwd();
+        const cwd = opts.projectPath ? resolve(opts.projectPath) : process.cwd();
         const { identity } = await resolveProject({ cwd, createIfMissing: true });
 
         // Re-run detection: if project is already configured, show recap.
@@ -196,7 +199,15 @@ export function createInitCommand(): Command {
           projectPath: cwd,
           providerProfileId: result.providerProfileId,
         }));
-        await deps.initWorkflow(info, identity.id, { projectPath: cwd, config: result.answers.advanced as unknown as Record<string, unknown> });
+        const advancedConfig = result.answers.advanced as Record<string, unknown> | undefined;
+        const config: Record<string, unknown> = {
+          ...(advancedConfig ?? {}),
+          budgetLimit: result.answers.budgetLimit,
+          defaultDelay: result.answers.defaultDelay,
+          retryDelay: result.answers.retryDelay,
+          level: result.answers.level,
+        };
+        await deps.initWorkflow(info, identity.id, { projectPath: cwd, config });
 
         if (json) {
           writeJson({

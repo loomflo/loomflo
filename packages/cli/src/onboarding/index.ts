@@ -1,3 +1,4 @@
+import os from "node:os";
 import { ProviderProfiles, type ProviderProfile } from "@loomflo/core";
 
 import { theme } from "../theme/index.js";
@@ -39,17 +40,23 @@ export async function runWizard(input: WizardInput): Promise<WizardResult> {
   const budgetLimit =
     flags.budget !== undefined
       ? flags.budget
-      : await askBudget(prompt);
+      : flags.nonInteractive
+        ? 0  // use safe default
+        : await askBudget(prompt);
 
   const defaultDelay =
     flags.defaultDelay !== undefined
       ? flags.defaultDelay
-      : await askDelay(prompt, "time between nodes", preset.defaultDelay);
+      : flags.nonInteractive
+        ? preset.defaultDelay
+        : await askDelay(prompt, "time between nodes", preset.defaultDelay);
 
   const retryDelay =
     flags.retryDelay !== undefined
       ? flags.retryDelay
-      : await askDelay(prompt, "time between retries", preset.retryDelay);
+      : flags.nonInteractive
+        ? preset.retryDelay
+        : await askDelay(prompt, "time between retries", preset.retryDelay);
 
   const advancedFlagOn = flags.advanced || level === "custom";
   const advancedPrompted = advancedFlagOn
@@ -228,5 +235,5 @@ async function askAdvanced(prompt: PromptBackend, preset: ReturnType<typeof pres
 }
 
 function defaultProfilesPath(): string {
-  return `${process.env["HOME"] ?? ""}/.loomflo/credentials.json`;
+  return `${os.homedir()}/.loomflo/credentials.json`;
 }

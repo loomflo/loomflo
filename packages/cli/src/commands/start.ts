@@ -101,7 +101,7 @@ export function createStartCommand(): Command {
           ...(options.projectPath ? ["--project-path", options.projectPath] : []),
           ...(json ? ["--json"] : []),
         ]);
-        return;
+        // Fall through to start the workflow after init completes.
       }
 
       const sp = json ? null : theme.spinner("starting\u2026");
