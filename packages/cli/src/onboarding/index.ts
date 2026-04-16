@@ -51,7 +51,7 @@ export async function runWizard(input: WizardInput): Promise<WizardResult> {
       ? flags.retryDelay
       : await askDelay(prompt, "time between retries", preset.retryDelay);
 
-  const advancedFlagOn = flags.advanced === true || level === "custom";
+  const advancedFlagOn = flags.advanced || level === "custom";
   const advancedPrompted = advancedFlagOn
     ? true
     : (flags.nonInteractive || flags.yes)
@@ -150,8 +150,7 @@ async function runExistingValidator(profile: ProviderProfile): Promise<void> {
 function defaultBaseUrl(type: "openai" | "moonshot" | "nvidia"): string {
   if (type === "openai") return "https://api.openai.com/v1";
   if (type === "moonshot") return "https://api.moonshot.ai/v1";
-  if (type === "nvidia") return "https://integrate.api.nvidia.com/v1";
-  throw new Error(`no default baseUrl for ${String(type)}`);
+  return "https://integrate.api.nvidia.com/v1";
 }
 
 async function createNewProfile(

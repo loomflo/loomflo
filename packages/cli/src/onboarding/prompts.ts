@@ -16,7 +16,7 @@ export interface FakeAnswer {
 }
 
 export function createFakePromptBackend(queue: FakeAnswer[]): PromptBackend {
-  const pull = <T>(kind: FakeAnswer["kind"]): T => {
+  const pull = (kind: FakeAnswer["kind"]): unknown => {
     const next = queue.shift();
     if (!next) throw new Error("fake backend ran out of answers");
     if (next.kind !== kind) {
@@ -24,14 +24,22 @@ export function createFakePromptBackend(queue: FakeAnswer[]): PromptBackend {
         `fake backend kind mismatch — expected ${kind}, got ${next.kind}`,
       );
     }
-    return next.value as T;
+    return next.value;
+  };
+
+  const wrap = <R>(kind: FakeAnswer["kind"]): Promise<R> => {
+    try {
+      return Promise.resolve(pull(kind) as R);
+    } catch (err) {
+      return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+    }
   };
 
   return {
-    input: async () => pull<string>("input"),
-    password: async () => pull<string>("password"),
-    confirm: async () => pull<boolean>("confirm"),
-    select: async () => pull<string>("select"),
-    number: async () => pull<number>("number"),
+    input: () => wrap<string>("input"),
+    password: () => wrap<string>("password"),
+    confirm: () => wrap<boolean>("confirm"),
+    select: () => wrap<string>("select"),
+    number: () => wrap<number>("number"),
   } as PromptBackend;
 }

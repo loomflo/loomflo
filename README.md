@@ -133,6 +133,24 @@ pnpm build
 docker compose up -d
 ```
 
+## Onboarding a project
+
+```bash
+cd my-project
+loomflo init        # interactive wizard (or start — it delegates)
+```
+
+Flags for scripts / CI:
+
+```bash
+loomflo init \
+  --provider anthropic-oauth --profile default \
+  --level 2 --budget 0 --default-delay 1000 --retry-delay 2000 \
+  --yes
+```
+
+Re-running `loomflo init` on a configured project prints a one-line recap and asks whether to start.
+
 ## Usage Example
 
 ```bash
@@ -140,8 +158,8 @@ docker compose up -d
 cd /path/to/project
 loomflo start
 
-# Or generate specs from scratch
-loomflo init "Build a todo app with React frontend, Express backend, and SQLite"
+# Or run the interactive setup wizard
+loomflo init
 
 # Open the dashboard to review the spec and execution graph
 loomflo dashboard
@@ -184,7 +202,7 @@ environment signals:
 | --------------------------------------------- | ------------------------------------------------------------------ |
 | `loomflo start`                               | Start this project's workflow (auto-starts the daemon + registers) |
 | `loomflo stop`                                | Stop this project's workflow (the daemon keeps running)            |
-| `loomflo init "description"`                  | Generate spec + execution graph from a description                 |
+| `loomflo init`                                | Interactive onboarding wizard (provider, level, budget, delays)    |
 | `loomflo chat "message"`                      | Chat with the Architect agent                                      |
 | `loomflo status`                              | Show workflow state, active nodes, costs                           |
 | `loomflo resume`                              | Resume an interrupted workflow                                     |

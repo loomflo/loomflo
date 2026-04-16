@@ -131,8 +131,8 @@ export function createInitCommand(): Command {
             `${theme.line(
               theme.glyph.arrow,
               "muted",
-              `${identity.name}`,
-              `${identity.providerProfileId ?? "?"}, level ${String(prior.level ?? "?")}, budget ${budgetLabel}, delay ${String(prior.defaultDelay ?? "?")}ms`,
+              identity.name,
+              `${identity.providerProfileId}, level ${String(prior.level ?? "?")}, budget ${budgetLabel}, delay ${String(prior.defaultDelay ?? "?")}ms`,
             )}\n`,
           );
           if (json) {

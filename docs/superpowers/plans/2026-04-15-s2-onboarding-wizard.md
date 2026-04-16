@@ -50,7 +50,7 @@ T1 (deps) → T2 (types) → T3 (presets) → T4 (validators) → T5 (prompts)
 **Files:**
 - Modify: `packages/cli/package.json`
 
-- [ ] **Step 1: Add the inquirer prompts package**
+- [x] **Step 1: Add the inquirer prompts package**
 
 ```bash
 pnpm --filter @loomflo/cli add @inquirer/prompts@^6
@@ -58,11 +58,11 @@ pnpm --filter @loomflo/cli add @inquirer/prompts@^6
 
 (`ora` is already on the dep list from S3.)
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 `packages/cli/package.json` now has `"@inquirer/prompts": "^6.x.x"` in `dependencies`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/cli/package.json pnpm-lock.yaml
@@ -77,7 +77,7 @@ git commit -m "feat(cli): add @inquirer/prompts for S2 wizard (T1)"
 - Create: `packages/cli/src/onboarding/types.ts`
 - Test: `packages/cli/test/onboarding/types.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/types.test.ts
@@ -138,12 +138,12 @@ describe("WizardFlagsSchema", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/types`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Create the types module**
+- [x] **Step 3: Create the types module**
 
 ```ts
 // packages/cli/src/onboarding/types.ts
@@ -210,12 +210,12 @@ export interface WizardResult {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/types`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/types.ts packages/cli/test/onboarding/types.test.ts
@@ -230,7 +230,7 @@ git commit -m "feat(cli): wizard types + zod flags schema (T2)"
 - Create: `packages/cli/src/onboarding/presets.ts`
 - Test: `packages/cli/test/onboarding/presets.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/presets.test.ts
@@ -270,11 +270,11 @@ describe("presetDefaults", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/presets`
 
-- [ ] **Step 3: Create the presets module**
+- [x] **Step 3: Create the presets module**
 
 ```ts
 // packages/cli/src/onboarding/presets.ts
@@ -328,12 +328,12 @@ export function presetDefaults(level: Level): PresetConfig {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/presets`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/presets.ts packages/cli/test/onboarding/presets.test.ts
@@ -350,13 +350,13 @@ git commit -m "feat(cli): workflow presets — level → defaults map (T3)"
 
 Each validator returns a discriminated `{ ok: true } | { ok: false, reason, hint? }`. Tests mock HTTP via `nock` (already in the CLI devDeps if used elsewhere; if not, add it).
 
-- [ ] **Step 1: Install nock if absent**
+- [x] **Step 1: Install nock if absent**
 
 ```bash
 pnpm --filter @loomflo/cli add -D nock@^14
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/validators.test.ts
@@ -461,12 +461,12 @@ describe("validateOpenAICompat", () => {
 });
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/validators`
 Expected: FAIL, module not found.
 
-- [ ] **Step 4: Implement validators**
+- [x] **Step 4: Implement validators**
 
 ```ts
 // packages/cli/src/onboarding/validators.ts
@@ -547,12 +547,12 @@ export async function validateOpenAICompat(creds: OpenAICompatCreds): Promise<Va
 
 Also export `isOAuthTokenValid` from `@loomflo/core` if it isn't already. Check `packages/core/src/index.ts` — add `export { isOAuthTokenValid } from "./providers/credentials.js";` if missing.
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/validators`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/validators.ts packages/cli/test/onboarding/validators.test.ts packages/core/src/index.ts
@@ -570,7 +570,7 @@ git commit -m "feat(cli): provider validators (anthropic-oauth/apiKey/openai-com
 
 The prompt layer is split so tests can drive the wizard with fake answers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/prompts.test.ts
@@ -598,11 +598,11 @@ describe("prompts — fake backend", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/prompts`
 
-- [ ] **Step 3: Create the backend interface**
+- [x] **Step 3: Create the backend interface**
 
 ```ts
 // packages/cli/src/onboarding/prompts.ts
@@ -645,7 +645,7 @@ export function createFakePromptBackend(queue: FakeAnswer[]): PromptBackend {
 }
 ```
 
-- [ ] **Step 4: Create the inquirer-backed implementation**
+- [x] **Step 4: Create the inquirer-backed implementation**
 
 ```ts
 // packages/cli/src/onboarding/prompts.inquirer.ts
@@ -671,12 +671,12 @@ export const inquirerBackend: PromptBackend = {
 };
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/prompts`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/prompts.ts packages/cli/src/onboarding/prompts.inquirer.ts packages/cli/test/onboarding/prompts.test.ts
@@ -691,7 +691,7 @@ git commit -m "feat(cli): prompt backend abstraction + inquirer impl + fake for 
 - Create: `packages/cli/src/onboarding/summary.ts`
 - Test: `packages/cli/test/onboarding/summary.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/summary.test.ts
@@ -752,11 +752,11 @@ describe("renderSummary", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/summary`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 // packages/cli/src/onboarding/summary.ts
@@ -803,12 +803,12 @@ export function renderSummary(input: SummaryInput): string {
 
 (Note: `theme.kv` must accept an optional key-width third param — already present in S3 T3.)
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/summary`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/summary.ts packages/cli/test/onboarding/summary.test.ts
@@ -825,7 +825,7 @@ git commit -m "feat(cli): wizard summary renderer (T6)"
 
 Pulls everything together: prompts → validator → summary → confirm.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/onboarding/wizard.test.ts
@@ -909,11 +909,11 @@ describe("runWizard", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/wizard`
 
-- [ ] **Step 3: Implement the orchestrator**
+- [x] **Step 3: Implement the orchestrator**
 
 ```ts
 // packages/cli/src/onboarding/index.ts
@@ -1152,12 +1152,12 @@ function defaultProfilesPath(): string {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- onboarding/wizard`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/onboarding/index.ts packages/cli/test/onboarding/wizard.test.ts
@@ -1174,7 +1174,7 @@ git commit -m "feat(cli): wizard orchestrator — provider+level+budget+delays+a
 - Modify: `packages/cli/src/commands/init.ts`
 - Test: `packages/cli/test/commands/init.test.ts` (rewrite)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Replace `packages/cli/test/commands/init.test.ts` with:
 
@@ -1234,11 +1234,11 @@ describe("loomflo init", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init`
 
-- [ ] **Step 3: Refactor `init.ts`**
+- [x] **Step 3: Refactor `init.ts`**
 
 ```ts
 // packages/cli/src/commands/init.ts
@@ -1359,12 +1359,12 @@ export function createInitCommand(): Command {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/commands/init.ts packages/cli/test/commands/init.test.ts
@@ -1379,7 +1379,7 @@ git commit -m "refactor(cli): init runs the onboarding wizard + writes project.j
 - Modify: `packages/cli/src/commands/start.ts`
 - Test: `packages/cli/test/commands/start.delegate.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/commands/start.delegate.test.ts
@@ -1415,11 +1415,11 @@ describe("loomflo start — virgin project", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/start.delegate`
 
-- [ ] **Step 3: Modify `start.ts`**
+- [x] **Step 3: Modify `start.ts`**
 
 In `packages/cli/src/commands/start.ts`, add at the top of the action (before `ensureDaemon`):
 
@@ -1445,12 +1445,12 @@ action: async (options: StartOptions): Promise<void> => {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/start`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/commands/start.ts packages/cli/test/commands/start.delegate.test.ts
@@ -1467,7 +1467,7 @@ git commit -m "feat(cli): start delegates to init when project.json is missing (
 
 `--non-interactive` is wired into the wizard already (via T7). This task is the **defensive layer**: if TTY is absent and the flag wasn't explicitly set, imply it; and when required values are missing under non-interactive mode, produce an actionable error that lists the missing flags.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/commands/init.nonInteractive.test.ts
@@ -1514,11 +1514,11 @@ describe("loomflo init — non-interactive", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init.nonInteractive`
 
-- [ ] **Step 3: Implement the imply-TTY logic**
+- [x] **Step 3: Implement the imply-TTY logic**
 
 In `init.ts`, before the `WizardFlagsSchema.parse(...)` call, add:
 
@@ -1533,12 +1533,12 @@ const effectiveFlags = {
 
 And pass `effectiveFlags` to `WizardFlagsSchema.parse`.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init.nonInteractive`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/commands/init.ts packages/cli/test/commands/init.nonInteractive.test.ts
@@ -1553,7 +1553,7 @@ git commit -m "feat(cli): imply --non-interactive when no TTY / CI=true (T10)"
 - Modify: `packages/cli/src/commands/init.ts`
 - Test: `packages/cli/test/commands/init.rerun.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/cli/test/commands/init.rerun.test.ts
@@ -1607,11 +1607,11 @@ describe("loomflo init — re-run on configured project", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init.rerun`
 
-- [ ] **Step 3: Implement re-run detection**
+- [x] **Step 3: Implement re-run detection**
 
 In `init.ts`, before calling `runWizard`, detect an existing configured project:
 
@@ -1651,12 +1651,12 @@ async function readConfigSafely(path: string): Promise<Record<string, unknown> |
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @loomflo/cli test -- commands/init.rerun`
 Expected: PASS, 1 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/cli/src/commands/init.ts packages/cli/test/commands/init.rerun.test.ts
@@ -1674,7 +1674,7 @@ git commit -m "feat(cli): re-run recap + confirm on configured projects (T11)"
 
 Drives a full wizard run against a **real** temp `credentials.json` + `project.json` using the fake prompt backend. Validates that on success the files on disk have the expected shape.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```ts
 // packages/cli/test/integration/wizard.integration.test.ts
@@ -1740,12 +1740,12 @@ describe("wizard integration", () => {
 });
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 Run: `pnpm --filter @loomflo/cli test -- integration/wizard`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/cli/test/integration/wizard.integration.test.ts
@@ -1760,7 +1760,7 @@ git commit -m "test(cli): wizard integration — real FS + ProviderProfiles (T12
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Run the full suite**
+- [x] **Step 1: Run the full suite**
 
 ```bash
 pnpm --filter @loomflo/cli test
@@ -1771,7 +1771,7 @@ pnpm --filter @loomflo/cli build
 
 All green.
 
-- [ ] **Step 2: Manual smoke**
+- [x] **Step 2: Manual smoke**
 
 ```bash
 rm -rf /tmp/loomflo-s2-smoke && mkdir /tmp/loomflo-s2-smoke && cd /tmp/loomflo-s2-smoke
@@ -1782,7 +1782,7 @@ cat .loomflo/project.json
 cat .loomflo/config.json
 ```
 
-- [ ] **Step 3: README section**
+- [x] **Step 3: README section**
 
 Append to `README.md`:
 
@@ -1806,7 +1806,7 @@ loomflo init \
 Re-running `loomflo init` on a configured project prints a one-line recap and asks whether to start.
 ```
 
-- [ ] **Step 4: CHANGELOG**
+- [x] **Step 4: CHANGELOG**
 
 Under `0.3.0`:
 
@@ -1818,7 +1818,7 @@ Under `0.3.0`:
 - Re-run recap line on already-configured projects.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add README.md CHANGELOG.md

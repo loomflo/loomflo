@@ -4,6 +4,10 @@
 
 ### Added
 
+- Interactive onboarding wizard: provider selection (with live validation), workflow preset, budget, delays, advanced tuning.
+- Non-interactive flag path for CI (`--non-interactive`, implicit when no TTY / CI=true).
+- Re-run recap line on already-configured projects.
+- `start` delegates to `init` on virgin projects (no `.loomflo/project.json`).
 - Pastel-green CLI theme (Mint palette) with truecolor + 256-color fallback.
 - `--json` flag on every user-facing command for machine-readable output.
 - `loomflo theme:preview` manual QA script (dev-only).

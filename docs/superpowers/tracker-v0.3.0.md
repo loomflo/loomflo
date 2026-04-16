@@ -9,7 +9,7 @@
 |---|---|---|---|
 | S1 — Multi-project daemon | `004-multi-project-daemon` | `plans/2026-04-14-s1-multi-project-daemon.md` | Implementation complete; **PR pending** |
 | S3 — Visual CLI theme | `006-cli-theme` | `plans/2026-04-15-s3-cli-theme.md` | **Complete** — T1–T9 done, PR pending |
-| S2 — Onboarding wizard | `005-onboarding-wizard` | `plans/2026-04-15-s2-onboarding-wizard.md` | Not started (depends on S3) |
+| S2 — Onboarding wizard | `005-onboarding-wizard` | `plans/2026-04-15-s2-onboarding-wizard.md` | **Complete** — T1–T13 done, PR pending |
 | S4 — Observation CLI | `007-observation-cli` | `plans/2026-04-15-s4-observation-cli.md` | Not started (depends on S1+S3) |
 | S5 — Multi-project dashboard | `008-multiproject-dashboard` | `plans/2026-04-15-s5-multiproject-dashboard.md` | Not started (depends on S1+S3) |
 
@@ -58,19 +58,19 @@ S2 and S4 can run in parallel once S3 lands. S5 is independent of S2/S4 but also
 **Branch**: `005-onboarding-wizard`
 **Blocked by**: S3 merged.
 
-- [ ] T1 — Add `@inquirer/prompts` dependency
-- [ ] T2 — Wizard types + zod `WizardFlagsSchema`
-- [ ] T3 — Presets (level → config defaults)
-- [ ] T4 — Provider validators (anthropic-oauth / apiKey / openai-compat)
-- [ ] T5 — Prompt backend abstraction + inquirer impl + fake-for-tests
-- [ ] T6 — Summary renderer (heading + kv + advanced section)
-- [ ] T7 — Wizard orchestrator (`runWizard()`)
-- [ ] T8 — Refactor `init.ts` to call `runWizard()` + write `project.json` + `config.json`
-- [ ] T9 — `start` delegates to `init` when `project.json` is missing
-- [ ] T10 — Non-interactive flag (implicit on `!isTTY` / `CI=true`, fast-fail with actionable error)
-- [ ] T11 — Re-run semantics (one-line recap + `[Y/n]` on configured projects)
-- [ ] T12 — Wizard integration test (real FS, real `ProviderProfiles`)
-- [ ] T13 — Full verification + README + CHANGELOG + PR
+- [x] T1 — Add `@inquirer/prompts` dependency
+- [x] T2 — Wizard types + zod `WizardFlagsSchema`
+- [x] T3 — Presets (level → config defaults)
+- [x] T4 — Provider validators (anthropic-oauth / apiKey / openai-compat)
+- [x] T5 — Prompt backend abstraction + inquirer impl + fake-for-tests
+- [x] T6 — Summary renderer (heading + kv + advanced section)
+- [x] T7 — Wizard orchestrator (`runWizard()`)
+- [x] T8 — Refactor `init.ts` to call `runWizard()` + write `project.json` + `config.json`
+- [x] T9 — `start` delegates to `init` when `project.json` is missing
+- [x] T10 — Non-interactive flag (implicit on `!isTTY` / `CI=true`, fast-fail with actionable error)
+- [x] T11 — Re-run semantics (one-line recap + `[Y/n]` on configured projects)
+- [x] T12 — Wizard integration test (real FS, real `ProviderProfiles`)
+- [x] T13 — Full verification + README + CHANGELOG + PR
 
 ---
 
