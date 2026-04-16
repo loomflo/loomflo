@@ -130,28 +130,56 @@ async function resolveProviderProfile(
   return pick;
 }
 
+/** Maximum number of validator attempts before surfacing a terminal failure. */
+const VALIDATOR_MAX_ATTEMPTS = 3;
+
+async function runValidatorOnce(
+  profile: ProviderProfile,
+): Promise<{ ok: true } | { ok: false; reason: string; hint?: string }> {
+  if (profile.type === "anthropic-oauth") return validateAnthropicOauth();
+  if (profile.type === "anthropic") return validateAnthropicApiKey(profile.apiKey);
+  return validateOpenAICompat({
+    apiKey: profile.apiKey,
+    baseUrl: profile.baseUrl ?? defaultBaseUrl(profile.type),
+  });
+}
+
 async function runExistingValidator(profile: ProviderProfile): Promise<void> {
-  const sp = theme.spinner("validating profile\u2026");
-  sp.start();
-  try {
-    const res =
-      profile.type === "anthropic-oauth"
-        ? await validateAnthropicOauth()
-        : profile.type === "anthropic"
-          ? await validateAnthropicApiKey(profile.apiKey)
-          : await validateOpenAICompat({
-              apiKey: profile.apiKey,
-              baseUrl: profile.baseUrl ?? defaultBaseUrl(profile.type),
-            });
-    if (res.ok) {
-      sp.succeed("profile validated");
-    } else {
-      sp.fail(`${res.reason}${res.hint ? `  (${res.hint})` : ""}`);
-      throw new Error(`profile validation failed: ${res.reason}`);
+  // Spec L112: give the user up to 3 attempts before giving up, so a transient
+  // network blip or a retryable 5xx does not force them to restart the wizard.
+  let lastReason = "unknown";
+  let lastHint: string | undefined;
+
+  for (let attempt = 1; attempt <= VALIDATOR_MAX_ATTEMPTS; attempt++) {
+    const label =
+      attempt === 1
+        ? "validating profile\u2026"
+        : `validating profile\u2026 (attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)})`;
+    const sp = theme.spinner(label);
+    sp.start();
+    try {
+      const res = await runValidatorOnce(profile);
+      if (res.ok) {
+        sp.succeed("profile validated");
+        return;
+      }
+      lastReason = res.reason;
+      lastHint = res.hint;
+      const hintSuffix = res.hint ? `  (${res.hint})` : "";
+      const failMessage =
+        attempt < VALIDATOR_MAX_ATTEMPTS
+          ? `attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)} failed: ${res.reason}${hintSuffix} \u2014 retrying\u2026`
+          : `attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)} failed: ${res.reason}${hintSuffix}`;
+      sp.fail(failMessage);
+    } finally {
+      sp.stop();
     }
-  } finally {
-    sp.stop();
   }
+
+  const finalHint = lastHint ? `  (${lastHint})` : "";
+  throw new Error(
+    `profile validation failed after ${String(VALIDATOR_MAX_ATTEMPTS)} attempts: ${lastReason}${finalHint}`,
+  );
 }
 
 function defaultBaseUrl(type: "openai" | "moonshot" | "nvidia"): string {
