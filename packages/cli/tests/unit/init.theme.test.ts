@@ -17,8 +17,25 @@ vi.mock("../../src/daemon-control.js", () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+vi.mock("../../src/onboarding/index.js", () => ({
+  runWizard: vi.fn(),
+}));
+
 import { createInitCommand } from "../../src/commands/init.js";
+import { runWizard } from "../../src/onboarding/index.js";
 import { ensureDaemonRunning } from "../../src/daemon-control.js";
+
+const wizardResult = {
+  confirmed: true,
+  providerProfileId: "default",
+  answers: {
+    providerProfileId: "default",
+    level: 2,
+    budgetLimit: 0,
+    defaultDelay: 1000,
+    retryDelay: 2000,
+  },
+};
 
 let tmp: string;
 let stdoutWrites: string[];
@@ -26,6 +43,7 @@ let stdoutWrites: string[];
 beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), "loomflo-init-theme-"));
 
+  (runWizard as ReturnType<typeof vi.fn>).mockResolvedValue(wizardResult);
   (ensureDaemonRunning as ReturnType<typeof vi.fn>).mockResolvedValue({
     port: 41234,
     token: "t",
@@ -47,7 +65,7 @@ beforeEach(async () => {
     if (u.includes("/projects") && init?.method === "POST") {
       return {
         ok: true,
-        json: async () => ({ id: "proj_test1234", status: "idle" }),
+        json: async () => ({ id: "proj_test1234", name: "test" }),
       };
     }
     return { ok: true, json: async () => ({}) };
@@ -59,9 +77,7 @@ beforeEach(async () => {
     return true;
   });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-  vi.spyOn(process, "exit").mockImplementation((): never => {
-    throw new Error("process.exit");
-  });
+  process.chdir(tmp);
 });
 
 afterEach(async () => {
@@ -70,37 +86,24 @@ afterEach(async () => {
 });
 
 describe("loomflo init — themed output", () => {
-  it("prints check-line for workflow initialization", async () => {
+  it("prints check-line for project ready", async () => {
     const cmd = createInitCommand();
-    cmd.exitOverride();
-    await cmd.parseAsync([
-      "node",
-      "init",
-      "Build a todo application with authentication",
-      "--project-path",
-      tmp,
-    ]);
+    await cmd.parseAsync(["node", "init"]);
     const plain = stdoutWrites.map(stripAnsi).join("");
     expect(plain).toContain("\u2713");
-    expect(plain).toContain("workflow");
+    expect(plain).toContain("project");
+    expect(plain).toContain("ready");
   });
 });
 
 describe("loomflo init --json", () => {
-  it("prints JSON with project and workflow info", async () => {
+  it("prints JSON with project and config info", async () => {
     const cmd = createInitCommand();
-    cmd.exitOverride();
-    await cmd.parseAsync([
-      "node",
-      "init",
-      "Build a todo application with authentication",
-      "--json",
-      "--project-path",
-      tmp,
-    ]);
+    await cmd.parseAsync(["node", "init", "--json"]);
     const raw = stdoutWrites.join("").trim();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     expect(parsed).toHaveProperty("project");
-    expect(parsed).toHaveProperty("workflow");
+    expect(parsed).toHaveProperty("providerProfileId");
+    expect(parsed).toHaveProperty("config");
   });
 });
