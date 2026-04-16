@@ -24,6 +24,7 @@
     "theme:preview": "tsx scripts/theme-preview.ts"
   },
   "dependencies": {
+    "@inquirer/prompts": "^6",
     "@loomflo/core": "workspace:*",
     "chalk": "^5",
     "cli-table3": "^0.6",
