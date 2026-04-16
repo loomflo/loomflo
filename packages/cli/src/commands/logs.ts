@@ -1,8 +1,10 @@
 import { Command } from "commander";
 
 import { resolveProject } from "../project-resolver.js";
+import { readDaemonConfig } from "../client.js";
 import { openClient } from "../client.js";
 import { withJsonSupport, isJsonMode, writeJsonStream, writeError } from "../output.js";
+import { openSubscription } from "../observation/ws.js";
 import { theme } from "../theme/index.js";
 
 // ============================================================================
@@ -59,11 +61,7 @@ function formatTimestamp(ts: string): string {
  *   `loomflo logs <node-id>` — show events for a specific node
  *   `loomflo logs --type agent_created` — filter by event type
  *   `loomflo logs --limit 100` — fetch more events
- *   `loomflo logs -f` — (temporarily disabled, see note below)
- *
- * Note: --follow is temporarily disabled pending WebSocket multiplexing
- * (S3/S4). When enabled, it will stream live events via the multiplexed
- * WS endpoint with a subscribe protocol.
+ *   `loomflo logs -f` — stream live events via WebSocket
  *
  * @returns A configured commander Command instance.
  */
@@ -132,14 +130,35 @@ export function createLogsCommand(): Command {
         }
 
         /* ---------------------------------------------------------------- */
-        /* Follow mode: temporarily disabled                                */
-        /* TODO(S3/S4): wire up multiplexed WebSocket subscribe protocol   */
+        /* Follow mode: stream live events via WebSocket                    */
         /* ---------------------------------------------------------------- */
 
         if (opts.follow) {
-          process.stderr.write(
-            `${theme.line(theme.glyph.warn, "warn", "--follow is temporarily disabled pending WebSocket multiplexing")}\n`,
-          );
+          const daemon = await readDaemonConfig();
+          const sub = await openSubscription(daemon, { projectIds: [identity.id] });
+
+          const cleanup = (): void => {
+            sub.close();
+            process.exit(0);
+          };
+          process.on("SIGINT", cleanup);
+          process.on("SIGTERM", cleanup);
+
+          sub.onMessage((frame) => {
+            const f = frame as Record<string, unknown>;
+            if (isJsonMode(opts)) {
+              process.stdout.write(`${JSON.stringify(f)}\n`);
+              return;
+            }
+            const type = typeof f["type"] === "string" ? f["type"] : "event";
+            const ts = typeof f["timestamp"] === "string" ? formatTimestamp(f["timestamp"]) : "";
+            const nodeId = typeof f["nodeId"] === "string" ? f["nodeId"] : undefined;
+            process.stdout.write(
+              `${theme.line(theme.glyph.arrow, "muted", `${type}  ${theme.dim(ts)}`, nodeId)}\n`,
+            );
+          });
+
+          await new Promise<void>((resolve) => { sub.onClose(() => { resolve(); }); });
           return;
         }
       } catch (err) {
