@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { wsUrl, type SubscribeSpec } from "../lib/ws.js";
+import { wsSubprotocols, wsUrl, type SubscribeSpec } from "../lib/ws.js";
 
 export interface UseWebSocketOptions {
   baseUrl: string;
@@ -26,7 +26,7 @@ export function useWebSocket(opts: UseWebSocketOptions): UseWebSocketReturn {
     let socket: WebSocket | null = null;
 
     const connect = (): void => {
-      socket = new WebSocket(wsUrl(opts.baseUrl, opts.token));
+      socket = new WebSocket(wsUrl(opts.baseUrl), wsSubprotocols(opts.token));
       socket.onopen = (): void => {
         retry = 0;
         setConnected(true);

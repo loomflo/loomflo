@@ -52,11 +52,13 @@ class MockWebSocket {
   static readonly CLOSED: number = 3;
 
   readonly url: string;
+  readonly protocols: string[];
   readyState: number = MockWebSocket.OPEN;
   private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols === undefined ? [] : Array.isArray(protocols) ? protocols : [protocols];
   }
 
   addEventListener(event: string, handler: (...args: unknown[]) => void): void {
@@ -126,8 +128,8 @@ beforeEach(() => {
   vi.stubGlobal(
     "WebSocket",
     class extends MockWebSocket {
-      constructor(url: string) {
-        super(url);
+      constructor(url: string, protocols?: string | string[]) {
+        super(url, protocols);
         capturedWebSockets.push(this);
       }
     },
@@ -243,7 +245,8 @@ describe("DaemonClient.connect", () => {
     await DaemonClient.connect({ websocket: true });
 
     expect(capturedWebSockets).toHaveLength(1);
-    expect(capturedWebSockets[0].url).toBe("ws://127.0.0.1:5000/ws?token=t1");
+    expect(capturedWebSockets[0].url).toBe("ws://127.0.0.1:5000/ws");
+    expect(capturedWebSockets[0].protocols).toEqual(["loomflo.bearer", "t1"]);
   });
 });
 
@@ -460,11 +463,12 @@ describe("DaemonClient.connectWebSocket", () => {
     client = new DaemonClient(8080, "ws-token");
   });
 
-  it("should create a WebSocket with the correct URL including token", () => {
+  it("should create a WebSocket with the correct URL and token subprotocol", () => {
     client.connectWebSocket();
 
     expect(capturedWebSockets).toHaveLength(1);
-    expect(capturedWebSockets[0].url).toBe("ws://127.0.0.1:8080/ws?token=ws-token");
+    expect(capturedWebSockets[0].url).toBe("ws://127.0.0.1:8080/ws");
+    expect(capturedWebSockets[0].protocols).toEqual(["loomflo.bearer", "ws-token"]);
   });
 
   it("should set up open, message, close, and error event listeners", () => {

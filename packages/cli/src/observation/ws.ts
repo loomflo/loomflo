@@ -34,11 +34,21 @@ export interface Subscription {
 // ============================================================================
 
 /**
+ * Subprotocol identifier the daemon expects when carrying the bearer token
+ * on the WebSocket upgrade (`Sec-WebSocket-Protocol: loomflo.bearer, <token>`).
+ *
+ * Keeping the token out of the URL prevents it from landing in proxy access
+ * logs, shell history, or daemon request logs.
+ */
+const WS_SUBPROTOCOL_PREFIX = "loomflo.bearer";
+
+/**
  * Open a WebSocket subscription to the daemon's event stream.
  *
- * Connects to `ws://127.0.0.1:<port>/ws?token=<token>`, waits for the
- * socket to open, sends a subscribe frame containing the spec, and
- * returns a {@link Subscription} handle.
+ * Connects to `ws://127.0.0.1:<port>/ws`, authenticates via the
+ * `Sec-WebSocket-Protocol` upgrade header, waits for the socket to open,
+ * sends a subscribe frame containing the spec, and returns a
+ * {@link Subscription} handle.
  *
  * @param daemon - Daemon connection info (port + token).
  * @param spec - Which projects to subscribe to.
@@ -46,8 +56,8 @@ export interface Subscription {
  */
 export function openSubscription(daemon: DaemonEndpoint, spec: SubscribeSpec): Promise<Subscription> {
   return new Promise<Subscription>((resolve, reject) => {
-    const url = `ws://127.0.0.1:${String(daemon.port)}/ws?token=${daemon.token}`;
-    const socket = new WebSocket(url);
+    const url = `ws://127.0.0.1:${String(daemon.port)}/ws`;
+    const socket = new WebSocket(url, [WS_SUBPROTOCOL_PREFIX, daemon.token]);
 
     const messageCallbacks: Array<(data: unknown) => void> = [];
     const closeCallbacks: Array<() => void> = [];

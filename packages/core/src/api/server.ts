@@ -27,6 +27,15 @@ const VERSION = "0.3.0";
 /** WebSocket close code for unauthorized connections. */
 const WS_CLOSE_UNAUTHORIZED = 4001;
 
+/**
+ * Subprotocol prefix used to carry the daemon auth token on WebSocket upgrade.
+ *
+ * Clients connect with `Sec-WebSocket-Protocol: loomflo.bearer, <token>` so the
+ * token never appears in URLs, access logs, or proxy buffers. The server echoes
+ * the prefix (not the token) so the handshake completes correctly.
+ */
+const WS_SUBPROTOCOL_PREFIX = "loomflo.bearer";
+
 /** Numeric value of WebSocket.OPEN readyState. */
 const WS_OPEN = 1;
 
@@ -147,6 +156,32 @@ export interface ServerResult {
 }
 
 // ============================================================================
+// WebSocket subprotocol auth
+// ============================================================================
+
+/**
+ * Extract a bearer token carried by the `Sec-WebSocket-Protocol` upgrade header.
+ *
+ * Clients MUST offer two subprotocols: the literal identifier
+ * `loomflo.bearer` followed by the token value. The header is a
+ * comma-separated list (RFC 6455 §4.1); browsers normalize it.
+ *
+ * Returns `null` when the header is missing, empty, does not begin with the
+ * expected prefix, or does not include a token element.
+ */
+function extractBearerFromSubprotocol(header: string | string[] | undefined): string | null {
+  if (header === undefined) return null;
+  const raw = Array.isArray(header) ? header.join(",") : header;
+  const parts = raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length < 2) return null;
+  if (parts[0] !== WS_SUBPROTOCOL_PREFIX) return null;
+  return parts[1] ?? null;
+}
+
+// ============================================================================
 // preValidation hook factory
 // ============================================================================
 
@@ -187,7 +222,9 @@ function makeProjectRuntimeHook(getRuntime: (id: string) => ProjectRuntime | nul
  *
  * Authentication:
  * - HTTP routes use Bearer token in the `Authorization` header.
- * - WebSocket connections authenticate via `?token=xxx` query parameter.
+ * - WebSocket connections authenticate via the `Sec-WebSocket-Protocol`
+ *   upgrade header (`loomflo.bearer, <token>`) so credentials are never
+ *   written to URLs, access logs, or proxy buffers.
  * - `GET /health` is unauthenticated.
  *
  * @param options - Server configuration options.
@@ -208,7 +245,16 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // Plugins
   // ---------------------------------------------------------------------------
 
-  await server.register(fastifyWebsocket);
+  // Accept the `loomflo.bearer` subprotocol offered by our clients so the
+  // handshake completes with the expected Sec-WebSocket-Protocol response
+  // header. Authorization is still enforced in the route handler — picking the
+  // subprotocol here only negotiates the framing, not the token.
+  await server.register(fastifyWebsocket, {
+    options: {
+      handleProtocols: (protocols: Set<string>): string | false =>
+        protocols.has(WS_SUBPROTOCOL_PREFIX) ? WS_SUBPROTOCOL_PREFIX : false,
+    },
+  });
   await server.register(fastifyCors, { origin: true });
 
   if (dashboardRoot) {
@@ -407,10 +453,11 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   const subscriptions = new Map<SocketClient, ClientSubscription>();
 
   server.get("/ws", { websocket: true }, (socket: SocketClient, _request: FastifyRequest): void => {
-    const url = new URL(_request.url, `http://${_request.headers.host ?? "localhost"}`);
-    const queryToken = url.searchParams.get("token");
+    const presentedToken = extractBearerFromSubprotocol(
+      _request.headers["sec-websocket-protocol"],
+    );
 
-    if (queryToken !== token) {
+    if (presentedToken !== token) {
       socket.close(WS_CLOSE_UNAUTHORIZED, "Unauthorized");
       return;
     }

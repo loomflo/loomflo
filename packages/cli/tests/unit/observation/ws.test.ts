@@ -13,6 +13,8 @@ import { EventEmitter } from "node:events";
 class FakeSocket extends EventEmitter {
   sent: string[] = [];
   readyState = 1; // OPEN
+  url = "";
+  protocols: string[] = [];
   send(m: string): void {
     this.sent.push(m);
   }
@@ -27,8 +29,10 @@ class FakeSocket extends EventEmitter {
 
 vi.mock("ws", () => ({
   default: class {
-    constructor() {
+    constructor(url: string, protocols?: string | string[]) {
       const s = new FakeSocket();
+      s.url = url;
+      s.protocols = protocols === undefined ? [] : Array.isArray(protocols) ? protocols : [protocols];
       // Simulate async open
       setTimeout(() => s.emit("open"), 0);
       return s as unknown as never;
@@ -54,6 +58,15 @@ describe("openSubscription", () => {
     expect(socket.sent).toHaveLength(1);
     const frame = JSON.parse(socket.sent[0]!) as Record<string, unknown>;
     expect(frame).toMatchObject({ type: "subscribe", all: true });
+    sub.close();
+  });
+
+  it("carries the token on the Sec-WebSocket-Protocol subprotocol, not the URL", async () => {
+    const sub = await openSubscription({ port: 42000, token: "secret-tok" }, { all: true });
+    const socket = (sub as unknown as { _socket: FakeSocket })._socket;
+    expect(socket.url).toBe("ws://127.0.0.1:42000/ws");
+    expect(socket.url).not.toContain("token=");
+    expect(socket.protocols).toEqual(["loomflo.bearer", "secret-tok"]);
     sub.close();
   });
 
