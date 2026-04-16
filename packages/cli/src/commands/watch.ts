@@ -92,8 +92,9 @@ export function createWatchCommand(): Command {
     .option("-n, --interval <seconds>", "Refresh interval in seconds", "2")
     .action(async (projectId: string | undefined, opts: WatchOptions): Promise<void> => {
       try {
-        // Parse interval (min 1 second)
-        const intervalSec = Math.max(1, Math.floor(Number(opts.interval ?? "2")));
+        // Parse interval (min 1 second, default 2)
+        const raw = Number(opts.interval ?? "2");
+        const intervalSec = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 2;
 
         // Read daemon connection info
         const daemon = await readDaemonConfig();

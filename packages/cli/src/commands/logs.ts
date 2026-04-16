@@ -74,12 +74,71 @@ export function createLogsCommand(): Command {
     .option("-f, --follow", "Stream new events in real time via WebSocket", false)
     .action(async (nodeId: string | undefined, opts: LogsOptions): Promise<void> => {
       try {
-        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
-        const client = await openClient(identity.id);
+        /* ---------------------------------------------------------------- */
+        /* Follow-only mode: WS subscription (works outside a project)     */
+        /* ---------------------------------------------------------------- */
+
+        if (opts.follow) {
+          const daemon = await readDaemonConfig();
+
+          // Resolve project if possible; if outside a project, subscribe to all.
+          let projectId: string | undefined;
+          try {
+            const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+            projectId = identity.id;
+          } catch {
+            // Not inside a project — subscribe to all
+          }
+
+          const sub = await openSubscription(
+            daemon,
+            projectId !== undefined ? { projectIds: [projectId] } : { all: true },
+          );
+
+          const cleanup = (): void => {
+            sub.close();
+            process.exit(0);
+          };
+          process.on("SIGINT", cleanup);
+          process.on("SIGTERM", cleanup);
+
+          sub.onMessage((frame) => {
+            const f = frame as Record<string, unknown>;
+
+            // Filter by nodeId if positional arg was passed
+            if (nodeId !== undefined) {
+              const frameNodeId = typeof f["nodeId"] === "string" ? f["nodeId"] : undefined;
+              if (frameNodeId !== nodeId) return;
+            }
+
+            // Filter by --type if flag was passed
+            if (opts.type !== undefined) {
+              const frameType = typeof f["type"] === "string" ? f["type"] : undefined;
+              if (frameType !== opts.type) return;
+            }
+
+            if (isJsonMode(opts)) {
+              process.stdout.write(`${JSON.stringify(f)}\n`);
+              return;
+            }
+            const type = typeof f["type"] === "string" ? f["type"] : "event";
+            const ts = typeof f["timestamp"] === "string" ? formatTimestamp(f["timestamp"]) : "";
+            const evNodeId = typeof f["nodeId"] === "string" ? f["nodeId"] : undefined;
+            process.stdout.write(
+              `${theme.line(theme.glyph.arrow, "muted", `${type}  ${theme.dim(ts)}`, evNodeId)}\n`,
+            );
+          });
+
+          await new Promise<void>((resolve) => { sub.onClose(() => { resolve(); }); });
+          return;
+        }
 
         /* ---------------------------------------------------------------- */
-        /* Build query string                                               */
+        /* Historical mode: REST fetch (requires a project)                */
         /* ---------------------------------------------------------------- */
+
+        const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
+        const client = await openClient(identity.id);
 
         const params = new URLSearchParams();
 
@@ -96,10 +155,6 @@ export function createLogsCommand(): Command {
         const queryString = params.toString();
         const path = queryString.length > 0 ? `/events?${queryString}` : "/events";
 
-        /* ---------------------------------------------------------------- */
-        /* Fetch historical events                                          */
-        /* ---------------------------------------------------------------- */
-
         const { events, total } = await client.request<EventsResponse>("GET", path);
 
         /* Print events in chronological order (API returns most recent first). */
@@ -110,7 +165,7 @@ export function createLogsCommand(): Command {
           return;
         }
 
-        if (events.length === 0 && !opts.follow) {
+        if (events.length === 0) {
           process.stdout.write(
             `${theme.line(theme.glyph.arrow, "dim", "No events found.")}\n`,
           );
@@ -127,39 +182,6 @@ export function createLogsCommand(): Command {
           process.stdout.write(
             `${theme.line(theme.glyph.arrow, "dim", `Showing ${String(events.length)} of ${String(total)}. Use --limit to see more.`)}\n`,
           );
-        }
-
-        /* ---------------------------------------------------------------- */
-        /* Follow mode: stream live events via WebSocket                    */
-        /* ---------------------------------------------------------------- */
-
-        if (opts.follow) {
-          const daemon = await readDaemonConfig();
-          const sub = await openSubscription(daemon, { projectIds: [identity.id] });
-
-          const cleanup = (): void => {
-            sub.close();
-            process.exit(0);
-          };
-          process.on("SIGINT", cleanup);
-          process.on("SIGTERM", cleanup);
-
-          sub.onMessage((frame) => {
-            const f = frame as Record<string, unknown>;
-            if (isJsonMode(opts)) {
-              process.stdout.write(`${JSON.stringify(f)}\n`);
-              return;
-            }
-            const type = typeof f["type"] === "string" ? f["type"] : "event";
-            const ts = typeof f["timestamp"] === "string" ? formatTimestamp(f["timestamp"]) : "";
-            const nodeId = typeof f["nodeId"] === "string" ? f["nodeId"] : undefined;
-            process.stdout.write(
-              `${theme.line(theme.glyph.arrow, "muted", `${type}  ${theme.dim(ts)}`, nodeId)}\n`,
-            );
-          });
-
-          await new Promise<void>((resolve) => { sub.onClose(() => { resolve(); }); });
-          return;
         }
       } catch (err) {
         writeError(opts, (err as Error).message, "E_LOGS");
