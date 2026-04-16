@@ -8,10 +8,10 @@
 
 import { memo, useMemo } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import { CostTracker } from "../components/CostTracker.js";
 import type { NodeCostEntry } from "../components/CostTracker.js";
+import { useProjectId } from "../context/ProjectContext.js";
 import { useCosts } from "../hooks/useCosts.js";
 
 // ============================================================================
@@ -28,10 +28,8 @@ import { useCosts } from "../hooks/useCosts.js";
  *
  * @returns Rendered costs page element.
  */
-export const CostsPage = memo(function CostsPage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
-
+export const CostsPage = memo(function CostsPage(): ReactElement {
+  const projectId = useProjectId();
   const { entries, totalCost, loading, error } = useCosts(projectId);
 
   /** Aggregate CostEntry[] into per-node NodeCostEntry[] for CostTracker. */

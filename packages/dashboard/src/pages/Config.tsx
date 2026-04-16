@@ -8,10 +8,9 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import type { Config, Level, ModelsConfig, RetryStrategy } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 
 // ============================================================================
 // Constants
@@ -333,9 +332,8 @@ const NullableNumberField = memo(function NullableNumberField({
  *
  * @returns Rendered config page element.
  */
-export const ConfigPage = memo(function ConfigPage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
+export const ConfigPage = memo(function ConfigPage(): ReactElement {
+  const projectId = useProjectId();
   const { client } = useProject();
 
   const [config, setConfig] = useState<Config | null>(null);

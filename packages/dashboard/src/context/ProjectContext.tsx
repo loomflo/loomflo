@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -7,6 +8,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { useParams } from "react-router-dom";
 
 import { api, type ApiClient } from "../lib/api.js";
 import { readToken } from "../lib/token.js";
@@ -43,6 +45,14 @@ export function useProject(): ProjectContextValue {
     throw new Error("useProject must be used inside a <ProjectProvider>");
   }
   return ctx;
+}
+
+export function useProjectId(): string {
+  const { projectId } = useParams<{ projectId: string }>();
+  if (projectId === undefined) {
+    throw new Error("useProjectId must be used inside a /projects/:projectId route");
+  }
+  return projectId;
 }
 
 // ============================================================================
@@ -89,7 +99,7 @@ function ProjectProviderInner(props: {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  const refresh = async (): Promise<void> => {
+  const refresh = useCallback(async (): Promise<void> => {
     try {
       const list = await client.listProjects();
       setAllProjects(list);
@@ -97,11 +107,11 @@ function ProjectProviderInner(props: {
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     }
-  };
+  }, [client]);
 
   useEffect(() => {
     void refresh();
-  }, [client]);
+  }, [refresh]);
 
   const value: ProjectContextValue = {
     token: props.token,

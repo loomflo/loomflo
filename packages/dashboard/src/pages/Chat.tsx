@@ -9,9 +9,9 @@
 
 import { memo } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import { ChatInterface } from "../components/ChatInterface.js";
+import { useProjectId } from "../context/ProjectContext.js";
 import { useChat } from "../hooks/useChat.js";
 
 // ============================================================================
@@ -30,9 +30,8 @@ import { useChat } from "../hooks/useChat.js";
  *
  * @returns Rendered chat page element.
  */
-export const ChatPage = memo(function ChatPage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
+export const ChatPage = memo(function ChatPage(): ReactElement {
+  const projectId = useProjectId();
   const { messages, sendMessage, isLoading, error } = useChat(projectId);
 
   return (

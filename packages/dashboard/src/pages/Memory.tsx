@@ -9,10 +9,9 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import type { Memory } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { MarkdownViewer } from "../components/MarkdownViewer.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 
@@ -62,9 +61,8 @@ function formatTimestamp(iso: string): string {
  *
  * @returns Rendered memory page element.
  */
-export const MemoryPage = memo(function MemoryPage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
+export const MemoryPage = memo(function MemoryPage(): ReactElement {
+  const projectId = useProjectId();
   const { client, baseUrl, token } = useProject();
 
   const [files, setFiles] = useState<MemoryFile[]>([]);

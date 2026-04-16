@@ -16,7 +16,7 @@ import type {
   NodeStatus,
   ReviewReport as ReviewReportData,
 } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { AgentStatusCard } from "../components/AgentStatus.js";
 import { LogStream } from "../components/LogStream.js";
 import { ReviewReport } from "../components/ReviewReport.js";
@@ -86,8 +86,9 @@ function formatUsd(value: number): string {
  * @returns Rendered node detail page element.
  */
 export const NodePage = memo(function NodePage(): ReactElement | null {
-  const { projectId, id } = useParams<{ projectId: string; id: string }>();
-  if (projectId === undefined || id === undefined) return null;
+  const projectId = useProjectId();
+  const { id } = useParams<{ id: string }>();
+  if (id === undefined) return null;
   const { client, baseUrl, token } = useProject();
 
   const [node, setNode] = useState<Node | null>(null);

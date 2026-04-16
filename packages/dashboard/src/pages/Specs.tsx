@@ -9,10 +9,9 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import type { Specs } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { MarkdownViewer } from "../components/MarkdownViewer.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 
@@ -58,9 +57,8 @@ function formatFileSize(bytes: number): string {
  *
  * @returns Rendered specs page element.
  */
-export const SpecsPage = memo(function SpecsPage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
+export const SpecsPage = memo(function SpecsPage(): ReactElement {
+  const projectId = useProjectId();
   const { client, baseUrl, token } = useProject();
 
   const [artifacts, setArtifacts] = useState<SpecArtifact[]>([]);

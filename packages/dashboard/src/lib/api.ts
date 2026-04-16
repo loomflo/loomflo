@@ -72,7 +72,7 @@ export function api(opts: ApiOptions): ApiClient {
       headers: {
         ...headers,
         ...(init?.headers as Record<string, string> | undefined),
-        "content-type": "application/json",
+        ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
       },
     });
 

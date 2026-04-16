@@ -9,10 +9,10 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import type { Edge, Node, NodeStatus } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { GraphView } from "../components/GraphView.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
@@ -396,11 +396,9 @@ function useSpecPhase(projectId: string, isSpecPhase: boolean): UseSpecPhaseRetu
  *
  * @returns Rendered graph page filling the parent container.
  */
-export const GraphPage = memo(function GraphPage(): ReactElement | null {
+export const GraphPage = memo(function GraphPage(): ReactElement {
   const navigate = useNavigate();
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
-
+  const projectId = useProjectId();
   const { workflow, nodes, loading, error } = useWorkflow(projectId);
 
   const isSpecPhase = workflow?.status === "spec";

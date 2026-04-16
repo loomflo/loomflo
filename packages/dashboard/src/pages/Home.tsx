@@ -7,11 +7,10 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
-import { useParams } from "react-router-dom";
 
 import type { Event, Node, NodeStatus } from "../lib/types.js";
 import type { CostSummary } from "../lib/types.js";
-import { useProject } from "../context/ProjectContext.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { LogStream } from "../components/LogStream.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
@@ -111,9 +110,8 @@ function computeNodeCounts(nodes: readonly Node[]): Map<NodeStatus, number> {
  *
  * @returns Rendered home page element.
  */
-export const HomePage = memo(function HomePage(): ReactElement | null {
-  const { projectId } = useParams<{ projectId: string }>();
-  if (projectId === undefined) return null;
+export const HomePage = memo(function HomePage(): ReactElement {
+  const projectId = useProjectId();
   const { client, baseUrl, token } = useProject();
 
   const { workflow, nodes, loading, error } = useWorkflow(projectId);
