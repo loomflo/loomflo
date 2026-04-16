@@ -57,6 +57,7 @@ export function createDashboardCommand(): Command {
     /* ------------------------------------------------------------------ */
 
     let port: number;
+    let token: string | undefined;
 
     if (options.port !== undefined) {
       port = parseInt(options.port, 10);
@@ -69,6 +70,7 @@ export function createDashboardCommand(): Command {
       try {
         const config = await readDaemonConfig();
         port = config.port;
+        token = config.token;
       } catch {
         writeError(options, "Daemon is not running. Start with: loomflo start");
         process.exitCode = 1;
@@ -76,7 +78,9 @@ export function createDashboardCommand(): Command {
       }
     }
 
-    const url = `http://127.0.0.1:${String(port)}`;
+    const url = token !== undefined
+      ? `http://127.0.0.1:${String(port)}/#token=${encodeURIComponent(token)}`
+      : `http://127.0.0.1:${String(port)}`;
 
     /* ------------------------------------------------------------------ */
     /* Open browser or print URL                                          */
