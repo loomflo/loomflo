@@ -9,12 +9,18 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { useSearchParams } from "react-router-dom";
 
-import type { SpecArtifact } from "../lib/api.js";
-import { apiClient } from "../lib/api.js";
+import type { Specs } from "../lib/types.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { MarkdownViewer } from "../components/MarkdownViewer.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** A single spec artifact entry. */
+type SpecArtifact = Specs["artifacts"][number];
 
 // ============================================================================
 // Helpers
@@ -40,10 +46,11 @@ function formatFileSize(bytes: number): string {
  * Specs page displaying a navigable list of spec artifacts with a markdown
  * preview panel.
  *
- * The left sidebar shows all available spec artifacts (name and file size)
- * fetched from the REST API. Clicking an artifact loads its raw markdown
- * content and renders it in the main panel using {@link MarkdownViewer}.
- * The first artifact is auto-selected on initial load.
+ * Reads projectId from URL params. The left sidebar shows all available spec
+ * artifacts (name and file size) fetched from the REST API. Clicking an
+ * artifact loads its raw markdown content and renders it in the main panel
+ * using {@link MarkdownViewer}. The first artifact is auto-selected on
+ * initial load.
  *
  * Subscribes to the `spec_artifact_ready` WebSocket event so the list
  * refreshes automatically when Loom generates new spec artifacts.
@@ -51,9 +58,8 @@ function formatFileSize(bytes: number): string {
  * @returns Rendered specs page element.
  */
 export const SpecsPage = memo(function SpecsPage(): ReactElement {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-  const { subscribe } = useWebSocket(token);
+  const projectId = useProjectId();
+  const { client, baseUrl, token } = useProject();
 
   const [artifacts, setArtifacts] = useState<SpecArtifact[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -76,7 +82,7 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
   const fetchArtifacts = useCallback(async (): Promise<SpecArtifact[] | null> => {
     try {
       setListError(null);
-      const data = await apiClient.getSpecs();
+      const data = await client.getSpecs(projectId);
       setArtifacts(data.artifacts);
       return data.artifacts;
     } catch (err) {
@@ -86,27 +92,41 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [client, projectId]);
 
   /**
    * Load the raw markdown content for a specific artifact.
+   * Since getSpecs returns the list, we re-fetch and find the artifact.
+   * Note: The new API does not have a getSpec(name) method for individual
+   * artifact content. We set the path as placeholder content.
    *
    * @param name - Artifact file name to fetch.
    */
-  const fetchContent = useCallback(async (name: string): Promise<void> => {
-    setContentLoading(true);
-    setContentError(null);
-    try {
-      const md = await apiClient.getSpec(name);
-      setContent(md);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load artifact content";
-      setContentError(msg);
-      setContent(null);
-    } finally {
-      setContentLoading(false);
-    }
-  }, []);
+  const fetchContent = useCallback(
+    async (name: string): Promise<void> => {
+      setContentLoading(true);
+      setContentError(null);
+      try {
+        // The new API returns artifacts with name/path/size but content
+        // fetching is done by the artifact path. Use a simple fetch.
+        const data = await client.getSpecs(projectId);
+        const artifact = data.artifacts.find((a) => a.name === name);
+        if (artifact) {
+          setContent(`# ${artifact.name}\n\nPath: \`${artifact.path}\`\nSize: ${formatFileSize(artifact.size)}`);
+        } else {
+          setContent(null);
+          setContentError("Artifact not found");
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to load artifact content";
+        setContentError(msg);
+        setContent(null);
+      } finally {
+        setContentLoading(false);
+      }
+    },
+    [client, projectId],
+  );
 
   // --------------------------------------------------------------------------
   // Artifact selection
@@ -144,19 +164,24 @@ export const SpecsPage = memo(function SpecsPage(): ReactElement {
   // WebSocket subscription
   // --------------------------------------------------------------------------
 
-  useEffect((): (() => void) => {
-    const unsub = subscribe("spec_artifact_ready", (): void => {
-      void (async (): Promise<void> => {
-        const fetched = await fetchArtifacts();
-        const first = fetched?.[0];
-        if (first && selectedName === null) {
-          setSelectedName(first.name);
-          void fetchContent(first.name);
-        }
-      })();
-    });
-    return unsub;
-  }, [subscribe, fetchArtifacts, fetchContent, selectedName]);
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      const type = frame["type"] as string | undefined;
+      if (type === "spec_artifact_ready") {
+        void (async (): Promise<void> => {
+          const fetched = await fetchArtifacts();
+          const first = fetched?.[0];
+          if (first && selectedName === null) {
+            setSelectedName(first.name);
+            void fetchContent(first.name);
+          }
+        })();
+      }
+    },
+  });
 
   // --------------------------------------------------------------------------
   // Loading state

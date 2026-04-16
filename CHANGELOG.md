@@ -16,6 +16,18 @@
 - `loomflo nodes` / `loomflo inspect <id>` — per-project node table + detail.
 - `loomflo tree` — ASCII workflow DAG.
 - `loomflo logs -f` now streams events over WebSocket (previously stubbed).
+- Landing page at `/` listing all registered projects as cards.
+- Top-bar project switcher preserving the current sub-page when switching.
+- Daemon token passed via URL fragment; cleared from the address bar on load.
+- Mint palette applied to the dashboard (Tailwind 4 CSS-first `@theme`).
+- `ProjectContext` provides `{ token, projectId, allProjects, client }` to all pages.
+- WebSocket subscribe protocol sends `{ projectIds }` or `{ all }` on open.
+
+### Fixed
+
+- Dashboard: all pages were silently empty after S1's route refactor because
+  the frontend still called `/workflow`, `/nodes`, `/events`. Every endpoint
+  is now scoped under `/projects/:id/*`.
 
 ### Changed
 

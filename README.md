@@ -232,8 +232,18 @@ environment signals:
 
 ## Dashboard
 
-The web dashboard provides real-time visibility into the entire workflow:
+```bash
+loomflo dashboard
+```
 
+Opens the web dashboard. On a single-project daemon it jumps straight into that
+project; with multiple projects it shows a landing grid and a top-bar switcher
+to move between them. Every page is scoped under `/projects/:id/*`.
+
+The daemon token is passed via URL fragment (`#token=...`), never sent to the
+server; the fragment is cleared from the address bar at load.
+
+- **Landing** — Project cards with status, current node, and cost at a glance
 - **Graph View** — Interactive node graph with live status updates (React Flow)
 - **Node Detail** — Agent activity, file scopes, logs, review reports, costs
 - **Spec Viewer** — Browse all generated spec artifacts as formatted Markdown

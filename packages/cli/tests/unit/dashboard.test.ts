@@ -120,7 +120,7 @@ describe("dashboard command — default browser open", () => {
     expect(plain).toContain("opening browser");
     expect(mockExec).toHaveBeenCalledOnce();
     const [command] = mockExec.mock.calls[0] as [string];
-    expect(command).toBe('xdg-open "http://127.0.0.1:4000"');
+    expect(command).toBe('xdg-open "http://127.0.0.1:4000/#token=test-token"');
   });
 
   it("should use 'open' command on darwin", async () => {
@@ -129,7 +129,7 @@ describe("dashboard command — default browser open", () => {
     await runDashboard();
 
     const [command] = mockExec.mock.calls[0] as [string];
-    expect(command).toBe('open "http://127.0.0.1:4000"');
+    expect(command).toBe('open "http://127.0.0.1:4000/#token=test-token"');
   });
 
   it("should use 'start' command on win32", async () => {
@@ -138,7 +138,7 @@ describe("dashboard command — default browser open", () => {
     await runDashboard();
 
     const [command] = mockExec.mock.calls[0] as [string];
-    expect(command).toBe('start "http://127.0.0.1:4000"');
+    expect(command).toBe('start "http://127.0.0.1:4000/#token=test-token"');
   });
 });
 
@@ -209,7 +209,7 @@ describe("dashboard command — browser open failure", () => {
 
     const plain = stderrWrites.map(stripAnsi).join("");
     expect(plain).toContain(
-      "Failed to open browser automatically. Visit http://127.0.0.1:4000 in your browser.",
+      "Failed to open browser automatically. Visit http://127.0.0.1:4000/#token=test-token in your browser.",
     );
   });
 });

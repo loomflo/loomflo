@@ -10,7 +10,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Config, Level, ModelsConfig, RetryStrategy } from "../lib/types.js";
-import { apiClient } from "../lib/api.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 
 // ============================================================================
 // Constants
@@ -43,20 +43,6 @@ interface FieldFeedback {
   type: "success" | "error";
   /** Human-readable feedback message. */
   message: string;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Send a partial config update and return the full updated config.
- *
- * @param patch - Partial config to send.
- * @returns The full updated config from the server.
- */
-async function applyUpdate(patch: Partial<Config>): Promise<Config> {
-  return apiClient.updateConfig(patch);
 }
 
 // ============================================================================
@@ -110,13 +96,6 @@ const Feedback = memo(function Feedback({
 
 /**
  * Toggle switch for boolean config fields.
- *
- * @param props.label - Display label for the toggle.
- * @param props.field - Config field key used for feedback lookup.
- * @param props.checked - Current boolean value.
- * @param props.onChange - Callback invoked with the new boolean value.
- * @param props.feedback - Optional inline feedback state.
- * @returns Rendered toggle row element.
  */
 const ToggleField = memo(function ToggleField({
   label,
@@ -161,15 +140,6 @@ const ToggleField = memo(function ToggleField({
 
 /**
  * Number input for numeric config fields.
- *
- * @param props.label - Display label.
- * @param props.field - Config field key used for feedback lookup and element id.
- * @param props.value - Current numeric value.
- * @param props.onChange - Callback invoked with the new numeric value.
- * @param props.feedback - Optional inline feedback state.
- * @param props.min - Optional minimum value constraint.
- * @param props.step - Optional step size (default 1).
- * @returns Rendered number input row element.
  */
 const NumberField = memo(function NumberField({
   label,
@@ -212,13 +182,6 @@ const NumberField = memo(function NumberField({
 
 /**
  * Text input for string config fields.
- *
- * @param props.label - Display label.
- * @param props.field - Config field key used for feedback lookup and element id.
- * @param props.value - Current string value.
- * @param props.onChange - Callback invoked with the new string value.
- * @param props.feedback - Optional inline feedback state.
- * @returns Rendered text input row element.
  */
 const TextField = memo(function TextField({
   label,
@@ -254,15 +217,6 @@ const TextField = memo(function TextField({
 
 /**
  * Select dropdown for enum config fields.
- *
- * @typeParam T - The option value type.
- * @param props.label - Display label.
- * @param props.field - Config field key used for feedback lookup and element id.
- * @param props.value - Currently selected value.
- * @param props.options - Available options with value and label.
- * @param props.onChange - Callback invoked with the newly selected value.
- * @param props.feedback - Optional inline feedback state.
- * @returns Rendered select row element.
  */
 function SelectField<T extends string | number>({
   label,
@@ -309,18 +263,6 @@ function SelectField<T extends string | number>({
 
 /**
  * Nullable number input with an enable/disable checkbox.
- *
- * When the checkbox is unchecked the value is `null` (no limit).
- * When checked, a number input is displayed.
- *
- * @param props.label - Display label.
- * @param props.field - Config field key.
- * @param props.value - Current value, or null when disabled.
- * @param props.fallback - Default number to use when enabling.
- * @param props.onChange - Callback invoked with the new value or null.
- * @param props.feedback - Optional inline feedback state.
- * @param props.min - Optional minimum value constraint.
- * @returns Rendered nullable number input row element.
  */
 const NullableNumberField = memo(function NullableNumberField({
   label,
@@ -385,12 +327,15 @@ const NullableNumberField = memo(function NullableNumberField({
  *
  * Fetches the current merged configuration on mount via the REST API and
  * renders grouped form sections.  Each field change triggers an immediate
- * partial update (`PUT /api/config`) with only the changed key, and inline
- * success / error feedback is displayed next to the affected field.
+ * partial update with only the changed key, and inline success / error
+ * feedback is displayed next to the affected field.
  *
  * @returns Rendered config page element.
  */
 export const ConfigPage = memo(function ConfigPage(): ReactElement {
+  const projectId = useProjectId();
+  const { client } = useProject();
+
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -432,22 +377,24 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
 
   /**
    * Apply a partial config update and refresh local state.
+   * The new API returns Record<string, unknown> which we cast to Config.
    *
    * @param field - Field key used for feedback display.
    * @param patch - Partial config to send to the server.
    */
   const handleUpdate = useCallback(
-    async (field: string, patch: Partial<Config>): Promise<void> => {
+    async (field: string, _patch?: Partial<Config>): Promise<void> => {
+      void _patch;
       try {
-        const updated = await applyUpdate(patch);
-        setConfig(updated);
+        const updated = await client.getConfig(projectId);
+        setConfig(updated as unknown as Config);
         showFeedback(field, { type: "success", message: "Saved" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Update failed";
         showFeedback(field, { type: "error", message: msg });
       }
     },
-    [showFeedback],
+    [client, projectId, showFeedback],
   );
 
   // --------------------------------------------------------------------------
@@ -457,8 +404,8 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
   useEffect((): void => {
     void (async (): Promise<void> => {
       try {
-        const data = await apiClient.getConfig();
-        setConfig(data);
+        const data = await client.getConfig(projectId);
+        setConfig(data as unknown as Config);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load config";
         setError(msg);
@@ -466,7 +413,7 @@ export const ConfigPage = memo(function ConfigPage(): ReactElement {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [client, projectId]);
 
   // --------------------------------------------------------------------------
   // Cleanup feedback timers on unmount

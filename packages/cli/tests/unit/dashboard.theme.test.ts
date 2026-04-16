@@ -105,7 +105,7 @@ describe("loomflo dashboard --no-open --json", () => {
 
     const raw = stdoutWrites.join("").trim();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    expect(parsed).toHaveProperty("url", "http://127.0.0.1:4000");
+    expect(parsed).toHaveProperty("url", "http://127.0.0.1:4000/#token=test-token");
   });
 });
 
