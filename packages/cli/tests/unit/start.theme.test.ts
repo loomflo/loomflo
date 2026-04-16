@@ -1,6 +1,6 @@
 import stripAnsi from "strip-ansi";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,6 +25,12 @@ let stdoutWrites: string[];
 
 beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), "loomflo-start-theme-"));
+  // Create project.json so start doesn't delegate to init.
+  await mkdir(join(tmp, ".loomflo"), { recursive: true });
+  await writeFile(
+    join(tmp, ".loomflo", "project.json"),
+    JSON.stringify({ id: "proj_test1234", name: "test", providerProfileId: "default", createdAt: "2026-04-15T00:00:00Z" }),
+  );
 
   (ensureDaemonRunning as ReturnType<typeof vi.fn>).mockResolvedValue({
     port: 41234,

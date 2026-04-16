@@ -1,6 +1,7 @@
 // packages/cli/src/commands/start.ts
 import { Command } from "commander";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { resolve, join } from "node:path";
 import { resolveProject } from "../project-resolver.js";
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
 import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
@@ -89,6 +90,20 @@ export function createStartCommand(): Command {
     .action(async (options: { projectPath?: string; provider?: string; name?: string; json?: boolean }) => {
       const cwd = options.projectPath ? resolve(options.projectPath) : process.cwd();
       const json = isJsonMode(options);
+
+      // Delegate to init if the project hasn't been configured yet.
+      const projectJson = join(cwd, ".loomflo", "project.json");
+      if (!existsSync(projectJson)) {
+        const { createInitCommand } = await import("./init.js");
+        await createInitCommand().parseAsync([
+          "node",
+          "init",
+          ...(options.projectPath ? ["--project-path", options.projectPath] : []),
+          ...(json ? ["--json"] : []),
+        ]);
+        return;
+      }
+
       const sp = json ? null : theme.spinner("starting\u2026");
       sp?.start();
 
