@@ -33,6 +33,7 @@
     "zod": "^3.0.0"
   },
   "devDependencies": {
+    "nock": "^14",
     "strip-ansi": "^7",
     "tsup": "^8.0.0",
     "tsx": "^4.21.0"
