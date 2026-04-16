@@ -6,6 +6,7 @@ import { createChatCommand } from "./commands/chat.js";
 import { createConfigCommand } from "./commands/config.js";
 import { createDaemonCommand } from "./commands/daemon.js";
 import { createDashboardCommand } from "./commands/dashboard.js";
+import { createInspectCommand } from "./commands/inspect.js";
 import { createInitCommand } from "./commands/init.js";
 import { createLogsCommand } from "./commands/logs.js";
 import { createNodesCommand } from "./commands/nodes.js";
@@ -47,6 +48,7 @@ function createProgram(): Command {
   program.addCommand(createDaemonCommand());
   program.addCommand(createProjectCommand());
   program.addCommand(createPsCommand());
+  program.addCommand(createInspectCommand());
 
   return program;
 }
