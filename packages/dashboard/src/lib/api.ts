@@ -8,7 +8,6 @@
 import type {
   ChatBody,
   ChatResponse,
-  Config,
   CostSummary as Costs,
   Event as WorkflowEvent,
   Memory,

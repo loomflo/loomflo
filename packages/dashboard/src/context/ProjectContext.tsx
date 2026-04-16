@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ReactElement,
   type ReactNode,
 } from "react";
 
@@ -58,7 +59,7 @@ export interface ProjectProviderProps {
  * provider or a "paste your token" gate.  Split into two components so
  * hooks are never called conditionally.
  */
-export function ProjectProvider(props: ProjectProviderProps): JSX.Element {
+export function ProjectProvider(props: ProjectProviderProps): ReactElement {
   const token = readToken();
   if (token === null) {
     return <MissingTokenGate />;
@@ -78,7 +79,7 @@ function ProjectProviderInner(props: {
   baseUrl: string;
   token: string;
   children: ReactNode;
-}): JSX.Element {
+}): ReactElement {
   const client = useMemo(
     () => api({ baseUrl: props.baseUrl, token: props.token }),
     [props.baseUrl, props.token],
@@ -121,7 +122,7 @@ function ProjectProviderInner(props: {
 // Fallback gate when no token is present
 // ============================================================================
 
-function MissingTokenGate(): JSX.Element {
+function MissingTokenGate(): ReactElement {
   const [pasted, setPasted] = useState("");
 
   const onSubmit = (e: React.FormEvent): void => {
