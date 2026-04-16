@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { writeFile, mkdir, readFile, stat } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -57,6 +57,25 @@ describe("loomflo init", () => {
     const raw = await readFile(join(tmp, ".loomflo", "project.json"), "utf-8");
     const parsed = JSON.parse(raw) as { providerProfileId: string };
     expect(parsed.providerProfileId).toBe("default");
+  });
+
+  it("writes project.json with 0600 mode (P0-3)", async () => {
+    const { createInitCommand } = await import("../../../src/commands/init.js");
+    await createInitCommand().parseAsync(["node", "init"]);
+    const projectFile = join(tmp, ".loomflo", "project.json");
+    const mode = (await stat(projectFile)).mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
+
+  it("re-runs on a pre-existing 0644 project.json and tightens it to 0600", async () => {
+    const projectFile = join(tmp, ".loomflo", "project.json");
+    await writeFile(projectFile, JSON.stringify({ id: "proj_x", name: "sandbox" }), {
+      mode: 0o644,
+    });
+    const { createInitCommand } = await import("../../../src/commands/init.js");
+    await createInitCommand().parseAsync(["node", "init"]);
+    const mode = (await stat(projectFile)).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 
   it("exits non-zero and prints an error when wizard is not confirmed", async () => {

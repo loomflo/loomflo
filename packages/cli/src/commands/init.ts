@@ -1,6 +1,6 @@
 // packages/cli/src/commands/init.ts
 import { Command } from "commander";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { chmod, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { ensureDaemonRunning, type DaemonInfo } from "../daemon-control.js";
@@ -167,10 +167,18 @@ export function createInitCommand(): Command {
         }
 
         // Persist project.json with the provider profile id.
+        // mode 0600: project.json holds a `providerProfileId` pointer so the
+        // file's permissions are kept consistent with ~/.loomflo/credentials.json.
         const projectFile = join(cwd, ".loomflo", "project.json");
         const projectData = { ...identity, providerProfileId: result.providerProfileId };
         await mkdir(join(cwd, ".loomflo"), { recursive: true });
-        await writeFile(projectFile, `${JSON.stringify(projectData, null, 2)}\n`, { encoding: "utf-8" });
+        await writeFile(projectFile, `${JSON.stringify(projectData, null, 2)}\n`, {
+          encoding: "utf-8",
+          mode: 0o600,
+        });
+        // writeFile's `mode` option is ignored when the file already exists;
+        // chmod afterwards so a re-run tightens an existing 0644 file.
+        await chmod(projectFile, 0o600);
 
         // Persist config.
         const configFile = join(cwd, ".loomflo", "config.json");
