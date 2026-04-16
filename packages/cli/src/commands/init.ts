@@ -104,6 +104,8 @@ export function createInitCommand(): Command {
     .option("--non-interactive", "Fail instead of prompting when values are missing", false)
     .action(async (opts: InitFlags): Promise<void> => {
       const json = isJsonMode(opts);
+      const nonTty = !process.stdin.isTTY;
+      const inferNonInteractive = nonTty || process.env["CI"] === "true";
       const flags = WizardFlagsSchema.parse({
         provider: opts.provider,
         profile: opts.profile,
@@ -113,7 +115,7 @@ export function createInitCommand(): Command {
         retryDelay: opts.retryDelay,
         advanced: opts.advanced,
         yes: opts.yes,
-        nonInteractive: opts.nonInteractive,
+        nonInteractive: opts.nonInteractive === true || inferNonInteractive,
       });
 
       try {
