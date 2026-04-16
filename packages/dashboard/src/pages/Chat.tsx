@@ -9,11 +9,10 @@
 
 import { memo } from "react";
 import type { ReactElement } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { ChatInterface } from "../components/ChatInterface.js";
 import { useChat } from "../hooks/useChat.js";
-import { useWebSocket } from "../hooks/useWebSocket.js";
 
 // ============================================================================
 // ChatPage Component
@@ -23,9 +22,8 @@ import { useWebSocket } from "../hooks/useWebSocket.js";
  * Chat page providing a full-height conversational interface with the Loom
  * architect agent.
  *
- * Reads the authentication token from URL search params, establishes a
- * WebSocket connection via {@link useWebSocket}, and delegates conversation
- * state management to {@link useChat}. Renders {@link ChatInterface} for the
+ * Reads the projectId from URL params and delegates conversation state
+ * management to {@link useChat}. Renders {@link ChatInterface} for the
  * message list, input, and action confirmation badges.
  *
  * Displays an inline error banner when the chat hook reports an error.
@@ -33,10 +31,8 @@ import { useWebSocket } from "../hooks/useWebSocket.js";
  * @returns Rendered chat page element.
  */
 export const ChatPage = memo(function ChatPage(): ReactElement {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-  const { subscribe } = useWebSocket(token);
-  const { messages, sendMessage, isLoading, error } = useChat(subscribe);
+  const { projectId } = useParams<{ projectId: string }>();
+  const { messages, sendMessage, isLoading, error } = useChat(projectId!);
 
   return (
     <div className="flex h-full flex-col">

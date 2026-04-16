@@ -6,12 +6,12 @@
 // Subscribes to WebSocket events for real-time cost updates.
 // ============================================================================
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { ReactElement } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { CostTracker } from "../components/CostTracker.js";
-import { useWebSocket } from "../hooks/useWebSocket.js";
+import type { NodeCostEntry } from "../components/CostTracker.js";
 import { useCosts } from "../hooks/useCosts.js";
 
 // ============================================================================
@@ -22,20 +22,36 @@ import { useCosts } from "../hooks/useCosts.js";
  * Costs page displaying comprehensive cost tracking for the active workflow.
  *
  * Renders the {@link CostTracker} component with budget gauge, per-node cost
- * breakdown (including retries), loom overhead, and totals. Connects to the
- * Loomflo daemon via {@link useWebSocket} (token read from the `?token=`
- * query parameter) and subscribes to `cost_update` events for real-time
+ * breakdown (including retries), loom overhead, and totals. Reads projectId
+ * from URL params and subscribes to `cost_update` events for real-time
  * updates through {@link useCosts}.
  *
  * @returns Rendered costs page element.
  */
 export const CostsPage = memo(function CostsPage(): ReactElement {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const { projectId } = useParams<{ projectId: string }>();
 
-  const { subscribe } = useWebSocket(token);
-  const { total, budgetLimit, budgetRemaining, nodes, loomCost, loading, error } =
-    useCosts(subscribe);
+  const { entries, totalCost, loading, error } = useCosts(projectId!);
+
+  /** Aggregate CostEntry[] into per-node NodeCostEntry[] for CostTracker. */
+  const nodeCostEntries = useMemo((): NodeCostEntry[] => {
+    const map = new Map<string, { cost: number; count: number }>();
+    for (const entry of entries) {
+      const existing = map.get(entry.nodeId);
+      if (existing) {
+        existing.cost += entry.cost;
+        existing.count += 1;
+      } else {
+        map.set(entry.nodeId, { cost: entry.cost, count: 1 });
+      }
+    }
+    return Array.from(map.entries()).map(([nodeId, data]) => ({
+      id: nodeId,
+      title: nodeId,
+      cost: data.cost,
+      retries: 0,
+    }));
+  }, [entries]);
 
   // --------------------------------------------------------------------------
   // Loading state
@@ -68,7 +84,7 @@ export const CostsPage = memo(function CostsPage(): ReactElement {
   // Empty state
   // --------------------------------------------------------------------------
 
-  if (nodes.length === 0 && total === 0) {
+  if (entries.length === 0 && totalCost === 0) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -96,11 +112,11 @@ export const CostsPage = memo(function CostsPage(): ReactElement {
           Cost Breakdown
         </h3>
         <CostTracker
-          total={total}
-          budgetLimit={budgetLimit}
-          budgetRemaining={budgetRemaining}
-          nodes={nodes}
-          loomCost={loomCost}
+          total={totalCost}
+          budgetLimit={null}
+          budgetRemaining={null}
+          nodes={nodeCostEntries}
+          loomCost={0}
         />
       </div>
     </div>
