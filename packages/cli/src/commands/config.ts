@@ -238,8 +238,10 @@ export function createConfigCommand(): Command {
         writeJson(resolved);
       } else {
         process.stdout.write(theme.heading("Configuration") + "\n");
-        for (const [key, value] of Object.entries(resolved as Record<string, unknown>)) {
-          process.stdout.write(theme.kv(key, formatValue(value)) + "\n");
+        const entries = Object.entries(resolved as Record<string, unknown>);
+        const maxKey = Math.max(...entries.map(([k]) => k.length));
+        for (const [key, value] of entries) {
+          process.stdout.write(theme.kv(key, formatValue(value), maxKey) + "\n");
         }
       }
     } catch (error: unknown) {

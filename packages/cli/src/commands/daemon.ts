@@ -12,16 +12,22 @@ export function createDaemonCommand(): Command {
     .description("Start the Loomflo daemon (no project)");
   withJsonSupport(startCmd);
   startCmd.action(async (options: { json?: boolean }) => {
-    const info = await ensureDaemonRunning();
-    const port = String(info.port);
-    const pid = String(info.pid);
-    const version = info.version ?? "?";
-    if (isJsonMode(options)) {
-      writeJson({ action: "start", port: info.port, pid: info.pid, version });
-    } else {
-      process.stdout.write(
-        theme.line(theme.glyph.check, "accent", `daemon v${version} running`, `port ${port}, pid ${pid}`) + "\n",
-      );
+    try {
+      const info = await ensureDaemonRunning();
+      const port = String(info.port);
+      const pid = String(info.pid);
+      const version = info.version ?? "?";
+      if (isJsonMode(options)) {
+        writeJson({ action: "start", port: info.port, pid: info.pid, version });
+      } else {
+        process.stdout.write(
+          theme.line(theme.glyph.check, "accent", `daemon v${version} running`, `port ${port}, pid ${pid}`) + "\n",
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      writeError(options, msg, "E_DAEMON");
+      process.exitCode = 1;
     }
   });
 
@@ -67,28 +73,35 @@ export function createDaemonCommand(): Command {
     .description("Show daemon status");
   withJsonSupport(statusCmd);
   statusCmd.action(async (options: { json?: boolean }) => {
-    const info = await getRunningDaemon();
-    if (!info) {
+    try {
+      const info = await getRunningDaemon();
+      if (!info) {
+        if (isJsonMode(options)) {
+          writeJson({ status: "not_running" });
+        } else {
+          process.stdout.write(
+            theme.line(theme.glyph.dot, "dim", "daemon is not running") + "\n",
+          );
+        }
+        return;
+      }
+      const res = await fetchJson<Record<string, unknown>>(
+        `http://127.0.0.1:${String(info.port)}/daemon/status`,
+        info.token,
+      );
       if (isJsonMode(options)) {
-        writeJson({ status: "not_running" });
+        writeJson(res);
       } else {
-        process.stdout.write(
-          theme.line(theme.glyph.dot, "dim", "daemon is not running") + "\n",
-        );
+        process.stdout.write(theme.heading("Daemon Status") + "\n");
+        const maxKey = Math.max(...Object.keys(res).map((k) => k.length));
+        for (const [key, value] of Object.entries(res)) {
+          process.stdout.write(theme.kv(key, String(value), maxKey) + "\n");
+        }
       }
-      return;
-    }
-    const res = await fetchJson<Record<string, unknown>>(
-      `http://127.0.0.1:${String(info.port)}/daemon/status`,
-      info.token,
-    );
-    if (isJsonMode(options)) {
-      writeJson(res);
-    } else {
-      process.stdout.write(theme.heading("Daemon Status") + "\n");
-      for (const [key, value] of Object.entries(res)) {
-        process.stdout.write(theme.kv(key, String(value)) + "\n");
-      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      writeError(options, msg, "E_DAEMON");
+      process.exitCode = 1;
     }
   });
 

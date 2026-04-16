@@ -3,12 +3,12 @@ import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { palette, type Tone } from './palette.js';
 
-const noColor = (s: string): string => s;
-
 const toneFn = (tone: Tone): ((s: string) => string) => {
-  if (chalk.level === 0) return noColor;
   const [r, g, b] = palette[tone];
-  return (s: string): string => chalk.rgb(r, g, b)(s);
+  return (s: string): string => {
+    if (chalk.level === 0) return s;
+    return chalk.rgb(r, g, b)(s);
+  };
 };
 
 export const glyph = {
