@@ -27,8 +27,8 @@ const NAV_ITEMS: readonly { path: string; label: string }[] = [
  */
 function Layout(): ReactElement {
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100">
-      <nav className="flex w-56 flex-col border-r border-gray-800 bg-gray-900 p-4">
+    <div className="flex h-screen bg-loom-bg text-gray-100">
+      <nav className="flex w-56 flex-col border-r border-gray-800 bg-loom-panel p-4">
         <h1 className="mb-6 text-lg font-bold tracking-tight">Loomflo</h1>
         <ul className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ path, label }) => (

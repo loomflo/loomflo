@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+@theme {
+  --color-loom-accent: #8BD1B5;
+  --color-loom-muted:  #A7D7C5;
+  --color-loom-dim:    #6B7A78;
+  --color-loom-warn:   #E6C97A;
+  --color-loom-err:    #E8908C;
+  --color-loom-bg:     #0d0f11;
+  --color-loom-panel:  #161a1d;
+  --color-loom-panel-2:#1d2226;
+}
