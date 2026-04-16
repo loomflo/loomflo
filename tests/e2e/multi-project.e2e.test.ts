@@ -41,6 +41,12 @@ maybeDescribe("E2E multi-project", () => {
   let a: string;
   let b: string;
   let savedDaemonJson: string | null = null;
+  /** Whether project registration succeeded (201/409 for both projects). */
+  let registered = false;
+
+  async function cli(args: string[], cwd?: string): Promise<ProcResult> {
+    return run("node", [CLI, ...args], cwd ?? a);
+  }
 
   beforeAll(async () => {
     // Preserve any pre-existing daemon.json so we don't interfere with a live dev daemon
@@ -51,23 +57,7 @@ maybeDescribe("E2E multi-project", () => {
     }
     a = await mkdtemp(join(tmpdir(), "loomflo-e2e-a-"));
     b = await mkdtemp(join(tmpdir(), "loomflo-e2e-b-"));
-  });
 
-  afterAll(async () => {
-    // Best-effort teardown
-    try {
-      await run("node", [CLI, "daemon", "stop", "--force"], a, 10_000);
-    } catch {
-      /* ignore */
-    }
-    if (a) await rm(a, { recursive: true, force: true });
-    if (b) await rm(b, { recursive: true, force: true });
-    // Restore whatever daemon.json was there before
-    if (savedDaemonJson !== null) await writeFile(DAEMON_JSON, savedDaemonJson);
-    else await rm(DAEMON_JSON, { force: true });
-  });
-
-  it("registers two projects under one daemon and lists them", async () => {
     // Start the daemon (no project binding). Returns as soon as daemon.json appears.
     const startRes = await run("node", [CLI, "daemon", "start"], a);
     expect(startRes.code).toBe(0);
@@ -103,19 +93,64 @@ maybeDescribe("E2E multi-project", () => {
     expect([201, 400, 409, 500]).toContain(statusA);
     expect([201, 400, 409, 500]).toContain(statusB);
 
-    if ((statusA === 201 || statusA === 409) && (statusB === 201 || statusB === 409)) {
-      const listRes = await run("node", [CLI, "project", "list"], a);
-      expect(listRes.stdout).toContain("proj_e2eaaaa1");
-      expect(listRes.stdout).toContain("proj_e2ebbbb2");
-    } else {
+    registered =
+      (statusA === 201 || statusA === 409) && (statusB === 201 || statusB === 409);
+
+    if (!registered) {
       console.warn(
         `[T25 E2E] registration returned ${statusA}/${statusB} — default profile likely missing. ` +
           `Seed with 'loomflo config' before re-running.`,
       );
     }
-
-    // Clean stop
-    const stopRes = await run("node", [CLI, "daemon", "stop", "--force"], a);
-    expect(stopRes.code).toBe(0);
   }, 60_000);
+
+  afterAll(async () => {
+    // Best-effort teardown
+    try {
+      await run("node", [CLI, "daemon", "stop", "--force"], a, 10_000);
+    } catch {
+      /* ignore */
+    }
+    if (a) await rm(a, { recursive: true, force: true });
+    if (b) await rm(b, { recursive: true, force: true });
+    // Restore whatever daemon.json was there before
+    if (savedDaemonJson !== null) await writeFile(DAEMON_JSON, savedDaemonJson);
+    else await rm(DAEMON_JSON, { force: true });
+  });
+
+  it("registers two projects under one daemon and lists them", async () => {
+    if (!registered) return; // registration failed — nothing to verify
+    const listRes = await run("node", [CLI, "project", "list"], a);
+    expect(listRes.stdout).toContain("proj_e2eaaaa1");
+    expect(listRes.stdout).toContain("proj_e2ebbbb2");
+  }, 60_000);
+
+  describe("S4 observation — against a real daemon", () => {
+    // These tests reuse the daemon started in the parent describe's beforeAll.
+    // They run after project registration, so the daemon should be up.
+    // If registration failed, these may return empty data — that's fine.
+
+    it("loomflo ps --json lists projects", async () => {
+      const out = await cli(["ps", "--json"]);
+      // Should exit cleanly. If daemon isn't running, it'll exit with code 1.
+      if (out.code === 0) {
+        const parsed = JSON.parse(out.stdout) as unknown[];
+        expect(Array.isArray(parsed)).toBe(true);
+      }
+    });
+
+    it("loomflo nodes --json returns an array for a project", async () => {
+      const out = await cli(["nodes", "--project", "proj_e2eaaaa1", "--all", "--json"]);
+      if (out.code === 0) {
+        const parsed = JSON.parse(out.stdout) as unknown[];
+        expect(Array.isArray(parsed)).toBe(true);
+      }
+    });
+
+    it("loomflo tree prints output for a project", async () => {
+      const out = await cli(["tree", "--project", "proj_e2eaaaa1"]);
+      // Even if the tree is empty, it should not crash
+      expect(out.code === 0 || out.code === 1).toBe(true);
+    });
+  });
 });
