@@ -6,7 +6,7 @@
  */
 
 import picomatch from "picomatch";
-import type { AgentInfo, Node, NodeStatus, ReviewReport } from "../types.js";
+import type { AgentInfo, Node, NodeStatus, ProviderRetryState, ReviewReport } from "../types.js";
 import { FileOwnershipManager, generateTestPaths } from "./file-ownership.js";
 
 /**
@@ -18,11 +18,13 @@ import { FileOwnershipManager, generateTestPaths } from "./file-ownership.js";
 const TRANSITIONS: Readonly<Record<NodeStatus, readonly NodeStatus[]>> = {
   pending: ["waiting"],
   waiting: ["running"],
-  running: ["review", "done", "failed", "blocked"],
+  running: ["review", "done", "failed", "blocked", "waiting_for_provider", "failed_provider_exhausted"],
   review: ["done", "running", "blocked", "failed"],
   done: [],
   failed: [],
   blocked: [],
+  waiting_for_provider: ["running", "failed_provider_exhausted"],
+  failed_provider_exhausted: [],
 } as const;
 
 /**
@@ -82,6 +84,20 @@ export class WorkflowNode {
     return this.data.fileOwnership;
   }
 
+  /** The provider retry state (rate-limit backoff), or null if not in retry. */
+  get providerRetryState(): ProviderRetryState {
+    return this.data.providerRetryState;
+  }
+
+  /**
+   * Sets or clears the provider retry state for rate-limit backoff.
+   *
+   * @param state - The provider retry state to set, or null to clear.
+   */
+  setProviderRetryState(state: ProviderRetryState): void {
+    this.data.providerRetryState = state;
+  }
+
   /**
    * Checks whether a transition to the given status is valid.
    *
@@ -127,7 +143,12 @@ export class WorkflowNode {
       this.data.startedAt = now;
     }
 
-    if (to === "done" || to === "failed" || to === "blocked") {
+    if (
+      to === "done" ||
+      to === "failed" ||
+      to === "blocked" ||
+      to === "failed_provider_exhausted"
+    ) {
       this.data.completedAt = now;
     }
   }
@@ -359,6 +380,7 @@ export class WorkflowNode {
       cost: 0,
       startedAt: null,
       completedAt: null,
+      providerRetryState: null,
     });
   }
 }
