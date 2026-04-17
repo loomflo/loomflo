@@ -133,9 +133,12 @@ async function resolveProviderProfile(
 /** Maximum number of validator attempts before surfacing a terminal failure. */
 const VALIDATOR_MAX_ATTEMPTS = 3;
 
+/** Base delay in milliseconds for exponential backoff between retry attempts. */
+const RETRY_BASE_MS = 500;
+
 async function runValidatorOnce(
   profile: ProviderProfile,
-): Promise<{ ok: true } | { ok: false; reason: string; hint?: string }> {
+): Promise<{ ok: true } | { ok: false; reason: string; hint?: string; retryable?: boolean }> {
   if (profile.type === "anthropic-oauth") return validateAnthropicOauth();
   if (profile.type === "anthropic") return validateAnthropicApiKey(profile.apiKey);
   return validateOpenAICompat({
@@ -151,6 +154,12 @@ async function runExistingValidator(profile: ProviderProfile): Promise<void> {
   let lastHint: string | undefined;
 
   for (let attempt = 1; attempt <= VALIDATOR_MAX_ATTEMPTS; attempt++) {
+    // Exponential backoff: 500ms after 1st failure, 1s after 2nd.
+    // Gives transient errors (5xx, DNS glitch, connection pool) time to recover.
+    if (attempt > 1) {
+      await new Promise((r) => setTimeout(r, RETRY_BASE_MS * 2 ** (attempt - 2)));
+    }
+
     const label =
       attempt === 1
         ? "validating profile\u2026"
@@ -165,6 +174,15 @@ async function runExistingValidator(profile: ProviderProfile): Promise<void> {
       }
       lastReason = res.reason;
       lastHint = res.hint;
+
+      // Don't retry deterministic failures (auth errors, forbidden, etc.).
+      // Only transient errors (5xx, network timeouts) benefit from retrying.
+      if (res.retryable === false) {
+        const hintSuffix = res.hint ? `  (${res.hint})` : "";
+        sp.fail(`${res.reason}${hintSuffix}`);
+        break;
+      }
+
       const hintSuffix = res.hint ? `  (${res.hint})` : "";
       const failMessage =
         attempt < VALIDATOR_MAX_ATTEMPTS
