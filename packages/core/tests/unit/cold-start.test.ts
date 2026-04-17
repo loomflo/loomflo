@@ -72,4 +72,71 @@ describe("Daemon cold-start", () => {
     const body = (await res.json()) as { status: string };
     expect(body.status).toBe("ok");
   });
+
+  it("full cold-start chain: daemon starts, stub profile is usable by the wizard", async () => {
+    // This test verifies the complete cold-start-to-init contract:
+    // 1. Daemon.start() on a virgin directory creates the stub profile.
+    // 2. A ProviderProfiles reader (simulating the wizard) can resolve "default".
+    // 3. The profile shape matches what validators expect.
+    // 4. The daemon's /projects POST endpoint is reachable with the token.
+
+    const info = await daemon.start();
+
+    // Step 1+2: the wizard's resolveProviderProfile calls profiles.get("default").
+    const { ProviderProfiles } = await import("../../src/providers/profiles.js");
+    const profiles = new ProviderProfiles(join(home, "credentials.json"));
+    const defaultProfile = await profiles.get("default");
+
+    expect(defaultProfile).not.toBeNull();
+    expect(defaultProfile!.type).toBe("anthropic-oauth");
+
+    // Step 3: the profile shape matches the ProviderProfile discriminated union.
+    // For "anthropic-oauth", the only required field is `type`. Ensure no
+    // extraneous keys were introduced.
+    expect(Object.keys(defaultProfile!)).toEqual(["type"]);
+
+    // Step 4: verify the daemon's authenticated API is reachable.
+    // The init command would POST to /projects to register the project.
+    const address = (
+      daemon as unknown as { server: { server: { address: () => { port: number } } } }
+    ).server.server.address();
+    const port = address.port;
+
+    // Unauthenticated request to an API route should return 401.
+    const unauthed = await fetch(`http://127.0.0.1:${String(port)}/projects`, {
+      method: "GET",
+    });
+    expect(unauthed.status).toBe(401);
+
+    // Authenticated request should succeed (empty project list).
+    const authed = await fetch(`http://127.0.0.1:${String(port)}/daemon/status`, {
+      headers: { authorization: `Bearer ${info.token}` },
+    });
+    expect(authed.status).toBe(200);
+    const status = (await authed.json()) as { projectCount: number };
+    expect(status.projectCount).toBe(0);
+
+    // Step 5: verify /projects POST works (the init command's postProject call).
+    const projectDir = join(home, "test-project");
+    const { mkdir: mkdirFs } = await import("node:fs/promises");
+    await mkdirFs(projectDir, { recursive: true });
+
+    const registerRes = await fetch(`http://127.0.0.1:${String(port)}/projects`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${info.token}`,
+      },
+      body: JSON.stringify({
+        id: "proj_deadbeef",
+        name: "test-project",
+        projectPath: projectDir,
+        providerProfileId: "default",
+      }),
+    });
+    expect(registerRes.status).toBe(201);
+    const registered = (await registerRes.json()) as { id: string; name: string };
+    expect(registered.id).toBe("proj_deadbeef");
+    expect(registered.name).toBe("test-project");
+  });
 });
