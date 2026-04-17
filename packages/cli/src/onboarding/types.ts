@@ -17,6 +17,8 @@ export interface WizardAnswers {
   budgetLimit: number;
   defaultDelay: number;
   retryDelay: number;
+  validatorRetryDelay: number;
+  validatorMaxAttempts: number;
   advanced?: AdvancedAnswers;
 }
 
@@ -45,6 +47,8 @@ export const WizardFlagsSchema = z.object({
   budget: numberFromString.optional(),
   defaultDelay: numberFromString.optional(),
   retryDelay: numberFromString.optional(),
+  validatorRetryDelay: numberFromString.optional(),
+  validatorMaxAttempts: numberFromString.optional(),
   apiKey: z.string().optional(),
   advanced: z.boolean().optional().default(false),
   yes: z.boolean().optional().default(false),

@@ -28,7 +28,7 @@ describe("loomflo init — re-run on configured project", () => {
     );
     await writeFile(
       join(tmp, ".loomflo", "config.json"),
-      JSON.stringify({ budgetLimit: 0, level: 2, defaultDelay: 1000, retryDelay: 2000 }),
+      JSON.stringify({ budgetLimit: 0, level: 2, defaultDelay: 1000, retryDelay: 2000, validatorRetryDelay: 500, validatorMaxAttempts: 3 }),
     );
     process.chdir(tmp);
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);

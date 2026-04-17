@@ -58,6 +58,20 @@ export async function runWizard(input: WizardInput): Promise<WizardResult> {
         ? preset.retryDelay
         : await askDelay(prompt, "time between retries", preset.retryDelay);
 
+  const validatorRetryDelay =
+    flags.validatorRetryDelay !== undefined
+      ? flags.validatorRetryDelay
+      : flags.nonInteractive
+        ? preset.validatorRetryDelay
+        : await askDelay(prompt, "time between validator retries", preset.validatorRetryDelay);
+
+  const validatorMaxAttempts =
+    flags.validatorMaxAttempts !== undefined
+      ? flags.validatorMaxAttempts
+      : flags.nonInteractive
+        ? preset.validatorMaxAttempts
+        : await prompt.number({ message: "max validator attempts", default: preset.validatorMaxAttempts, min: 1 });
+
   const advancedFlagOn = flags.advanced || level === "custom";
   const advancedPrompted = advancedFlagOn
     ? true
@@ -75,6 +89,8 @@ export async function runWizard(input: WizardInput): Promise<WizardResult> {
     budgetLimit,
     defaultDelay,
     retryDelay,
+    validatorRetryDelay,
+    validatorMaxAttempts,
     advanced,
   };
 
@@ -95,10 +111,11 @@ async function resolveProviderProfile(
   flags: WizardFlags,
   profiles: ProviderProfiles,
 ): Promise<string> {
+  const retryCfg = validatorRetryCfgFromFlags(flags);
   if (flags.profile) {
     const existing = await profiles.get(flags.profile);
     if (existing) {
-      await runExistingValidator(existing);
+      await runExistingValidator(existing, retryCfg);
       return flags.profile;
     }
   }
@@ -126,15 +143,30 @@ async function resolveProviderProfile(
   }
 
   const chosen = list[pick];
-  if (chosen) await runExistingValidator(chosen);
+  if (chosen) await runExistingValidator(chosen, retryCfg);
   return pick;
 }
 
-/** Maximum number of validator attempts before surfacing a terminal failure. */
-const VALIDATOR_MAX_ATTEMPTS = 3;
+/** Fallback validator retry delay when no configured value is available yet. */
+const DEFAULT_VALIDATOR_RETRY_DELAY = 500;
 
-/** Base delay in milliseconds for exponential backoff between retry attempts. */
-const RETRY_BASE_MS = 500;
+/** Fallback max validator attempts when no configured value is available yet. */
+const DEFAULT_VALIDATOR_MAX_ATTEMPTS = 3;
+
+interface ValidatorRetryConfig {
+  retryBaseMs: number;
+  maxAttempts: number;
+}
+
+function validatorRetryCfgFromFlags(flags: WizardFlags): ValidatorRetryConfig | undefined {
+  if (flags.validatorRetryDelay === undefined && flags.validatorMaxAttempts === undefined) {
+    return undefined;
+  }
+  return {
+    retryBaseMs: flags.validatorRetryDelay ?? DEFAULT_VALIDATOR_RETRY_DELAY,
+    maxAttempts: flags.validatorMaxAttempts ?? DEFAULT_VALIDATOR_MAX_ATTEMPTS,
+  };
+}
 
 async function runValidatorOnce(
   profile: ProviderProfile,
@@ -147,23 +179,29 @@ async function runValidatorOnce(
   });
 }
 
-async function runExistingValidator(profile: ProviderProfile): Promise<void> {
-  // Spec L112: give the user up to 3 attempts before giving up, so a transient
+async function runExistingValidator(
+  profile: ProviderProfile,
+  retryCfg?: ValidatorRetryConfig,
+): Promise<void> {
+  const retryBaseMs = retryCfg?.retryBaseMs ?? DEFAULT_VALIDATOR_RETRY_DELAY;
+  const maxAttempts = retryCfg?.maxAttempts ?? DEFAULT_VALIDATOR_MAX_ATTEMPTS;
+
+  // Spec L112: give the user up to N attempts before giving up, so a transient
   // network blip or a retryable 5xx does not force them to restart the wizard.
   let lastReason = "unknown";
   let lastHint: string | undefined;
 
-  for (let attempt = 1; attempt <= VALIDATOR_MAX_ATTEMPTS; attempt++) {
-    // Exponential backoff: 500ms after 1st failure, 1s after 2nd.
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Exponential backoff: retryBaseMs after 1st failure, 2×retryBaseMs after 2nd, etc.
     // Gives transient errors (5xx, DNS glitch, connection pool) time to recover.
     if (attempt > 1) {
-      await new Promise((r) => setTimeout(r, RETRY_BASE_MS * 2 ** (attempt - 2)));
+      await new Promise((r) => setTimeout(r, retryBaseMs * 2 ** (attempt - 2)));
     }
 
     const label =
       attempt === 1
         ? "validating profile\u2026"
-        : `validating profile\u2026 (attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)})`;
+        : `validating profile\u2026 (attempt ${String(attempt)}/${String(maxAttempts)})`;
     const sp = theme.spinner(label);
     sp.start();
     try {
@@ -185,9 +223,9 @@ async function runExistingValidator(profile: ProviderProfile): Promise<void> {
 
       const hintSuffix = res.hint ? `  (${res.hint})` : "";
       const failMessage =
-        attempt < VALIDATOR_MAX_ATTEMPTS
-          ? `attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)} failed: ${res.reason}${hintSuffix} \u2014 retrying\u2026`
-          : `attempt ${String(attempt)}/${String(VALIDATOR_MAX_ATTEMPTS)} failed: ${res.reason}${hintSuffix}`;
+        attempt < maxAttempts
+          ? `attempt ${String(attempt)}/${String(maxAttempts)} failed: ${res.reason}${hintSuffix} \u2014 retrying\u2026`
+          : `attempt ${String(attempt)}/${String(maxAttempts)} failed: ${res.reason}${hintSuffix}`;
       sp.fail(failMessage);
     } finally {
       sp.stop();
@@ -196,7 +234,7 @@ async function runExistingValidator(profile: ProviderProfile): Promise<void> {
 
   const finalHint = lastHint ? `  (${lastHint})` : "";
   throw new Error(
-    `profile validation failed after ${String(VALIDATOR_MAX_ATTEMPTS)} attempts: ${lastReason}${finalHint}`,
+    `profile validation failed after ${String(maxAttempts)} attempts: ${lastReason}${finalHint}`,
   );
 }
 
@@ -237,7 +275,7 @@ async function createNewProfile(
     profile = { type, apiKey, baseUrl: defaultBaseUrl(type) };
   }
 
-  await runExistingValidator(profile);
+  await runExistingValidator(profile, validatorRetryCfgFromFlags(flags));
   await profiles.upsert(name, profile);
   return name;
 }

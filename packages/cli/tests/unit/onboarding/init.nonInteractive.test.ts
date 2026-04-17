@@ -28,7 +28,7 @@ describe("loomflo init — non-interactive", () => {
     (runWizard as ReturnType<typeof vi.fn>).mockResolvedValue({
       confirmed: true,
       providerProfileId: "default",
-      answers: { providerProfileId: "default", level: 2, budgetLimit: 0, defaultDelay: 1000, retryDelay: 2000 },
+      answers: { providerProfileId: "default", level: 2, budgetLimit: 0, defaultDelay: 1000, retryDelay: 2000, validatorRetryDelay: 500, validatorMaxAttempts: 3 },
     });
     const { createInitCommand } = await import("../../../src/commands/init.js");
     await createInitCommand().parseAsync(["node", "init", "--profile", "default", "--level", "2", "--budget", "0", "--default-delay", "1000", "--retry-delay", "2000", "--yes"]);

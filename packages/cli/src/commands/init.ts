@@ -37,6 +37,8 @@ interface InitFlags {
   budget?: string;
   defaultDelay?: string;
   retryDelay?: string;
+  validatorRetryDelay?: string;
+  validatorMaxAttempts?: string;
   apiKey?: string;
   advanced?: boolean;
   yes?: boolean;
@@ -100,6 +102,8 @@ export function createInitCommand(): Command {
     .option("--budget <usd>", "Budget limit (0 = unlimited)")
     .option("--default-delay <ms>", "Delay between nodes in ms")
     .option("--retry-delay <ms>", "Delay between retries in ms")
+    .option("--validator-retry-delay <ms>", "Base delay between validator retries in ms")
+    .option("--validator-max-attempts <n>", "Max validator retry attempts")
     .option("--api-key <key>", "Provider API key (avoids interactive prompt)")
     .option("--advanced", "Prompt for advanced settings", false)
     .option("--yes", "Skip the final confirmation", false)
@@ -115,6 +119,8 @@ export function createInitCommand(): Command {
         budget: opts.budget,
         defaultDelay: opts.defaultDelay,
         retryDelay: opts.retryDelay,
+        validatorRetryDelay: opts.validatorRetryDelay,
+        validatorMaxAttempts: opts.validatorMaxAttempts,
         apiKey: opts.apiKey,
         advanced: opts.advanced,
         yes: opts.yes,
@@ -192,6 +198,8 @@ export function createInitCommand(): Command {
               budgetLimit: result.answers.budgetLimit,
               defaultDelay: result.answers.defaultDelay,
               retryDelay: result.answers.retryDelay,
+              validatorRetryDelay: result.answers.validatorRetryDelay,
+              validatorMaxAttempts: result.answers.validatorMaxAttempts,
               level: result.answers.level,
               ...result.answers.advanced,
             },
@@ -219,6 +227,8 @@ export function createInitCommand(): Command {
           budgetLimit: result.answers.budgetLimit,
           defaultDelay: result.answers.defaultDelay,
           retryDelay: result.answers.retryDelay,
+          validatorRetryDelay: result.answers.validatorRetryDelay,
+          validatorMaxAttempts: result.answers.validatorMaxAttempts,
           level: result.answers.level,
         };
         await deps.initWorkflow(info, identity.id, { projectPath: cwd, config });

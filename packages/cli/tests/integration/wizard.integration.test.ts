@@ -35,6 +35,8 @@ describe("wizard integration", () => {
       { kind: "number", value: 0 },
       { kind: "number", value: 1000 },
       { kind: "number", value: 2000 },
+      { kind: "number", value: 500 }, // validatorRetryDelay
+      { kind: "number", value: 3 }, // validatorMaxAttempts
       { kind: "confirm", value: false }, // advanced? no
       { kind: "confirm", value: true }, // start?
     ]);
@@ -53,6 +55,8 @@ describe("wizard integration", () => {
       { kind: "number", value: 0 },
       { kind: "number", value: 1000 },
       { kind: "number", value: 2000 },
+      { kind: "number", value: 500 }, // validatorRetryDelay
+      { kind: "number", value: 3 }, // validatorMaxAttempts
       { kind: "confirm", value: false },
       { kind: "confirm", value: true },
     ]);

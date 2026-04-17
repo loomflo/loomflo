@@ -25,6 +25,8 @@ export function renderSummary(input: SummaryInput): string {
     theme.kv("budget", fmtBudget(answers.budgetLimit)),
     theme.kv("delay", fmtMs(answers.defaultDelay)),
     theme.kv("retry", fmtMs(answers.retryDelay)),
+    theme.kv("validator retry", fmtMs(answers.validatorRetryDelay)),
+    theme.kv("validator attempts", String(answers.validatorMaxAttempts)),
   ];
   if (answers.advanced) {
     lines.push(

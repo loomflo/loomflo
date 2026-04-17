@@ -35,6 +35,8 @@ describe("runWizard", () => {
       { kind: "number", value: 0 }, // budget
       { kind: "number", value: 1000 }, // defaultDelay
       { kind: "number", value: 2000 }, // retryDelay
+      { kind: "number", value: 500 }, // validatorRetryDelay
+      { kind: "number", value: 3 }, // validatorMaxAttempts
       { kind: "confirm", value: false }, // advanced? no
       { kind: "confirm", value: true }, // start?
     ]);
@@ -47,6 +49,8 @@ describe("runWizard", () => {
       budgetLimit: 0,
       defaultDelay: 1000,
       retryDelay: 2000,
+      validatorRetryDelay: 500,
+      validatorMaxAttempts: 3,
     });
   });
 
@@ -60,6 +64,8 @@ describe("runWizard", () => {
         budget: 0,
         defaultDelay: 1000,
         retryDelay: 2000,
+        validatorRetryDelay: 500,
+        validatorMaxAttempts: 3,
         advanced: false,
         yes: true,
         nonInteractive: false,
@@ -67,6 +73,8 @@ describe("runWizard", () => {
     });
     expect(result.confirmed).toBe(true);
     expect(result.answers.level).toBe(2);
+    expect(result.answers.validatorRetryDelay).toBe(500);
+    expect(result.answers.validatorMaxAttempts).toBe(3);
   });
 
   it("fails fast in non-interactive mode when values are missing", async () => {

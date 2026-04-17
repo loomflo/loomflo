@@ -11,6 +11,8 @@ describe("renderSummary", () => {
     budgetLimit: 0,
     defaultDelay: 1000,
     retryDelay: 2000,
+    validatorRetryDelay: 500,
+    validatorMaxAttempts: 3,
   };
 
   it("renders a heading + kv list", () => {

@@ -7,6 +7,8 @@ describe("presetDefaults", () => {
     const d = presetDefaults(1);
     expect(d.defaultDelay).toBe(500);
     expect(d.retryDelay).toBe(1000);
+    expect(d.validatorRetryDelay).toBe(300);
+    expect(d.validatorMaxAttempts).toBe(2);
     expect(d.maxRetriesPerNode).toBe(1);
     expect(d.reviewerEnabled).toBe(false);
   });
@@ -15,6 +17,8 @@ describe("presetDefaults", () => {
     const d = presetDefaults(2);
     expect(d.defaultDelay).toBe(1000);
     expect(d.retryDelay).toBe(2000);
+    expect(d.validatorRetryDelay).toBe(500);
+    expect(d.validatorMaxAttempts).toBe(3);
     expect(d.maxRetriesPerNode).toBe(3);
     expect(d.reviewerEnabled).toBe(true);
   });
@@ -23,6 +27,8 @@ describe("presetDefaults", () => {
     const d = presetDefaults(3);
     expect(d.defaultDelay).toBe(2000);
     expect(d.retryDelay).toBe(5000);
+    expect(d.validatorRetryDelay).toBe(1000);
+    expect(d.validatorMaxAttempts).toBe(5);
     expect(d.maxRetriesPerNode).toBe(5);
     expect(d.reviewerEnabled).toBe(true);
   });

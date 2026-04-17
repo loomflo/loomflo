@@ -3,6 +3,8 @@ import type { Level } from "./types.js";
 export interface PresetConfig {
   defaultDelay: number;
   retryDelay: number;
+  validatorRetryDelay: number;
+  validatorMaxAttempts: number;
   maxRetriesPerNode: number;
   maxRetriesPerTask: number;
   maxLoomasPerLoomi: number;
@@ -13,6 +15,8 @@ export interface PresetConfig {
 const L1: PresetConfig = {
   defaultDelay: 500,
   retryDelay: 1000,
+  validatorRetryDelay: 300,
+  validatorMaxAttempts: 2,
   maxRetriesPerNode: 1,
   maxRetriesPerTask: 1,
   maxLoomasPerLoomi: 3,
@@ -23,6 +27,8 @@ const L1: PresetConfig = {
 const L2: PresetConfig = {
   defaultDelay: 1000,
   retryDelay: 2000,
+  validatorRetryDelay: 500,
+  validatorMaxAttempts: 3,
   maxRetriesPerNode: 3,
   maxRetriesPerTask: 2,
   maxLoomasPerLoomi: 5,
@@ -33,6 +39,8 @@ const L2: PresetConfig = {
 const L3: PresetConfig = {
   defaultDelay: 2000,
   retryDelay: 5000,
+  validatorRetryDelay: 1000,
+  validatorMaxAttempts: 5,
   maxRetriesPerNode: 5,
   maxRetriesPerTask: 3,
   maxLoomasPerLoomi: 8,
