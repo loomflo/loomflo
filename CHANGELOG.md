@@ -6,6 +6,30 @@ Five sub-projects shipping together: S1 multi-project daemon (finalised from
 v0.2.0), S2 onboarding wizard, S3 visual CLI theme, S4 observation CLI, and
 S5 multi-project dashboard.
 
+### Breaking changes
+
+- **WebSocket authentication migrated from query string to Sec-WebSocket-Protocol.**
+  The daemon no longer accepts `?token=<value>` on the `/ws` endpoint. Clients
+  must pass the token via the `Sec-WebSocket-Protocol` upgrade header using the
+  `loomflo.bearer` subprotocol. Old clients connecting with `?token=` will be
+  rejected with WebSocket close code **4001** (Unauthorized).
+
+  **Migration**: update your WebSocket constructor from:
+
+  ```js
+  new WebSocket(`ws://host:port/ws?token=${token}`)
+  ```
+
+  to:
+
+  ```js
+  new WebSocket(`ws://host:port/ws`, ["loomflo.bearer", token])
+  ```
+
+  All official clients (`@loomflo/cli`, `@loomflo/sdk`, `@loomflo/dashboard`)
+  are already updated. Only custom or third-party WebSocket clients need manual
+  migration.
+
 ### Added
 
 #### S3 — Visual CLI theme
