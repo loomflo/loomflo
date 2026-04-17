@@ -181,6 +181,9 @@ export function createInitCommand(): Command {
         await chmod(projectFile, 0o600);
 
         // Persist config.
+        // mode 0600: config.json may hold sensitive advanced settings via
+        // the `...result.answers.advanced` spread. Apply the same permissions
+        // treatment as project.json for defense in depth.
         const configFile = join(cwd, ".loomflo", "config.json");
         await writeFile(
           configFile,
@@ -195,8 +198,11 @@ export function createInitCommand(): Command {
             null,
             2,
           )}\n`,
-          { encoding: "utf-8" },
+          { encoding: "utf-8", mode: 0o600 },
         );
+        // writeFile's `mode` option is ignored when the file already exists;
+        // chmod afterwards so a re-run tightens an existing 0644 file.
+        await chmod(configFile, 0o600);
 
         // Register + init workflow.
         const deps = defaultDeps();

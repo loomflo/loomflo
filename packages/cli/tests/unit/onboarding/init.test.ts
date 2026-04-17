@@ -78,6 +78,14 @@ describe("loomflo init", () => {
     expect(mode).toBe(0o600);
   });
 
+  it("writes config.json with 0600 mode (R5)", async () => {
+    const { createInitCommand } = await import("../../../src/commands/init.js");
+    await createInitCommand().parseAsync(["node", "init"]);
+    const configFile = join(tmp, ".loomflo", "config.json");
+    const mode = (await stat(configFile)).mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
+
   it("exits non-zero and prints an error when wizard is not confirmed", async () => {
     const { runWizard } = await import("../../../src/onboarding/index.js");
     (runWizard as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ confirmed: false, providerProfileId: "default", answers: {} });
