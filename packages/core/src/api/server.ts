@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
@@ -153,6 +154,28 @@ export interface ServerResult {
   broadcastForProject: (projectId: string, event: Record<string, unknown>) => void;
   /** Signal that is aborted when the server closes. */
   signal: AbortSignal;
+}
+
+// ============================================================================
+// Timing-safe token comparison
+// ============================================================================
+
+/**
+ * Compare two strings in constant time to prevent timing attacks.
+ *
+ * Uses `crypto.timingSafeEqual` under the hood. When the two strings differ
+ * in length, the comparison is still performed against a same-length buffer
+ * to avoid leaking length information, and the result is always `false`.
+ */
+function safeTokenEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf-8");
+  const bufB = Buffer.from(b, "utf-8");
+  if (bufA.length !== bufB.length) {
+    // Compare bufA against itself to keep constant time, then return false.
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
 }
 
 // ============================================================================
@@ -314,7 +337,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
         return;
       }
 
-      if (header.slice(BEARER_PREFIX.length) !== token) {
+      if (!safeTokenEquals(header.slice(BEARER_PREFIX.length), token)) {
         await reply.code(401).send({ error: "Unauthorized" });
         return;
       }
@@ -457,7 +480,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       _request.headers["sec-websocket-protocol"],
     );
 
-    if (presentedToken !== token) {
+    if (!presentedToken || !safeTokenEquals(presentedToken, token)) {
       socket.close(WS_CLOSE_UNAUTHORIZED, "Unauthorized");
       return;
     }
