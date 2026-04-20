@@ -52,16 +52,35 @@ interface WorkflowResponse {
 // httpGet
 // ============================================================================
 
+/** Error thrown by {@link httpGet} when the daemon returns a non-2xx status. */
+export class DaemonHttpError extends Error {
+  readonly status: number;
+  readonly path: string;
+  /** Error code from the daemon JSON body, if any (e.g. "No active workflow"). */
+  readonly daemonError: string | null;
+  constructor(path: string, status: number, daemonError: string | null) {
+    const body = daemonError ?? "";
+    const suffix = body.length > 0 ? `: ${body}` : "";
+    super(`GET ${path} failed: HTTP ${String(status)}${suffix}`);
+    this.name = "DaemonHttpError";
+    this.status = status;
+    this.path = path;
+    this.daemonError = daemonError;
+  }
+}
+
 /**
  * Thin GET helper targeting the local daemon.
  *
  * Adds `Authorization: Bearer <token>` automatically and returns parsed JSON.
+ * On a non-2xx response, attempts to extract `{error}` from the JSON body
+ * and surfaces it via {@link DaemonHttpError.daemonError}.
  *
  * @typeParam T - Expected shape of the JSON response body.
  * @param path - URL path (e.g. `/projects`).
  * @param daemon - Daemon connection info (port + token).
  * @returns Parsed JSON response.
- * @throws {Error} If the response is not ok (status outside 200-299).
+ * @throws {DaemonHttpError} If the response is not ok (status outside 200-299).
  */
 export async function httpGet<T = unknown>(path: string, daemon: DaemonEndpoint): Promise<T> {
   const url = `http://127.0.0.1:${String(daemon.port)}${path}`;
@@ -73,7 +92,8 @@ export async function httpGet<T = unknown>(path: string, daemon: DaemonEndpoint)
   });
 
   if (!res.ok) {
-    throw new Error(`GET ${path} failed: HTTP ${String(res.status)} ${res.statusText}`);
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new DaemonHttpError(path, res.status, body?.error ?? null);
   }
 
   return (await res.json()) as T;

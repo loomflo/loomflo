@@ -33,16 +33,45 @@ describe("httpGet", () => {
     );
   });
 
-  it("throws on non-ok response", async () => {
+  it("throws on non-ok response with daemon error body", async () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: "Not Found",
+      json: async () => ({ error: "No active workflow" }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    const { httpGet } = await import("../../../src/observation/api.js");
-    await expect(httpGet("/missing", { port: 9000, token: "tok" })).rejects.toThrow(/404/);
+    const { httpGet, DaemonHttpError } = await import("../../../src/observation/api.js");
+    const err = await httpGet("/missing", { port: 9000, token: "tok" }).then(
+      () => null,
+      (e: unknown) => e as DaemonHttpError,
+    );
+    expect(err).toBeInstanceOf(DaemonHttpError);
+    expect(err?.status).toBe(404);
+    expect(err?.daemonError).toBe("No active workflow");
+    expect(err?.message).toMatch(/404/);
+  });
+
+  it("throws on non-ok response even when body is not JSON", async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      json: async () => {
+        throw new Error("not json");
+      },
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { httpGet, DaemonHttpError } = await import("../../../src/observation/api.js");
+    const err = await httpGet("/broken", { port: 9000, token: "tok" }).then(
+      () => null,
+      (e: unknown) => e as DaemonHttpError,
+    );
+    expect(err).toBeInstanceOf(DaemonHttpError);
+    expect(err?.status).toBe(500);
+    expect(err?.daemonError).toBeNull();
   });
 });
 

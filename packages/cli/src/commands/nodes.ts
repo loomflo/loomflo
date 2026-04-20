@@ -11,7 +11,7 @@
 import { Command } from "commander";
 
 import { readDaemonConfig } from "../client.js";
-import { httpGet, type DaemonEndpoint } from "../observation/api.js";
+import { DaemonHttpError, httpGet, type DaemonEndpoint } from "../observation/api.js";
 import { withJsonSupport, isJsonMode, writeJson, writeError, type WithJsonOption } from "../output.js";
 import { resolveProject } from "../project-resolver.js";
 import { statusCell, formatUptime } from "./ps.js";
@@ -99,18 +99,27 @@ export function createNodesCommand(): Command {
           projectId = resolved.identity.id;
         }
 
-        // Fetch nodes from the daemon
-        const response = await httpGet<{ nodes: NodeRow[] }>(
-          `/projects/${projectId}/nodes`,
-          daemon as DaemonEndpoint,
-        );
+        // Fetch nodes from the daemon. The daemon returns a bare array;
+        // wrap the call to translate "no active workflow" into a friendly
+        // empty state instead of a cryptic HTTP 404.
+        let nodes: NodeRow[];
+        try {
+          nodes = await httpGet<NodeRow[]>(
+            `/projects/${projectId}/nodes`,
+            daemon as DaemonEndpoint,
+          );
+        } catch (err) {
+          if (err instanceof DaemonHttpError && err.status === 404) {
+            nodes = [];
+          } else {
+            throw err;
+          }
+        }
 
-        let nodes = response.nodes;
-
-        // Filter out completed/failed unless --all is set
+        // Filter out terminal statuses (done/failed) unless --all is set.
         if (opts.all !== true) {
           nodes = nodes.filter(
-            (n) => n.status !== "completed" && n.status !== "failed",
+            (n) => n.status !== "done" && n.status !== "failed",
           );
         }
 
