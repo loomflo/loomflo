@@ -95,13 +95,23 @@ export function createStartCommand(): Command {
       const projectJson = join(cwd, ".loomflo", "project.json");
       if (!existsSync(projectJson)) {
         const { createInitCommand } = await import("./init.js");
+        // Reset so we can detect whether init's .action() set a failure code.
+        // commander's parseAsync swallows errors thrown inside .action(), it
+        // only sets process.exitCode — so we must check it ourselves.
+        const priorExit = process.exitCode;
+        process.exitCode = 0;
         await createInitCommand().parseAsync([
           "node",
           "init",
           ...(options.projectPath ? ["--project-path", options.projectPath] : []),
           ...(json ? ["--json"] : []),
         ]);
-        // Fall through to start the workflow after init completes.
+        if (process.exitCode !== 0 || !existsSync(projectJson)) {
+          // Init failed (validation error, user cancelled, …) — do NOT fall
+          // through and start the daemon on an unconfigured project.
+          return;
+        }
+        process.exitCode = priorExit;
       }
 
       const sp = json ? null : theme.spinner("starting\u2026");
