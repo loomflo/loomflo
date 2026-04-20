@@ -434,8 +434,10 @@ export class DaemonClient {
       return;
     }
 
-    const wsUrl = this.baseUrl.replace(/^http/, "ws") + `/ws?token=${this.token}`;
-    const socket = new WebSocket(wsUrl);
+    const wsUrl = this.baseUrl.replace(/^http/, "ws") + "/ws";
+    // Auth rides on Sec-WebSocket-Protocol (`loomflo.bearer, <token>`) so the
+    // token never leaks into URLs, logs, or proxies.
+    const socket = new WebSocket(wsUrl, ["loomflo.bearer", this.token]);
 
     socket.addEventListener("open", (): void => {
       this.reconnectDelay = RECONNECT_INITIAL_MS;

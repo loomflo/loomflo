@@ -7,11 +7,10 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
-import { useSearchParams } from "react-router-dom";
 
-import type { Event, NodeStatus } from "../lib/types.js";
-import type { CostsResponse, NodeSummary } from "../lib/api.js";
-import { apiClient } from "../lib/api.js";
+import type { Event, Node, NodeStatus } from "../lib/types.js";
+import type { CostSummary } from "../lib/types.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { LogStream } from "../components/LogStream.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
@@ -85,12 +84,12 @@ function formatUsd(value: number): string {
 }
 
 /**
- * Compute per-status node counts from a list of node summaries.
+ * Compute per-status node counts from a list of nodes.
  *
- * @param nodes - Node summaries to count.
+ * @param nodes - Nodes to count.
  * @returns Map of node status to count.
  */
-function computeNodeCounts(nodes: readonly NodeSummary[]): Map<NodeStatus, number> {
+function computeNodeCounts(nodes: readonly Node[]): Map<NodeStatus, number> {
   const map = new Map<NodeStatus, number>();
   for (const node of nodes) {
     map.set(node.status, (map.get(node.status) ?? 0) + 1);
@@ -106,21 +105,18 @@ function computeNodeCounts(nodes: readonly NodeSummary[]): Map<NodeStatus, numbe
  * Home/overview page displaying workflow status, active nodes summary,
  * cost summary with budget progress bar, and the most recent events.
  *
- * Connects to the Loomflo daemon via {@link useWebSocket} (token read from
- * the `?token=` query parameter) and fetches workflow state through
- * {@link useWorkflow}. Subscribes to `workflow_status`, `node_status`,
- * and `cost_update` WebSocket events for real-time updates.
+ * Reads projectId from URL params via useParams(). Connects to the Loomflo
+ * daemon via useWebSocket and fetches workflow state through useWorkflow.
  *
  * @returns Rendered home page element.
  */
 export const HomePage = memo(function HomePage(): ReactElement {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const projectId = useProjectId();
+  const { client, baseUrl, token } = useProject();
 
-  const { subscribe } = useWebSocket(token);
-  const { workflow, nodes, loading, error } = useWorkflow(subscribe);
+  const { workflow, nodes, loading, error } = useWorkflow(projectId);
 
-  const [costs, setCosts] = useState<CostsResponse | null>(null);
+  const [costs, setCosts] = useState<CostSummary | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
 
   // --------------------------------------------------------------------------
@@ -130,22 +126,22 @@ export const HomePage = memo(function HomePage(): ReactElement {
   /** Fetch costs from the REST API. */
   const refetchCosts = useCallback(async (): Promise<void> => {
     try {
-      const data = await apiClient.getCosts();
+      const data = await client.getCosts(projectId);
       setCosts(data);
     } catch {
-      // Silently ignore — costs card will show workflow.totalCost fallback
+      // Silently ignore -- costs card will show workflow.totalCost fallback
     }
-  }, []);
+  }, [client, projectId]);
 
   /** Fetch recent events from the REST API. */
   const refetchEvents = useCallback(async (): Promise<void> => {
     try {
-      const data = await apiClient.getEvents({ limit: 20 });
-      setEvents(data.events);
+      const data = await client.getEvents(projectId, { limit: 20 });
+      setEvents(data);
     } catch {
-      // Silently ignore — events section will show empty state
+      // Silently ignore -- events section will show empty state
     }
-  }, []);
+  }, [client, projectId]);
 
   // --------------------------------------------------------------------------
   // Initial data load
@@ -160,34 +156,23 @@ export const HomePage = memo(function HomePage(): ReactElement {
   // WebSocket subscriptions
   // --------------------------------------------------------------------------
 
-  useEffect((): (() => void) => {
-    const unsubs: (() => void)[] = [];
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      const type = frame["type"] as string | undefined;
 
-    unsubs.push(
-      subscribe("workflow_status", (): void => {
+      if (type === "workflow_status" || type === "node_status") {
         void refetchEvents();
-      }),
-    );
+      }
 
-    unsubs.push(
-      subscribe("node_status", (): void => {
-        void refetchEvents();
-      }),
-    );
-
-    unsubs.push(
-      subscribe("cost_update", (): void => {
+      if (type === "cost_update") {
         void refetchCosts();
         void refetchEvents();
-      }),
-    );
-
-    return (): void => {
-      for (const unsub of unsubs) {
-        unsub();
       }
-    };
-  }, [subscribe, refetchCosts, refetchEvents]);
+    },
+  });
 
   // --------------------------------------------------------------------------
   // Derived values
@@ -253,9 +238,8 @@ export const HomePage = memo(function HomePage(): ReactElement {
     dot: "bg-gray-400",
   };
 
-  const totalCost = costs?.total ?? workflow.totalCost;
-  const budgetLimit = costs?.budgetLimit ?? workflow.config.budgetLimit;
-  const budgetRemaining = costs?.budgetRemaining ?? null;
+  const totalCost = costs?.totalCost ?? workflow.totalCost;
+  const budgetLimit = workflow.config.budgetLimit;
   const budgetUsedPercent =
     budgetLimit !== null && budgetLimit > 0 ? Math.min((totalCost / budgetLimit) * 100, 100) : null;
 
@@ -350,7 +334,7 @@ export const HomePage = memo(function HomePage(): ReactElement {
             <div>
               <span className="text-xs uppercase tracking-wider text-gray-500">Remaining</span>
               <p className="mt-1 text-lg font-semibold text-gray-100">
-                {budgetRemaining !== null ? formatUsd(budgetRemaining) : "\u2014"}
+                {budgetLimit !== null ? formatUsd(Math.max(0, budgetLimit - totalCost)) : "\u2014"}
               </p>
             </div>
           </div>

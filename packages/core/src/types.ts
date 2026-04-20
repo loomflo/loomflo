@@ -28,6 +28,8 @@ export const NodeStatusSchema = z.enum([
   "done",
   "failed",
   "blocked",
+  "waiting_for_provider",
+  "failed_provider_exhausted",
 ]);
 
 /** Node execution state. */
@@ -76,6 +78,10 @@ export const EventTypeSchema = z.enum([
   "message_sent",
   "cost_tracked",
   "memory_updated",
+  "provider_rate_limited",
+  "provider_retry_scheduled",
+  "provider_retry_resumed",
+  "provider_exhausted",
 ]);
 
 /** Event type identifier for the event log. */
@@ -296,6 +302,23 @@ export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 // Complex Types
 // ============================================================================
 
+/** Zod schema for persisted provider retry state (rate-limit backoff). */
+export const ProviderRetryStateSchema = z
+  .object({
+    /** Number of provider rate-limit retries attempted so far (0-based, max 9). */
+    attempt: z.number().int().nonnegative(),
+    /** ISO 8601 timestamp when the next retry is scheduled, or null if not waiting. */
+    resumeAt: z.string().datetime().nullable(),
+    /** The last HTTP status code that triggered the retry (e.g., 429). */
+    lastStatusCode: z.number().int().nullable(),
+    /** Human-readable reason for the last rate-limit event. */
+    lastReason: z.string().nullable(),
+  })
+  .nullable();
+
+/** Persisted provider retry state for rate-limit backoff. */
+export type ProviderRetryState = z.infer<typeof ProviderRetryStateSchema>;
+
 /** Zod schema for a workflow node. */
 export const NodeSchema = z.object({
   /** Unique node identifier (e.g., "node-1"). */
@@ -326,6 +349,8 @@ export const NodeSchema = z.object({
   startedAt: z.string().datetime().nullable(),
   /** ISO 8601 timestamp when the node finished, or null. */
   completedAt: z.string().datetime().nullable(),
+  /** Provider retry state for rate-limit backoff, or null if not in retry. */
+  providerRetryState: ProviderRetryStateSchema.default(null),
 });
 
 /** A workflow node representing one major step in the execution graph. */

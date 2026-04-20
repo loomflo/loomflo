@@ -313,3 +313,63 @@ export interface CostSummary {
   /** Total output tokens across all entries. */
   totalOutputTokens: number;
 }
+
+// ============================================================================
+// Project Types
+// ============================================================================
+
+/** Summary of a project returned by the list endpoint. */
+export interface ProjectSummary {
+  /** Unique project identifier. */
+  id: string;
+  /** Human-readable project name. */
+  name: string;
+  /** Absolute filesystem path of the project workspace. */
+  projectPath: string;
+  /** Current project status. */
+  status: "idle" | "running" | "blocked" | "failed" | "completed";
+  /** ID of the currently executing node, or null. */
+  currentNodeId: string | null;
+  /** Accumulated cost in USD. */
+  cost: number;
+  /** ISO 8601 timestamp when the project started, or null. */
+  startedAt: string | null;
+}
+
+/** Detailed project info including its workflow. */
+export type ProjectDetail = ProjectSummary & {
+  /** Associated workflow summary. */
+  workflow: { id: string; status: string };
+};
+
+// ============================================================================
+// Chat Types
+// ============================================================================
+
+/** Request body for the chat endpoint. */
+export interface ChatBody {
+  /** Ordered list of chat messages. */
+  messages: Array<{ role: string; content: string }>;
+}
+
+/** Response from the chat endpoint. */
+export interface ChatResponse {
+  /** The assistant's reply message. */
+  message: { role: string; content: string };
+}
+
+// ============================================================================
+// Memory & Specs (simplified aliases)
+// ============================================================================
+
+/** Shared memory state. */
+export interface Memory {
+  /** Memory files. */
+  files: Array<{ name: string; lastModifiedBy: string; lastModifiedAt: string }>;
+}
+
+/** Spec artifacts. */
+export interface Specs {
+  /** Available spec artifacts. */
+  artifacts: Array<{ name: string; path: string; size: number }>;
+}

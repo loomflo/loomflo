@@ -9,14 +9,13 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import type { Edge, Node, NodeStatus } from "../lib/types.js";
-import type { NodeSummary } from "../lib/api.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { GraphView } from "../components/GraphView.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
-import type { Subscribe } from "../hooks/useWorkflow.js";
 
 // ============================================================================
 // Constants
@@ -224,8 +223,8 @@ const ArtifactStatusIcon = memo(function ArtifactStatusIcon({
 interface StatusBarProps {
   /** Current workflow lifecycle status. */
   workflowStatus: string;
-  /** All node summaries used to compute per-status counts. */
-  nodes: readonly NodeSummary[];
+  /** All nodes used to compute per-status counts. */
+  nodes: readonly Node[];
   /** Total accumulated cost in USD across all nodes. */
   totalCost: number;
 }
@@ -234,7 +233,7 @@ interface StatusBarProps {
  * Horizontal status bar displaying workflow status, node counts by state,
  * and total cost. Placed at the top of the graph page.
  *
- * @param props - Workflow status, node summaries, and total cost.
+ * @param props - Workflow status, nodes, and total cost.
  * @returns Rendered status bar element.
  */
 const StatusBar = memo(function StatusBar({
@@ -297,11 +296,12 @@ interface UseSpecPhaseReturn {
  * React hook that manages Phase 1 (spec) state: spec artifact tracking and
  * incremental graph node/edge accumulation from WebSocket events.
  *
- * @param subscribe - The subscribe function from useWebSocket.
+ * @param projectId - The project ID to subscribe to.
  * @param isSpecPhase - Whether the workflow is currently in the spec phase.
  * @returns Artifact statuses and incrementally accumulated graph data.
  */
-function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseReturn {
+function useSpecPhase(projectId: string, isSpecPhase: boolean): UseSpecPhaseReturn {
+  const { baseUrl, token } = useProject();
   const [readyArtifacts, setReadyArtifacts] = useState(new Set<string>());
   const [wsNodes, setWsNodes] = useState<Node[]>([]);
   const [wsEdges, setWsEdges] = useState<Edge[]>([]);
@@ -315,44 +315,50 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
     }
   }, [isSpecPhase]);
 
-  // Subscribe to spec_artifact_ready events
-  useEffect((): (() => void) => {
-    if (!isSpecPhase) return (): void => {};
+  // Subscribe to spec_artifact_ready and graph_modified events
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      if (!isSpecPhase) return;
 
-    return subscribe("spec_artifact_ready", (event): void => {
-      setReadyArtifacts((prev) => {
-        if (prev.has(event.name)) return prev;
-        const next = new Set(prev);
-        next.add(event.name);
-        return next;
-      });
-    });
-  }, [subscribe, isSpecPhase]);
+      const type = frame["type"] as string | undefined;
 
-  // Subscribe to graph_modified events for incremental node/edge insertion
-  useEffect((): (() => void) => {
-    if (!isSpecPhase) return (): void => {};
+      if (type === "spec_artifact_ready") {
+        const name = frame["name"] as string;
+        setReadyArtifacts((prev) => {
+          if (prev.has(name)) return prev;
+          const next = new Set(prev);
+          next.add(name);
+          return next;
+        });
+      }
 
-    return subscribe("graph_modified", (event): void => {
-      if (event.action === "insert_node") {
-        const node = parseInsertedNode(event.details);
-        if (node) {
-          setWsNodes((prev) => {
-            if (prev.some((n) => n.id === node.id)) return prev;
-            return [...prev, node];
-          });
-        }
-      } else if (event.action === "add_edge") {
-        const edge = parseAddedEdge(event.details);
-        if (edge) {
-          setWsEdges((prev) => {
-            if (prev.some((e) => e.from === edge.from && e.to === edge.to)) return prev;
-            return [...prev, edge];
-          });
+      if (type === "graph_modified") {
+        const action = frame["action"] as string | undefined;
+        const details = (frame["details"] ?? frame) as Record<string, unknown>;
+
+        if (action === "insert_node") {
+          const node = parseInsertedNode(details);
+          if (node) {
+            setWsNodes((prev) => {
+              if (prev.some((n) => n.id === node.id)) return prev;
+              return [...prev, node];
+            });
+          }
+        } else if (action === "add_edge") {
+          const edge = parseAddedEdge(details);
+          if (edge) {
+            setWsEdges((prev) => {
+              if (prev.some((e) => e.from === edge.from && e.to === edge.to)) return prev;
+              return [...prev, edge];
+            });
+          }
         }
       }
-    });
-  }, [subscribe, isSpecPhase]);
+    },
+  });
 
   // Compute artifact display statuses from the ready set
   const artifacts = useMemo((): SpecArtifactInfo[] => {
@@ -379,41 +385,37 @@ function useSpecPhase(subscribe: Subscribe, isSpecPhase: boolean): UseSpecPhaseR
 /**
  * Full-screen graph page that visualizes the workflow DAG with live status
  * updates. A status bar at the top shows workflow status, per-state node
- * counts, and total cost. Clicking a node navigates to `/node/:id`.
+ * counts, and total cost. Clicking a node navigates to the node detail page.
  *
  * During Phase 1 (spec), a planning header and spec artifact status panel
  * replace the normal status bar. The graph forms incrementally as nodes and
  * edges arrive via WebSocket events, with enter animations.
  *
- * Connects to the Loomflo daemon via {@link useWebSocket} (token read from
- * the `?token=` query parameter) and fetches workflow state through
- * {@link useWorkflow}, which combines REST polling with WebSocket events.
+ * Reads projectId from URL params and fetches workflow state through
+ * useWorkflow, which combines REST polling with WebSocket events.
  *
  * @returns Rendered graph page filling the parent container.
  */
 export const GraphPage = memo(function GraphPage(): ReactElement {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-
-  const { subscribe } = useWebSocket(token);
-  const { workflow, nodes, loading, error } = useWorkflow(subscribe);
+  const projectId = useProjectId();
+  const { workflow, nodes, loading, error } = useWorkflow(projectId);
 
   const isSpecPhase = workflow?.status === "spec";
 
-  const { artifacts, wsNodes, wsEdges } = useSpecPhase(subscribe, isSpecPhase);
+  const { artifacts, wsNodes, wsEdges } = useSpecPhase(projectId, isSpecPhase);
 
   /** Navigate to the node detail page when a graph node is clicked. */
   const handleNodeClick = useCallback(
     (nodeId: string): void => {
-      void navigate(`/node/${encodeURIComponent(nodeId)}`);
+      void navigate(`/projects/${encodeURIComponent(projectId)}/node/${encodeURIComponent(nodeId)}`);
     },
-    [navigate],
+    [navigate, projectId],
   );
 
   /**
    * Build full Node[] from the workflow graph, overlaying live status
-   * from the WebSocket-updated NodeSummary array. During spec phase,
+   * from the WebSocket-updated Node array. During spec phase,
    * merges in incrementally received WS nodes (deduplicated by ID).
    */
   const graphNodes = useMemo((): Node[] => {

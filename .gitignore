@@ -1,5 +1,5 @@
 .specify
-specs/
+/specs/
 speckit.*.md
 
 # Dependencies
@@ -25,3 +25,4 @@ coverage/
 
 # OS
 .DS_Store
+.superpowers/

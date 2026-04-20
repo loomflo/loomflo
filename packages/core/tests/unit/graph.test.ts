@@ -23,6 +23,7 @@ function makeNode(overrides: Partial<Node> = {}): Node {
     cost: 0,
     startedAt: null,
     completedAt: null,
+    providerRetryState: null,
     ...overrides,
   };
 }

@@ -487,10 +487,13 @@ export class LoomfloClient {
       throw new Error("Global WebSocket API is not available. Node.js 22+ is required.");
     }
 
-    const url = `${this.wsUrl}/ws?token=${encodeURIComponent(this.token)}`;
+    const url = `${this.wsUrl}/ws`;
 
     return new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(url);
+      // Auth rides on the Sec-WebSocket-Protocol upgrade header
+      // (`loomflo.bearer, <token>`). Node 22 and browser WebSocket constructors
+      // both accept a `protocols` array and forward it unchanged.
+      const ws = new WebSocket(url, ["loomflo.bearer", this.token]);
 
       ws.addEventListener("message", (event: MessageEvent) => {
         this.handleMessage(event);

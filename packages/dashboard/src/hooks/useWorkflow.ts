@@ -7,24 +7,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { Workflow } from "../lib/types.js";
-import { apiClient, ApiError } from "../lib/api.js";
-import type { NodeSummary } from "../lib/api.js";
-import type { UseWebSocketReturn } from "./useWebSocket.js";
+import type { Node, Workflow } from "../lib/types.js";
+import { useProject } from "../context/ProjectContext.js";
+import { useWebSocket } from "./useWebSocket.js";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/** The subscribe function signature extracted from useWebSocket. */
-export type Subscribe = UseWebSocketReturn["subscribe"];
 
 /** Return value of the useWorkflow hook. */
 export interface UseWorkflowReturn {
   /** Current workflow state, or null if no workflow is active. */
   workflow: Workflow | null;
   /** All nodes in the workflow graph. */
-  nodes: NodeSummary[];
+  nodes: Node[];
   /** Whether the initial data fetch is in progress. */
   loading: boolean;
   /** Error message from the most recent fetch, or null. */
@@ -41,12 +37,14 @@ export interface UseWorkflowReturn {
  * React hook that fetches the current workflow and node state via REST,
  * then subscribes to WebSocket events to keep the state updated in real-time.
  *
- * @param subscribe - The subscribe function from {@link useWebSocket}.
+ * @param projectId - The project to fetch workflow data for.
  * @returns Workflow state, nodes, loading/error indicators, and a refetch trigger.
  */
-export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
+export function useWorkflow(projectId: string): UseWorkflowReturn {
+  const { client, baseUrl, token } = useProject();
+
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [nodes, setNodes] = useState<NodeSummary[]>([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,15 +59,15 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
 
     try {
       const [workflowResult, nodesResult] = await Promise.allSettled([
-        apiClient.getWorkflow(),
-        apiClient.getNodes(),
+        client.getWorkflow(projectId),
+        client.getNodes(projectId),
       ]);
 
       if (workflowResult.status === "fulfilled") {
         setWorkflow(workflowResult.value);
       } else {
         const reason = workflowResult.reason as unknown;
-        if (reason instanceof ApiError && reason.status === 404) {
+        if (reason instanceof Error && reason.message.includes("404")) {
           setWorkflow(null);
         } else {
           setError(reason instanceof Error ? reason.message : "Failed to fetch workflow");
@@ -77,10 +75,10 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
       }
 
       if (nodesResult.status === "fulfilled") {
-        setNodes(nodesResult.value.nodes);
+        setNodes(nodesResult.value);
       } else {
         const reason = nodesResult.reason as unknown;
-        if (!(reason instanceof ApiError && reason.status === 404)) {
+        if (!(reason instanceof Error && reason.message.includes("404"))) {
           setError(
             (prev) => prev ?? (reason instanceof Error ? reason.message : "Failed to fetch nodes"),
           );
@@ -89,7 +87,7 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [client, projectId]);
 
   /** Fetch data on mount. */
   useEffect((): void => {
@@ -97,56 +95,55 @@ export function useWorkflow(subscribe: Subscribe): UseWorkflowReturn {
   }, [fetchData]);
 
   /** Subscribe to WebSocket events and update state accordingly. */
-  useEffect((): (() => void) => {
-    const unsubscribers: (() => void)[] = [];
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      const type = frame["type"] as string | undefined;
 
-    unsubscribers.push(
-      subscribe("workflow_status", (event): void => {
-        setWorkflow((prev) => (prev ? { ...prev, status: event.status } : prev));
-      }),
-    );
+      if (type === "workflow_status") {
+        const status = frame["status"] as string;
+        setWorkflow((prev) => (prev ? { ...prev, status: status as Workflow["status"] } : prev));
+      }
 
-    unsubscribers.push(
-      subscribe("node_status", (event): void => {
+      if (type === "node_status") {
+        const nodeId = frame["nodeId"] as string;
+        const status = frame["status"] as string;
         setNodes((prev) =>
-          prev.map((node) => (node.id === event.nodeId ? { ...node, status: event.status } : node)),
+          prev.map((node) =>
+            node.id === nodeId ? { ...node, status: status as Node["status"] } : node,
+          ),
         );
-      }),
-    );
+      }
 
-    unsubscribers.push(
-      subscribe("agent_status", (event): void => {
-        if (event.status === "created") {
+      if (type === "agent_status") {
+        const status = frame["status"] as string;
+        if (status === "created") {
+          const nodeId = frame["nodeId"] as string;
           setNodes((prev) =>
             prev.map((node) =>
-              node.id === event.nodeId ? { ...node, agentCount: node.agentCount + 1 } : node,
+              node.id === nodeId ? { ...node, agents: [...node.agents] } : node,
             ),
           );
         }
-      }),
-    );
-
-    unsubscribers.push(
-      subscribe("graph_modified", (): void => {
-        void fetchData();
-      }),
-    );
-
-    unsubscribers.push(
-      subscribe("cost_update", (event): void => {
-        setNodes((prev) =>
-          prev.map((node) => (node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node)),
-        );
-        setWorkflow((prev) => (prev ? { ...prev, totalCost: event.totalCost } : prev));
-      }),
-    );
-
-    return (): void => {
-      for (const unsub of unsubscribers) {
-        unsub();
       }
-    };
-  }, [subscribe, fetchData]);
+
+      if (type === "graph_modified") {
+        void fetchData();
+      }
+
+      if (type === "cost_update") {
+        const nodeId = frame["nodeId"] as string;
+        const nodeCost = frame["nodeCost"] as number;
+        const totalCost = frame["totalCost"] as number;
+        setNodes((prev) =>
+          prev.map((node) => (node.id === nodeId ? { ...node, cost: nodeCost } : node)),
+        );
+        setWorkflow((prev) => (prev ? { ...prev, totalCost } : prev));
+      }
+    },
+  });
 
   /** Manual refetch trigger exposed to consumers. */
   const refetch = useCallback((): void => {

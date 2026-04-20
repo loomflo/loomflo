@@ -9,12 +9,18 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { useSearchParams } from "react-router-dom";
 
-import type { MemoryFile } from "../lib/api.js";
-import { apiClient } from "../lib/api.js";
+import type { Memory } from "../lib/types.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { MarkdownViewer } from "../components/MarkdownViewer.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** A single memory file entry. */
+type MemoryFile = Memory["files"][number];
 
 // ============================================================================
 // Helpers
@@ -44,9 +50,9 @@ function formatTimestamp(iso: string): string {
  * Memory page displaying a navigable list of shared memory files with a
  * markdown preview panel.
  *
- * The left sidebar shows all shared memory files (name, last modified by,
- * and last modified timestamp) fetched from the REST API. Clicking a file
- * loads its raw markdown content and renders it in the main panel using
+ * Reads projectId from URL params. The left sidebar shows all shared memory
+ * files (name, last modified by, and last modified timestamp) fetched from the
+ * REST API. Clicking a file loads its info in the main panel using
  * {@link MarkdownViewer}. The first file is auto-selected on initial load.
  *
  * Subscribes to the `memory_updated` WebSocket event so the list refreshes
@@ -56,9 +62,8 @@ function formatTimestamp(iso: string): string {
  * @returns Rendered memory page element.
  */
 export const MemoryPage = memo(function MemoryPage(): ReactElement {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-  const { subscribe } = useWebSocket(token);
+  const projectId = useProjectId();
+  const { client, baseUrl, token } = useProject();
 
   const [files, setFiles] = useState<MemoryFile[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -84,7 +89,7 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
   const fetchFiles = useCallback(async (): Promise<MemoryFile[] | null> => {
     try {
       setListError(null);
-      const data = await apiClient.getMemory();
+      const data = await client.getMemory(projectId);
       setFiles(data.files);
       return data.files;
     } catch (err) {
@@ -94,27 +99,40 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [client, projectId]);
 
   /**
-   * Load the raw markdown content for a specific memory file.
+   * Load info for a specific memory file.
+   * The new API returns memory file metadata; individual file content fetching
+   * displays the file metadata.
    *
    * @param name - Memory file name to fetch.
    */
-  const fetchContent = useCallback(async (name: string): Promise<void> => {
-    setContentLoading(true);
-    setContentError(null);
-    try {
-      const md = await apiClient.getMemoryFile(name);
-      setContent(md);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load file content";
-      setContentError(msg);
-      setContent(null);
-    } finally {
-      setContentLoading(false);
-    }
-  }, []);
+  const fetchContent = useCallback(
+    async (name: string): Promise<void> => {
+      setContentLoading(true);
+      setContentError(null);
+      try {
+        const data = await client.getMemory(projectId);
+        const file = data.files.find((f) => f.name === name);
+        if (file) {
+          setContent(
+            `# ${file.name}\n\nLast modified by: **${file.lastModifiedBy}**\nLast modified at: ${file.lastModifiedAt}`,
+          );
+        } else {
+          setContent(null);
+          setContentError("File not found");
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to load file content";
+        setContentError(msg);
+        setContent(null);
+      } finally {
+        setContentLoading(false);
+      }
+    },
+    [client, projectId],
+  );
 
   // --------------------------------------------------------------------------
   // File selection
@@ -152,17 +170,23 @@ export const MemoryPage = memo(function MemoryPage(): ReactElement {
   // WebSocket subscription
   // --------------------------------------------------------------------------
 
-  useEffect((): (() => void) => {
-    const unsub = subscribe("memory_updated", (event): void => {
-      void (async (): Promise<void> => {
-        await fetchFiles();
-        if (selectedNameRef.current === event.file) {
-          void fetchContent(event.file);
-        }
-      })();
-    });
-    return unsub;
-  }, [subscribe, fetchFiles, fetchContent]);
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      const type = frame["type"] as string | undefined;
+      if (type === "memory_updated") {
+        const fileName = frame["file"] as string | undefined;
+        void (async (): Promise<void> => {
+          await fetchFiles();
+          if (selectedNameRef.current === fileName && fileName) {
+            void fetchContent(fileName);
+          }
+        })();
+      }
+    },
+  });
 
   // --------------------------------------------------------------------------
   // Loading state

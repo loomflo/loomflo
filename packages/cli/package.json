@@ -1,6 +1,6 @@
 {
   "name": "@loomflo/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -20,15 +20,25 @@
     "test": "vitest run",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "theme:preview": "tsx scripts/theme-preview.ts"
   },
   "dependencies": {
+    "@inquirer/prompts": "^6",
     "@loomflo/core": "workspace:*",
+    "chalk": "^5",
+    "cli-table3": "^0.6",
     "commander": "^13.0.0",
+    "ora": "^8",
+    "ws": "^8.20.0",
     "zod": "^3.0.0"
   },
   "devDependencies": {
-    "tsup": "^8.0.0"
+    "@types/ws": "^8.18.1",
+    "nock": "^14",
+    "strip-ansi": "^7",
+    "tsup": "^8.0.0",
+    "tsx": "^4.21.0"
   },
   "engines": {
     "node": ">=20"

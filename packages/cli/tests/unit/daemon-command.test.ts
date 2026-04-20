@@ -15,4 +15,12 @@ describe("daemon command", () => {
     const hasForce = stop.options.some((o) => o.long === "--force");
     expect(hasForce).toBe(true);
   });
+
+  it("each subcommand supports --json flag", () => {
+    const cmd = createDaemonCommand();
+    for (const sub of cmd.commands) {
+      const hasJson = sub.options.some((o) => o.long === "--json");
+      expect(hasJson, `${sub.name()} should have --json`).toBe(true);
+    }
+  });
 });

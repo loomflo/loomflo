@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { resolveProject } from "../project-resolver.js";
 import { openClient } from "../client.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 // ============================================================================
 // Types
@@ -33,10 +35,10 @@ interface ChatResponse {
  * @returns A configured commander Command instance.
  */
 export function createChatCommand(): Command {
-  return new Command("chat")
+  const cmd = new Command("chat")
     .description("Chat with the Loom architect agent")
     .argument("<message>", "Message to send to Loom")
-    .action(async (message: string): Promise<void> => {
+    .action(async (message: string, options: { json?: boolean }): Promise<void> => {
       try {
         const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
         const client = await openClient(identity.id);
@@ -45,17 +47,26 @@ export function createChatCommand(): Command {
           message,
         });
 
-        console.log(`[${category}] ${response}`);
+        if (isJsonMode(options)) {
+          writeJson({ response, category, action });
+          return;
+        }
+
+        process.stdout.write(
+          `${theme.line(theme.glyph.arrow, "muted", response, category)}\n`,
+        );
 
         if (action !== null) {
-          console.log(`  Action: ${action.type}`);
+          process.stdout.write(`${theme.kv("action", action.type)}\n`);
           for (const [key, value] of Object.entries(action.details)) {
-            console.log(`    ${key}: ${JSON.stringify(value)}`);
+            process.stdout.write(`${theme.kv(key, JSON.stringify(value))}\n`);
           }
         }
       } catch (err) {
-        console.error(`Error: ${(err as Error).message}`);
-        process.exit(1);
+        writeError(options, (err as Error).message, "E_CHAT");
+        process.exitCode = 1;
       }
     });
+
+  return withJsonSupport(cmd);
 }

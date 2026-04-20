@@ -5,6 +5,7 @@
  * error (openClient rejects), request error, and resolveProject fails.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import stripAnsi from "strip-ansi";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks (hoisted by vitest)
@@ -44,29 +45,34 @@ const IDENTITY = {
  * Execute the chat command action with the given message argument.
  *
  * @param message - The chat message to send.
+ * @param extraArgs - Additional CLI arguments (e.g., "--json").
  * @returns A promise that resolves when the command completes.
  */
-async function runChat(message: string): Promise<void> {
+async function runChat(message: string, extraArgs: string[] = []): Promise<void> {
   const cmd = createChatCommand();
   cmd.exitOverride();
-  await cmd.parseAsync(["node", "chat", message]);
+  await cmd.parseAsync(["node", "chat", ...extraArgs, message]);
 }
 
 // ---------------------------------------------------------------------------
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
-let mockConsoleLog: ReturnType<typeof vi.fn>;
-let mockConsoleError: ReturnType<typeof vi.fn>;
-let mockProcessExit: ReturnType<typeof vi.fn>;
+let stdoutWrites: string[];
+let stderrWrites: string[];
 
 beforeEach(() => {
-  mockProcessExit = vi.spyOn(process, "exit").mockImplementation((): never => {
-    throw new Error("process.exit");
-  }) as unknown as ReturnType<typeof vi.fn>;
+  stdoutWrites = [];
+  stderrWrites = [];
 
-  mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-  mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(process.stdout, "write").mockImplementation((c) => {
+    stdoutWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
+  vi.spyOn(process.stderr, "write").mockImplementation((c) => {
+    stderrWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
 
   mockRequest.mockReset();
   mockResolveProject.mockReset();
@@ -80,7 +86,7 @@ beforeEach(() => {
 
   mockOpenClient.mockResolvedValue({
     projectId: IDENTITY.id,
-    info: { port: 4000, token: "t", pid: 1234, version: "0.2.0" },
+    info: { port: 4000, token: "t", pid: 1234, version: "0.3.0" },
     request: mockRequest,
   });
 });
@@ -88,6 +94,18 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stdoutPlain(): string {
+  return stdoutWrites.map(stripAnsi).join("");
+}
+
+function stderrPlain(): string {
+  return stderrWrites.map(stripAnsi).join("");
+}
 
 // ===========================================================================
 // Happy path — response with action
@@ -113,12 +131,14 @@ describe("chat command — happy path with action", () => {
     expect(mockOpenClient).toHaveBeenCalledWith(IDENTITY.id);
     expect(mockRequest).toHaveBeenCalledWith("POST", "/chat", { message: "Add a login page" });
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("[graph_modification] I will add a login page.");
-    expect(mockConsoleLog).toHaveBeenCalledWith("  Action: add_node");
-    expect(mockConsoleLog).toHaveBeenCalledWith('    nodeId: "n3"');
-    expect(mockConsoleLog).toHaveBeenCalledWith('    title: "Login Page"');
-
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutPlain();
+    expect(plain).toContain("I will add a login page.");
+    expect(plain).toContain("graph_modification");
+    expect(plain).toContain("add_node");
+    expect(plain).toContain("nodeId");
+    expect(plain).toContain('"n3"');
+    expect(plain).toContain("title");
+    expect(plain).toContain('"Login Page"');
   });
 });
 
@@ -136,11 +156,11 @@ describe("chat command — happy path without action", () => {
 
     await runChat("How is the workflow?");
 
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      "[informational] The workflow is running smoothly.",
-    );
-    expect(mockConsoleLog).toHaveBeenCalledTimes(1);
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutPlain();
+    expect(plain).toContain("The workflow is running smoothly.");
+    expect(plain).toContain("informational");
+    // Only the response line should be written (no action lines)
+    expect(stdoutWrites).toHaveLength(1);
   });
 });
 
@@ -149,18 +169,18 @@ describe("chat command — happy path without action", () => {
 // ===========================================================================
 
 describe("chat command — connection error", () => {
-  it("should log error and exit(1) when openClient rejects", async () => {
+  it("should write error to stderr and set exitCode when openClient rejects", async () => {
     mockOpenClient.mockRejectedValue(
       new Error("Daemon is not running. Run 'loomflo start' first."),
     );
 
-    await expect(runChat("hello")).rejects.toThrow("process.exit");
+    await runChat("hello");
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: Daemon is not running. Run 'loomflo start' first.",
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("Daemon is not running");
+    expect(process.exitCode).toBe(1);
     expect(mockRequest).not.toHaveBeenCalled();
+    process.exitCode = undefined;
   });
 });
 
@@ -169,22 +189,26 @@ describe("chat command — connection error", () => {
 // ===========================================================================
 
 describe("chat command — request error", () => {
-  it("should log error and exit(1) when request throws", async () => {
+  it("should write error to stderr and set exitCode when request throws", async () => {
     mockRequest.mockRejectedValue(new Error("POST /chat -> HTTP 400"));
 
-    await expect(runChat("")).rejects.toThrow("process.exit");
+    await runChat("");
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Error: POST /chat -> HTTP 400");
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("POST /chat -> HTTP 400");
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
   });
 
-  it("should log error and exit(1) when request throws a network error", async () => {
+  it("should write error to stderr and set exitCode when request throws a network error", async () => {
     mockRequest.mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(runChat("hello")).rejects.toThrow("process.exit");
+    await runChat("hello");
 
-    expect(mockConsoleError).toHaveBeenCalledWith("Error: ECONNREFUSED");
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("ECONNREFUSED");
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
   });
 });
 
@@ -193,18 +217,18 @@ describe("chat command — request error", () => {
 // ===========================================================================
 
 describe("chat command — not a loomflo project", () => {
-  it("should log error and exit(1) when resolveProject rejects", async () => {
+  it("should write error to stderr and set exitCode when resolveProject rejects", async () => {
     mockResolveProject.mockRejectedValue(
       new Error("/tmp is not a loomflo project (no .loomflo/project.json found)."),
     );
 
-    await expect(runChat("hello")).rejects.toThrow("process.exit");
+    await runChat("hello");
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      "Error: /tmp is not a loomflo project (no .loomflo/project.json found).",
-    );
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrPlain();
+    expect(plain).toContain("not a loomflo project");
+    expect(process.exitCode).toBe(1);
     expect(mockOpenClient).not.toHaveBeenCalled();
     expect(mockRequest).not.toHaveBeenCalled();
+    process.exitCode = undefined;
   });
 });

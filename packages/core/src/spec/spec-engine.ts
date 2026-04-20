@@ -667,6 +667,7 @@ function createNodeFromDefinition(def: GraphNodeDefinition, defaultDelay: string
     cost: 0,
     startedAt: null,
     completedAt: null,
+    providerRetryState: null,
   };
 }
 

@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { join, resolve } from "node:path";
 import { withFileLock } from "@loomflo/core";
 
-export const MIN_DAEMON_VERSION = "0.2.0";
+export const MIN_DAEMON_VERSION = "0.3.0";
 const DAEMON_JSON_PATH = join(homedir(), ".loomflo", "daemon.json");
 const DAEMON_LOCK_PATH = join(homedir(), ".loomflo", "daemon.lock");
 const STARTUP_TIMEOUT_MS = 15_000;

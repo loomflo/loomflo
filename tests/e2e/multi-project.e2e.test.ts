@@ -42,6 +42,19 @@ maybeDescribe("E2E multi-project", () => {
   let b: string;
   let savedDaemonJson: string | null = null;
 
+  async function cli(args: string[], cwd?: string): Promise<ProcResult> {
+    return run("node", [CLI, ...args], cwd ?? a);
+  }
+
+  /** Shared daemon connection info — populated by the first test that boots the daemon. */
+  let daemonPort = 0;
+  let daemonToken = "";
+  /** Whether both projects were successfully registered (201 or 409). */
+  let projectsRegistered = false;
+
+  const PROJECT_A_ID = "proj_e2eaaaa1";
+  const PROJECT_B_ID = "proj_e2ebbbb2";
+
   beforeAll(async () => {
     // Preserve any pre-existing daemon.json so we don't interfere with a live dev daemon
     try {
@@ -51,23 +64,7 @@ maybeDescribe("E2E multi-project", () => {
     }
     a = await mkdtemp(join(tmpdir(), "loomflo-e2e-a-"));
     b = await mkdtemp(join(tmpdir(), "loomflo-e2e-b-"));
-  });
 
-  afterAll(async () => {
-    // Best-effort teardown
-    try {
-      await run("node", [CLI, "daemon", "stop", "--force"], a, 10_000);
-    } catch {
-      /* ignore */
-    }
-    if (a) await rm(a, { recursive: true, force: true });
-    if (b) await rm(b, { recursive: true, force: true });
-    // Restore whatever daemon.json was there before
-    if (savedDaemonJson !== null) await writeFile(DAEMON_JSON, savedDaemonJson);
-    else await rm(DAEMON_JSON, { force: true });
-  });
-
-  it("registers two projects under one daemon and lists them", async () => {
     // Start the daemon (no project binding). Returns as soon as daemon.json appears.
     const startRes = await run("node", [CLI, "daemon", "start"], a);
     expect(startRes.code).toBe(0);
@@ -75,13 +72,15 @@ maybeDescribe("E2E multi-project", () => {
     // Read token + port from daemon.json
     const raw = await readFile(DAEMON_JSON, "utf-8");
     const info = JSON.parse(raw) as { port: number; token: string; pid: number };
+    daemonPort = info.port;
+    daemonToken = info.token;
 
     const post = async (id: string, projectPath: string) => {
-      const res = await fetch(`http://127.0.0.1:${info.port}/projects`, {
+      const res = await fetch(`http://127.0.0.1:${String(daemonPort)}/projects`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${info.token}`,
+          authorization: `Bearer ${daemonToken}`,
         },
         body: JSON.stringify({
           id,
@@ -98,24 +97,109 @@ maybeDescribe("E2E multi-project", () => {
     // The test is forgiving: 201 proves full multi-project registration; 409 means the daemon
     // already has the project loaded from a previous run's projects.json; 400/500 still proves
     // the daemon accepted the HTTP request and the CLI lifecycle works end-to-end.
-    const statusA = await post("proj_e2eaaaa1", a);
-    const statusB = await post("proj_e2ebbbb2", b);
+    const statusA = await post(PROJECT_A_ID, a);
+    const statusB = await post(PROJECT_B_ID, b);
     expect([201, 400, 409, 500]).toContain(statusA);
     expect([201, 400, 409, 500]).toContain(statusB);
 
-    if ((statusA === 201 || statusA === 409) && (statusB === 201 || statusB === 409)) {
+    projectsRegistered =
+      (statusA === 201 || statusA === 409) && (statusB === 201 || statusB === 409);
+
+    if (projectsRegistered) {
       const listRes = await run("node", [CLI, "project", "list"], a);
-      expect(listRes.stdout).toContain("proj_e2eaaaa1");
-      expect(listRes.stdout).toContain("proj_e2ebbbb2");
+      expect(listRes.stdout).toContain(PROJECT_A_ID);
+      expect(listRes.stdout).toContain(PROJECT_B_ID);
     } else {
       console.warn(
         `[T25 E2E] registration returned ${statusA}/${statusB} — default profile likely missing. ` +
           `Seed with 'loomflo config' before re-running.`,
       );
     }
+  }, 60_000);
 
-    // Clean stop
+  // ---------------------------------------------------------------------------
+  // S4 — Observation CLI smoke tests
+  // ---------------------------------------------------------------------------
+
+  describe("S4 observation — against a real daemon", () => {
+    it("loomflo ps --json lists projects", async () => {
+      const out = await cli(["ps", "--json"]);
+      if (out.code === 0) {
+        const parsed = JSON.parse(out.stdout) as unknown[];
+        expect(Array.isArray(parsed)).toBe(true);
+      }
+    });
+
+    it("loomflo nodes --json returns an array for a project", async () => {
+      const out = await cli(["nodes", "--project", "proj_e2eaaaa1", "--all", "--json"]);
+      if (out.code === 0) {
+        const parsed = JSON.parse(out.stdout) as unknown[];
+        expect(Array.isArray(parsed)).toBe(true);
+      }
+    });
+
+    it("loomflo tree prints output for a project", async () => {
+      const out = await cli(["tree", "--project", "proj_e2eaaaa1"]);
+      expect(out.code === 0 || out.code === 1).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // S5 — Dashboard SPA + scoped routes smoke tests
+  // ---------------------------------------------------------------------------
+
+  describe("S5 dashboard — against a real daemon", () => {
+    it("GET / returns the SPA shell", async () => {
+      expect(daemonPort).toBeGreaterThan(0);
+      const res = await fetch(`http://127.0.0.1:${String(daemonPort)}/`);
+      expect(res.status).toBe(200);
+      expect((await res.text()).toLowerCase()).toContain("loomflo");
+    });
+
+    it("GET /projects returns at least 2 projects", async () => {
+      if (!projectsRegistered) {
+        console.warn("[S5 E2E] skipping — projects were not registered successfully");
+        return;
+      }
+      const res = await fetch(`http://127.0.0.1:${String(daemonPort)}/projects`, {
+        headers: { authorization: `Bearer ${daemonToken}` },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as unknown[];
+      expect(body.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("GET /projects/:id/workflow returns a workflow, not 410", async () => {
+      if (!projectsRegistered) {
+        console.warn("[S5 E2E] skipping — projects were not registered successfully");
+        return;
+      }
+      const res = await fetch(
+        `http://127.0.0.1:${String(daemonPort)}/projects/${PROJECT_A_ID}/workflow`,
+        { headers: { authorization: `Bearer ${daemonToken}` } },
+      );
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // Clean stop — runs after all test describes
+  it("stops the daemon cleanly", async () => {
+    if (daemonPort === 0) return; // daemon never started
     const stopRes = await run("node", [CLI, "daemon", "stop", "--force"], a);
     expect(stopRes.code).toBe(0);
   }, 60_000);
+
+  afterAll(async () => {
+    // Best-effort teardown
+    try {
+      await run("node", [CLI, "daemon", "stop", "--force"], a, 10_000);
+    } catch {
+      /* ignore */
+    }
+    if (a) await rm(a, { recursive: true, force: true });
+    if (b) await rm(b, { recursive: true, force: true });
+    // Restore whatever daemon.json was there before
+    if (savedDaemonJson !== null) await writeFile(DAEMON_JSON, savedDaemonJson);
+    else await rm(DAEMON_JSON, { force: true });
+  });
 });

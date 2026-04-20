@@ -8,17 +8,15 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import type { ReactElement } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import type {
-  AgentRole,
-  AgentStatus as AgentStatusType,
   Event,
+  Node,
   NodeStatus,
   ReviewReport as ReviewReportData,
 } from "../lib/types.js";
-import type { NodeDetailResponse } from "../lib/api.js";
-import { apiClient, ApiError } from "../lib/api.js";
+import { useProject, useProjectId } from "../context/ProjectContext.js";
 import { AgentStatusCard } from "../components/AgentStatus.js";
 import { LogStream } from "../components/LogStream.js";
 import { ReviewReport } from "../components/ReviewReport.js";
@@ -81,28 +79,26 @@ function formatUsd(value: number): string {
  * file ownership table, event log via {@link LogStream}, and review report
  * via {@link ReviewReport}.
  *
- * Reads the node ID from URL params and the auth token from the `?token=`
- * query parameter. Subscribes to WebSocket events (`agent_status`,
- * `node_status`, `cost_update`, `review_verdict`) filtered by the
- * current node ID for real-time updates.
+ * Reads the project ID and node ID from URL params. Subscribes to WebSocket
+ * events (`agent_status`, `node_status`, `cost_update`, `review_verdict`)
+ * filtered by the current node ID for real-time updates.
  *
  * @returns Rendered node detail page element.
  */
-export const NodePage = memo(function NodePage(): ReactElement {
+export const NodePage = memo(function NodePage(): ReactElement | null {
+  const projectId = useProjectId();
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  if (id === undefined) return null;
+  const { client, baseUrl, token } = useProject();
 
-  const { subscribe } = useWebSocket(token);
-
-  const [node, setNode] = useState<NodeDetailResponse | null>(null);
+  const [node, setNode] = useState<Node | null>(null);
   const [review, setReview] = useState<ReviewReportData | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // --------------------------------------------------------------------------
-  // Refetch callbacks (used by WS handlers — no loading state change)
+  // Refetch callbacks (used by WS handlers -- no loading state change)
   // --------------------------------------------------------------------------
 
   /**
@@ -110,142 +106,125 @@ export const NodePage = memo(function NodePage(): ReactElement {
    * Silently ignores errors to avoid disrupting the UI on transient failures.
    */
   const refetchNode = useCallback(async (): Promise<void> => {
-    if (!id) return;
+    if (!id || !projectId) return;
     try {
-      const data = await apiClient.getNode(id);
+      const data = await client.getNode(projectId, id);
       setNode(data);
     } catch {
       // Silently ignore refetch errors
     }
-  }, [id]);
+  }, [client, projectId, id]);
 
   /**
-   * Refetch review report from the REST API.
-   * A 404 is expected when no review exists yet and is silently ignored.
+   * Refetch review report from the node data (reviewReport field).
    */
   const refetchReview = useCallback(async (): Promise<void> => {
-    if (!id) return;
+    if (!id || !projectId) return;
     try {
-      const data = await apiClient.getNodeReview(id);
-      setReview(data);
+      const data = await client.getNode(projectId, id);
+      setReview(data.reviewReport);
     } catch {
-      // 404 is expected when no review exists
+      // Silently ignore -- review may not exist yet
     }
-  }, [id]);
+  }, [client, projectId, id]);
 
   /**
    * Refetch events filtered by node ID from the REST API.
    * Silently ignores errors to avoid disrupting the log stream display.
    */
   const refetchEvents = useCallback(async (): Promise<void> => {
-    if (!id) return;
+    if (!id || !projectId) return;
     try {
-      const data = await apiClient.getEvents({ nodeId: id });
-      setEvents(data.events);
+      const data = await client.getEvents(projectId, { type: undefined, limit: undefined, offset: undefined });
+      // Filter events by nodeId client-side since the new API may not support nodeId filtering
+      setEvents(data.filter((e) => e.nodeId === id));
     } catch {
       // Silently ignore refetch errors
     }
-  }, [id]);
+  }, [client, projectId, id]);
 
   // --------------------------------------------------------------------------
   // Initial data load
   // --------------------------------------------------------------------------
 
   useEffect((): void => {
-    if (!id) return;
+    if (!id || !projectId) return;
 
     const load = async (): Promise<void> => {
       setLoading(true);
       setError(null);
 
-      const [nodeResult, reviewResult, eventsResult] = await Promise.allSettled([
-        apiClient.getNode(id),
-        apiClient.getNodeReview(id),
-        apiClient.getEvents({ nodeId: id }),
+      const [nodeResult, eventsResult] = await Promise.allSettled([
+        client.getNode(projectId, id),
+        client.getEvents(projectId),
       ]);
 
       if (nodeResult.status === "fulfilled") {
         setNode(nodeResult.value);
+        setReview(nodeResult.value.reviewReport);
       } else {
         const reason = nodeResult.reason as unknown;
-        if (reason instanceof ApiError && reason.status === 404) {
+        if (reason instanceof Error && reason.message.includes("404")) {
           setError("Node not found");
         } else {
           setError(reason instanceof Error ? reason.message : "Failed to fetch node");
         }
       }
 
-      if (reviewResult.status === "fulfilled") {
-        setReview(reviewResult.value);
-      }
-
       if (eventsResult.status === "fulfilled") {
-        setEvents(eventsResult.value.events);
+        setEvents(eventsResult.value.filter((e) => e.nodeId === id));
       }
 
       setLoading(false);
     };
 
     void load();
-  }, [id]);
+  }, [client, projectId, id]);
 
   // --------------------------------------------------------------------------
   // WebSocket subscriptions
   // --------------------------------------------------------------------------
 
-  useEffect((): (() => void) => {
-    const unsubs: (() => void)[] = [];
+  useWebSocket({
+    baseUrl,
+    token,
+    subscribe: { projectIds: [projectId] },
+    onMessage: (frame): void => {
+      const type = frame["type"] as string | undefined;
+      const frameNodeId = frame["nodeId"] as string | undefined;
 
-    unsubs.push(
-      subscribe("node_status", (event): void => {
-        if (event.nodeId === id) {
-          void refetchNode();
-          void refetchEvents();
-          if (event.status === "review" || event.status === "done") {
-            void refetchReview();
-          }
-        }
-      }),
-    );
+      if (frameNodeId !== id) return;
 
-    unsubs.push(
-      subscribe("agent_status", (event): void => {
-        if (event.nodeId === id) {
-          void refetchNode();
-          void refetchEvents();
-        }
-      }),
-    );
-
-    unsubs.push(
-      subscribe("cost_update", (event): void => {
-        if (event.nodeId === id) {
-          void refetchNode();
-        }
-      }),
-    );
-
-    unsubs.push(
-      subscribe("review_verdict", (event): void => {
-        if (event.nodeId === id) {
+      if (type === "node_status") {
+        void refetchNode();
+        void refetchEvents();
+        const status = frame["status"] as string;
+        if (status === "review" || status === "done") {
           void refetchReview();
-          void refetchEvents();
         }
-      }),
-    );
-
-    return (): void => {
-      for (const unsub of unsubs) {
-        unsub();
       }
-    };
-  }, [id, subscribe, refetchNode, refetchReview, refetchEvents]);
+
+      if (type === "agent_status") {
+        void refetchNode();
+        void refetchEvents();
+      }
+
+      if (type === "cost_update") {
+        void refetchNode();
+      }
+
+      if (type === "review_verdict") {
+        void refetchReview();
+        void refetchEvents();
+      }
+    },
+  });
 
   // --------------------------------------------------------------------------
   // Derived values
   // --------------------------------------------------------------------------
 
-  const backUrl = token ? `/graph?token=${encodeURIComponent(token)}` : "/graph";
+  const backUrl = `/projects/${encodeURIComponent(projectId)}/graph`;
 
   // --------------------------------------------------------------------------
   // Loading state
@@ -372,8 +351,8 @@ export const NodePage = memo(function NodePage(): ReactElement {
               <AgentStatusCard
                 key={agent.id}
                 id={agent.id}
-                role={agent.role as AgentRole}
-                status={agent.status as AgentStatusType}
+                role={agent.role}
+                status={agent.status}
                 taskDescription={agent.taskDescription}
                 tokenUsage={agent.tokenUsage}
                 cost={agent.cost}
