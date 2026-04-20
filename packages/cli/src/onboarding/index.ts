@@ -101,7 +101,7 @@ export async function runWizard(input: WizardInput): Promise<WizardResult> {
   process.stdout.write(`${renderSummary({ projectName: input.projectName ?? "this project", answers })}\n\n`);
   const confirmed = flags.nonInteractive
     ? true
-    : await prompt.confirm({ message: "Start project?", default: true });
+    : await prompt.confirm({ message: "Save configuration?", default: true });
 
   return { answers, providerProfileId, confirmed };
 }

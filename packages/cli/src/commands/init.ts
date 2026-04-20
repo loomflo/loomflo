@@ -20,13 +20,13 @@ interface InitDeps {
   fetchProject: (info: DaemonInfo, id: string) => Promise<{ id: string; name: string } | null>;
   postProject: (
     info: DaemonInfo,
-    body: { id: string; name: string; projectPath: string; providerProfileId: string },
+    body: {
+      id: string;
+      name: string;
+      projectPath: string;
+      providerProfileId: string;
+    },
   ) => Promise<{ id: string; name: string }>;
-  initWorkflow: (
-    info: DaemonInfo,
-    projectId: string,
-    body: { projectPath: string; config?: Record<string, unknown> },
-  ) => Promise<{ id: string; status: string }>;
 }
 
 interface InitFlags {
@@ -67,23 +67,11 @@ function defaultDeps(): InitDeps {
         headers: { "content-type": "application/json", authorization: `Bearer ${info.token}` },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`register failed: HTTP ${String(res.status)}`);
-      return (await res.json()) as { id: string; name: string };
-    },
-    initWorkflow: async (info, projectId, body) => {
-      const res = await fetch(
-        `http://127.0.0.1:${String(info.port)}/projects/${projectId}/workflow/init`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${info.token}` },
-          body: JSON.stringify(body),
-        },
-      );
       if (!res.ok) {
         const err = (await res.json().catch(() => ({ error: "unknown" }))) as { error?: string };
-        throw new Error(err.error ?? `HTTP ${String(res.status)}`);
+        throw new Error(err.error ?? `register failed: HTTP ${String(res.status)}`);
       }
-      return (await res.json()) as { id: string; status: string };
+      return (await res.json()) as { id: string; name: string };
     },
   };
 }
@@ -212,7 +200,12 @@ export function createInitCommand(): Command {
         // chmod afterwards so a re-run tightens an existing 0644 file.
         await chmod(configFile, 0o600);
 
-        // Register + init workflow.
+        // Register the project with the daemon. The onboarding wizard only
+        // configures the project (provider + settings); the spec-generation
+        // workflow is kicked off later via `loomflo chat "<description>"`
+        // because it needs a natural-language description of what to build.
+        // The daemon's registerProject reads config from .loomflo/config.json
+        // directly (already written above), so no overrides need to be sent.
         const deps = defaultDeps();
         const info = await deps.ensureDaemon();
         const summary = (await deps.fetchProject(info, identity.id)) ?? (await deps.postProject(info, {
@@ -221,17 +214,6 @@ export function createInitCommand(): Command {
           projectPath: cwd,
           providerProfileId: result.providerProfileId,
         }));
-        const advancedConfig = result.answers.advanced as Record<string, unknown> | undefined;
-        const config: Record<string, unknown> = {
-          ...(advancedConfig ?? {}),
-          budgetLimit: result.answers.budgetLimit,
-          defaultDelay: result.answers.defaultDelay,
-          retryDelay: result.answers.retryDelay,
-          validatorRetryDelay: result.answers.validatorRetryDelay,
-          validatorMaxAttempts: result.answers.validatorMaxAttempts,
-          level: result.answers.level,
-        };
-        await deps.initWorkflow(info, identity.id, { projectPath: cwd, config });
 
         if (json) {
           writeJson({
