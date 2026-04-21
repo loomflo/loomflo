@@ -75,7 +75,16 @@ function defaultDeps(): StartDeps {
         },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`register failed: HTTP ${String(res.status)}`);
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+          details?: unknown;
+        };
+        const code = err.error ?? `HTTP ${String(res.status)}`;
+        const detail = err.message ?? (err.details ? JSON.stringify(err.details) : undefined);
+        throw new Error(detail ? `${code}: ${detail}` : code);
+      }
       return (await res.json()) as { id: string; status: string };
     },
   };
@@ -141,7 +150,7 @@ export function createStartCommand(): Command {
         );
       } catch (err) {
         sp?.fail();
-        writeError(options, err instanceof Error ? err.message : String(err), "E_START");
+        writeError(options, err instanceof Error ? err.message : String(err), "E_START", err);
         process.exitCode = 1;
       }
     });

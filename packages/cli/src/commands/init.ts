@@ -68,8 +68,14 @@ function defaultDeps(): InitDeps {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({ error: "unknown" }))) as { error?: string };
-        throw new Error(err.error ?? `register failed: HTTP ${String(res.status)}`);
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+          details?: unknown;
+        };
+        const code = err.error ?? `HTTP ${String(res.status)}`;
+        const detail = err.message ?? (err.details ? JSON.stringify(err.details) : undefined);
+        throw new Error(detail ? `${code}: ${detail}` : code);
       }
       return (await res.json()) as { id: string; name: string };
     },
@@ -228,7 +234,7 @@ export function createInitCommand(): Command {
           `${theme.line(theme.glyph.check, "accent", `project ${theme.muted(summary.name)} ready`, identity.id)}\n`,
         );
       } catch (err) {
-        writeError(opts, err instanceof Error ? err.message : String(err), "E_INIT");
+        writeError(opts, err instanceof Error ? err.message : String(err), "E_INIT", err);
         process.exitCode = 1;
       }
     });

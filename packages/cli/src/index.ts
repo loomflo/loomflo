@@ -34,7 +34,14 @@ function createProgram(): Command {
     .name("loomflo")
     .description("AI Agent Orchestration Framework")
     .version("0.3.0")
-    .enablePositionalOptions();
+    .enablePositionalOptions()
+    .option("--debug", "Print stack traces on error and hint at the daemon log path");
+
+  program.hook("preAction", (thisCmd) => {
+    if (thisCmd.opts()["debug"] === true) {
+      process.env["LOOMFLO_DEBUG"] = "1";
+    }
+  });
 
   // Implemented commands
   program.addCommand(createInitCommand());
