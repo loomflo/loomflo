@@ -5,6 +5,7 @@ import { LoomAgent } from "../../agents/loom.js";
 import type { ChatResult, ChatMessageCategory } from "../../agents/loom.js";
 import type { GraphModification } from "../../agents/escalation.js";
 import type { ProjectRuntime } from "../../daemon-types.js";
+import { saveWorkflowState } from "../../persistence/state.js";
 import type { Node, Workflow } from "../../types.js";
 import { WorkflowGraph } from "../../workflow/graph.js";
 
@@ -34,6 +35,12 @@ export interface ChatRoutesOptions {
   getWorkflow?: () => Workflow | null;
   /** Persist an updated workflow (used by the legacy / unit-test path). */
   setWorkflow?: (workflow: Workflow) => void;
+  /**
+   * Persist the workflow to disk. Defaults to
+   * {@link saveWorkflowState} in production. Primarily overridden in tests
+   * to assert the persistence call without touching disk.
+   */
+  persistWorkflow?: (projectPath: string, workflow: Workflow) => Promise<void>;
 }
 
 /** Shape of the POST /chat JSON response. */
@@ -117,6 +124,7 @@ interface ResolvedChatServices {
   addToHistory: (entry: ChatHistoryEntry) => void;
   getWorkflow: () => Workflow | null;
   setWorkflow: (workflow: Workflow) => void;
+  persistWorkflow: (projectPath: string, workflow: Workflow) => Promise<void>;
   runtime: ProjectRuntime | undefined;
 }
 
@@ -129,6 +137,10 @@ function resolveChatServices(
   options: ChatRoutesOptions,
 ): ResolvedChatServices {
   const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+
+  const persistWorkflow =
+    options.persistWorkflow ??
+    ((projectPath: string, wf: Workflow): Promise<void> => saveWorkflowState(projectPath, wf));
 
   if (rt) {
     const state = getOrCreateRuntimeState(rt);
@@ -147,6 +159,7 @@ function resolveChatServices(
       setWorkflow: (wf: Workflow): void => {
         rt.workflow = wf;
       },
+      persistWorkflow,
       runtime: rt,
     };
   }
@@ -157,6 +170,7 @@ function resolveChatServices(
     addToHistory: options.addToHistory ?? ((): void => undefined),
     getWorkflow: options.getWorkflow ?? ((): Workflow | null => null),
     setWorkflow: options.setWorkflow ?? ((): void => undefined),
+    persistWorkflow,
     runtime: undefined,
   };
 }
@@ -343,7 +357,14 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
 
       const { message } = parseResult.data;
       const services = resolveChatServices(request, options);
-      const { handleChat, addToHistory, getWorkflow, setWorkflow, runtime } = services;
+      const {
+        handleChat,
+        addToHistory,
+        getWorkflow,
+        setWorkflow,
+        persistWorkflow,
+        runtime,
+      } = services;
 
       if (!handleChat) {
         await reply.code(501).send({ error: "Chat not configured for this project" });
@@ -367,11 +388,14 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
       // Persist graph_modified actions so `loomflo status` reflects chat-driven
       // changes. Scaffolds a single-node workflow when `add_node` is returned
       // against a project with no active workflow, otherwise mutates the
-      // existing graph in-place.
+      // existing graph in-place. The updated workflow is also written to disk
+      // (matching the /workflow/start and /workflow/pause persistence pattern)
+      // so chat-seeded workflows survive a daemon restart.
       if (result.modification !== null && result.modification.action !== "no_action") {
+        let updated: Workflow | null = null;
         try {
           const current = getWorkflow();
-          const updated = applyChatModification(current, result.modification, {
+          updated = applyChatModification(current, result.modification, {
             projectPath: runtime?.projectPath ?? current?.projectPath ?? "",
             defaultDelay: runtime?.config.defaultDelay ?? current?.config.defaultDelay ?? "0",
             description: current?.description ?? message,
@@ -383,11 +407,23 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
               updated.config = runtime.config;
             }
             setWorkflow(updated);
+          } else {
+            // No in-memory change, so nothing to persist.
+            updated = null;
           }
         } catch {
-          // Non-fatal: chat response is still returned even if the graph
-          // mutation fails. The error bubbles up via the graph library's
-          // exception and would otherwise mask the assistant reply.
+          // Applier failure (e.g. cycle, duplicate node) — the in-memory
+          // state was not mutated, so there's nothing to persist either.
+          updated = null;
+        }
+
+        if (updated !== null && updated.projectPath.length > 0) {
+          // Matches /workflow/start and /workflow/pause: await the write and
+          // let any failure propagate as a 5xx. The in-memory state stays
+          // updated; the client is expected to retry. Skipping when
+          // projectPath is empty keeps the legacy/unit-test path — which
+          // supplies neither `request.runtime` nor a projectPath — working.
+          await persistWorkflow(updated.projectPath, updated);
         }
       }
 

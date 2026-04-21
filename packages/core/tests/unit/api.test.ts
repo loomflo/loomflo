@@ -917,6 +917,126 @@ describe("chat routes (graph_modified persistence)", () => {
 
     expect(runtime.workflow?.graph.nodes["node-a"]?.instructions).toBe("new instructions");
   });
+
+  it("persists the scaffolded workflow to disk via saveWorkflowState", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Scaffolding.",
+      category: "graph_change",
+      modification: {
+        action: "add_node",
+        newNode: { title: "Bootstrap", instructions: "set up repo" },
+        reason: "kickstart project",
+      },
+    });
+
+    vi.mocked(saveWorkflowState).mockClear();
+    vi.mocked(saveWorkflowState).mockResolvedValue(undefined);
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "scaffold the project" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(vi.mocked(saveWorkflowState)).toHaveBeenCalledTimes(1);
+    const [savedPath, savedWorkflow] = vi.mocked(saveWorkflowState).mock.calls[0] as [
+      string,
+      Workflow,
+    ];
+    expect(savedPath).toBe("/test/project");
+    expect(savedWorkflow.id).toBe(runtime.workflow?.id);
+    expect(Object.values(savedWorkflow.graph.nodes)).toHaveLength(1);
+    expect(Object.values(savedWorkflow.graph.nodes)[0]?.title).toBe("Bootstrap");
+  });
+
+  it("does not call saveWorkflowState on no_action", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Nothing to do.",
+      category: "question",
+      modification: { action: "no_action", reason: "just chatting" },
+    });
+
+    vi.mocked(saveWorkflowState).mockClear();
+    vi.mocked(saveWorkflowState).mockResolvedValue(undefined);
+
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "how is it going?" },
+    });
+
+    expect(vi.mocked(saveWorkflowState)).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when saveWorkflowState rejects (matches /workflow/start)", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Scaffolding.",
+      category: "graph_change",
+      modification: {
+        action: "add_node",
+        newNode: { title: "Boot", instructions: "x" },
+        reason: "y",
+      },
+    });
+
+    vi.mocked(saveWorkflowState).mockClear();
+    vi.mocked(saveWorkflowState).mockRejectedValue(new Error("ENOSPC"));
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "scaffold" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    // In-memory state is still updated — matches the /workflow/pause and
+    // /workflow/start behavior, where setWorkflow runs before the await.
+    expect(runtime.workflow).not.toBeNull();
+  });
+
+  it("saved workflow round-trips: re-hydrating from the persisted payload matches in-memory state", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Scaffolding.",
+      category: "graph_change",
+      modification: {
+        action: "add_node",
+        newNode: { title: "Install deps", instructions: "pnpm install" },
+        reason: "kickstart",
+      },
+    });
+
+    let captured: Workflow | null = null;
+    vi.mocked(saveWorkflowState).mockImplementation(
+      async (_path: string, wf: Workflow): Promise<void> => {
+        // Simulate disk round-trip via JSON.
+        captured = JSON.parse(JSON.stringify(wf)) as Workflow;
+      },
+    );
+
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "please start" },
+    });
+
+    // Simulate daemon restart: clear in-memory state, then re-hydrate from
+    // the persisted payload.
+    expect(captured).not.toBeNull();
+    const rehydrated = captured as unknown as Workflow;
+    runtime.workflow = null;
+    runtime.workflow = rehydrated;
+
+    expect(runtime.workflow?.status).toBe("building");
+    const nodes = Object.values(runtime.workflow?.graph.nodes ?? {});
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.title).toBe("Install deps");
+    expect(nodes[0]?.status).toBe("pending");
+  });
 });
 
 // ===========================================================================
