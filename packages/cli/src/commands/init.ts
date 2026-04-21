@@ -1,5 +1,6 @@
 // packages/cli/src/commands/init.ts
 import { Command } from "commander";
+import { editor } from "@inquirer/prompts";
 import { chmod, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -10,6 +11,12 @@ import { WizardFlagsSchema } from "../onboarding/types.js";
 import { isJsonMode, withJsonSupport, writeError, writeJson } from "../output.js";
 import { resolveProject } from "../project-resolver.js";
 import { theme } from "../theme/index.js";
+import { printLogo } from "../theme/logo.js";
+import {
+  defaultWorkflowInitDeps,
+  runWorkflowInit,
+  type WorkflowInitDeps,
+} from "../workflow-init.js";
 
 // ============================================================================
 // Types
@@ -44,6 +51,8 @@ interface InitFlags {
   yes?: boolean;
   nonInteractive?: boolean;
   json?: boolean;
+  description?: string;
+  skipWorkflow?: boolean;
 }
 
 // ============================================================================
@@ -86,7 +95,7 @@ function defaultDeps(): InitDeps {
 // Commander wrapper
 // ============================================================================
 
-export function createInitCommand(): Command {
+export function createInitCommand(workflowDeps?: WorkflowInitDeps): Command {
   const cmd = new Command("init")
     .description("Initialise a loomflo project (interactive onboarding wizard)")
     .option("--project-path <path>", "Project directory path")
@@ -102,10 +111,18 @@ export function createInitCommand(): Command {
     .option("--advanced", "Prompt for advanced settings", false)
     .option("--yes", "Skip the final confirmation", false)
     .option("--non-interactive", "Fail instead of prompting when values are missing", false)
+    .option("--description <text>", "Workflow description (skips the final workflow prompt)")
+    .option("--skip-workflow", "Skip the workflow-seeding prompt at the end of init", false)
     .action(async (opts: InitFlags): Promise<void> => {
       const json = isJsonMode(opts);
       const nonTty = !process.stdin.isTTY;
       const inferNonInteractive = nonTty || process.env["CI"] === "true";
+      const interactive = !(opts.nonInteractive === true || inferNonInteractive) && !json;
+
+      // Splash: show the LOOMFLO logo only in interactive mode.
+      if (interactive) {
+        printLogo();
+      }
       const flags = WizardFlagsSchema.parse({
         provider: opts.provider,
         profile: opts.profile,
@@ -221,18 +238,115 @@ export function createInitCommand(): Command {
           providerProfileId: result.providerProfileId,
         }));
 
+        if (!json) {
+          process.stdout.write(
+            `${theme.line(theme.glyph.check, "accent", `project ${theme.muted(summary.name)} ready`, identity.id)}\n`,
+          );
+        }
+
+        // -----------------------------------------------------------------
+        // Workflow seeding (change 2)
+        // -----------------------------------------------------------------
+        //
+        // Resolve the workflow description based on mode:
+        //   * --skip-workflow        → skip entirely
+        //   * --description provided → run straight through
+        //   * interactive            → confirm + inquirer editor
+        //   * non-interactive        → fail (explicit opt-in required)
+        let workflowSummary:
+          | { id: string; status: string; nodeCount: number }
+          | null = null;
+
+        const runWorkflowStep = async (description: string): Promise<void> => {
+          const sp = interactive ? theme.spinner("generating spec…") : null;
+          sp?.start();
+          try {
+            const wf = await runWorkflowInit(
+              { info, projectId: identity.id, projectPath: cwd, description },
+              workflowDeps ?? defaultWorkflowInitDeps(),
+            );
+            sp?.succeed();
+            workflowSummary = wf;
+            if (!json) {
+              process.stdout.write(
+                `${theme.line(
+                  theme.glyph.check,
+                  "accent",
+                  `workflow ${theme.muted(wf.id)} ready`,
+                  `${String(wf.nodeCount)} nodes`,
+                )}\n`,
+              );
+              process.stdout.write(
+                `${theme.line(theme.glyph.arrow, "muted", "run loomflo start to execute")}\n`,
+              );
+            }
+          } catch (wfErr) {
+            sp?.fail();
+            throw wfErr;
+          }
+        };
+
+        if (opts.skipWorkflow === true) {
+          if (!json) {
+            process.stdout.write(
+              `${theme.line(
+                theme.glyph.arrow,
+                "muted",
+                'run loomflo workflow init "<description>" later to seed a workflow.',
+              )}\n`,
+            );
+          }
+        } else if (typeof opts.description === "string" && opts.description.length > 0) {
+          await runWorkflowStep(opts.description);
+        } else if (!interactive) {
+          throw Object.assign(
+            new Error(
+              "non-interactive init requires --description \"<text>\" or --skip-workflow",
+            ),
+            { code: "E_INIT" },
+          );
+        } else {
+          const proceed = await inquirerBackend.confirm({
+            message: "Lancer la spec generation maintenant ?",
+            default: true,
+          });
+          if (!proceed) {
+            process.stdout.write(
+              `${theme.line(
+                theme.glyph.arrow,
+                "muted",
+                'run loomflo workflow init "<description>" later to seed a workflow.',
+              )}\n`,
+            );
+          } else {
+            const description = await editor({
+              message: "Décris le workflow que tu veux générer",
+              waitForUseInput: false,
+            });
+            const trimmed = description.trim();
+            if (trimmed.length === 0) {
+              process.stdout.write(
+                `${theme.line(
+                  theme.glyph.warn,
+                  "warn",
+                  "empty description — skipping workflow seeding",
+                )}\n`,
+              );
+            } else {
+              await runWorkflowStep(trimmed);
+            }
+          }
+        }
+
         if (json) {
           writeJson({
             project: { id: identity.id, name: summary.name },
             providerProfileId: result.providerProfileId,
             config: result.answers,
+            workflow: workflowSummary,
           });
           return;
         }
-
-        process.stdout.write(
-          `${theme.line(theme.glyph.check, "accent", `project ${theme.muted(summary.name)} ready`, identity.id)}\n`,
-        );
       } catch (err) {
         writeError(opts, err instanceof Error ? err.message : String(err), "E_INIT", err);
         process.exitCode = 1;

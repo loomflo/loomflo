@@ -55,7 +55,7 @@ beforeEach(async () => {
 describe("loomflo init", () => {
   it("runs the wizard and writes project.json with the chosen profile", async () => {
     const { createInitCommand } = await import("../../../src/commands/init.js");
-    await createInitCommand().parseAsync(["node", "init"]);
+    await createInitCommand().parseAsync(["node", "init", "--skip-workflow"]);
     const raw = await readFile(join(tmp, ".loomflo", "project.json"), "utf-8");
     const parsed = JSON.parse(raw) as { providerProfileId: string };
     expect(parsed.providerProfileId).toBe("default");
@@ -63,7 +63,7 @@ describe("loomflo init", () => {
 
   it("writes project.json with 0600 mode (P0-3)", async () => {
     const { createInitCommand } = await import("../../../src/commands/init.js");
-    await createInitCommand().parseAsync(["node", "init"]);
+    await createInitCommand().parseAsync(["node", "init", "--skip-workflow"]);
     const projectFile = join(tmp, ".loomflo", "project.json");
     const mode = (await stat(projectFile)).mode & 0o777;
     expect(mode).toBe(0o600);
@@ -75,14 +75,14 @@ describe("loomflo init", () => {
       mode: 0o644,
     });
     const { createInitCommand } = await import("../../../src/commands/init.js");
-    await createInitCommand().parseAsync(["node", "init"]);
+    await createInitCommand().parseAsync(["node", "init", "--skip-workflow"]);
     const mode = (await stat(projectFile)).mode & 0o777;
     expect(mode).toBe(0o600);
   });
 
   it("writes config.json with 0600 mode (R5)", async () => {
     const { createInitCommand } = await import("../../../src/commands/init.js");
-    await createInitCommand().parseAsync(["node", "init"]);
+    await createInitCommand().parseAsync(["node", "init", "--skip-workflow"]);
     const configFile = join(tmp, ".loomflo", "config.json");
     const mode = (await stat(configFile)).mode & 0o777;
     expect(mode).toBe(0o600);
@@ -92,7 +92,7 @@ describe("loomflo init", () => {
     const { runWizard } = await import("../../../src/onboarding/index.js");
     (runWizard as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ confirmed: false, providerProfileId: "default", answers: {} });
     const { createInitCommand } = await import("../../../src/commands/init.js");
-    await createInitCommand().parseAsync(["node", "init"]);
+    await createInitCommand().parseAsync(["node", "init", "--skip-workflow"]);
     expect(process.exitCode).toBe(1);
   });
 });

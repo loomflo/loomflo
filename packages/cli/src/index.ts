@@ -18,6 +18,7 @@ import { createStatusCommand } from "./commands/status.js";
 import { createStopCommand } from "./commands/stop.js";
 import { createTreeCommand } from "./commands/tree.js";
 import { createWatchCommand } from "./commands/watch.js";
+import { createWorkflowCommand } from "./commands/workflow.js";
 
 /**
  * Create and configure the loomflo CLI program.
@@ -61,6 +62,7 @@ function createProgram(): Command {
   program.addCommand(createInspectCommand());
   program.addCommand(createTreeCommand());
   program.addCommand(createWatchCommand());
+  program.addCommand(createWorkflowCommand());
 
   return program;
 }

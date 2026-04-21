@@ -88,7 +88,7 @@ afterEach(async () => {
 describe("loomflo init — themed output", () => {
   it("prints check-line for project ready", async () => {
     const cmd = createInitCommand();
-    await cmd.parseAsync(["node", "init"]);
+    await cmd.parseAsync(["node", "init", "--skip-workflow"]);
     const plain = stdoutWrites.map(stripAnsi).join("");
     expect(plain).toContain("\u2713");
     expect(plain).toContain("project");
@@ -99,7 +99,7 @@ describe("loomflo init — themed output", () => {
 describe("loomflo init --json", () => {
   it("prints JSON with project and config info", async () => {
     const cmd = createInitCommand();
-    await cmd.parseAsync(["node", "init", "--json"]);
+    await cmd.parseAsync(["node", "init", "--json", "--skip-workflow"]);
     const raw = stdoutWrites.join("").trim();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     expect(parsed).toHaveProperty("project");
