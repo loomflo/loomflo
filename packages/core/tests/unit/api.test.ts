@@ -702,6 +702,224 @@ describe("chat routes (runtime-scoped)", () => {
 });
 
 // ===========================================================================
+// Chat routes — graph_modified persistence (piste 1)
+// ===========================================================================
+
+/**
+ * When LoomAgent returns a graph_modified action, the chat handler must
+ * persist the modification so `loomflo status` reflects the new graph.
+ * Previously the modification was returned to the client but never
+ * applied to rt.workflow, so `GET /workflow` continued to report null.
+ */
+describe("chat routes (graph_modified persistence)", () => {
+  let server: FastifyInstance;
+  let handleChatMock: ReturnType<typeof vi.fn>;
+  let runtime: {
+    id: string;
+    projectPath: string;
+    workflow: Workflow | null;
+    config: typeof DEFAULT_CONFIG;
+    [k: string]: unknown;
+  };
+
+  beforeEach(async () => {
+    handleChatMock = vi.fn();
+    vi.mocked(LoomAgent).mockImplementation(
+      () =>
+        ({ handleChat: handleChatMock }) as unknown as InstanceType<typeof LoomAgent>,
+    );
+
+    runtime = {
+      id: "proj-1",
+      name: "test",
+      projectPath: "/test/project",
+      providerProfileId: "default",
+      workflow: null,
+      provider: { complete: vi.fn() } as unknown,
+      config: { ...DEFAULT_CONFIG },
+      costTracker: {} as unknown,
+      messageBus: {} as unknown,
+      sharedMemory: {} as unknown,
+      startedAt: "2026-03-24T00:00:00.000Z",
+      status: "idle",
+    };
+
+    server = Fastify();
+    addAuthHook(server);
+    server.addHook("preValidation", async (req: FastifyRequest): Promise<void> => {
+      (req as FastifyRequest & { runtime?: unknown }).runtime = runtime;
+    });
+    await server.register(chatRoutes({}));
+    await server.ready();
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  it("scaffolds a workflow from add_node when rt.workflow is null", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Adding an auth node.",
+      category: "graph_change",
+      modification: {
+        action: "add_node",
+        newNode: { title: "Auth", instructions: "Add bcrypt hashing" },
+        reason: "user requested auth",
+      },
+    });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "add a node that handles auth" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body: Record<string, unknown> = res.json();
+    expect((body.action as { type: string }).type).toBe("graph_modified");
+
+    // Runtime.workflow must no longer be null.
+    expect(runtime.workflow).not.toBeNull();
+    expect(runtime.workflow?.status).toBe("building");
+    const nodes = Object.values(runtime.workflow?.graph.nodes ?? {});
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.title).toBe("Auth");
+    expect(nodes[0]?.status).toBe("pending");
+  });
+
+  it("applies add_node to an existing workflow and wires insertAfter", async () => {
+    const existingNode: Node = {
+      id: "node-existing",
+      title: "Setup",
+      status: "done",
+      instructions: "Initial setup",
+      delay: "0",
+      resumeAt: null,
+      agents: [],
+      fileOwnership: {},
+      retryCount: 0,
+      maxRetries: 3,
+      reviewReport: null,
+      cost: 0,
+      startedAt: null,
+      completedAt: null,
+      providerRetryState: null,
+    };
+    runtime.workflow = {
+      id: "wf-existing",
+      status: "building",
+      description: "existing",
+      projectPath: "/test/project",
+      graph: {
+        nodes: { [existingNode.id]: existingNode },
+        edges: [],
+        topology: "linear",
+      },
+      config: DEFAULT_CONFIG,
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      totalCost: 0,
+    };
+
+    handleChatMock.mockResolvedValue({
+      response: "Inserted auth node.",
+      category: "graph_change",
+      modification: {
+        action: "add_node",
+        newNode: {
+          title: "Auth",
+          instructions: "Add bcrypt",
+          insertAfter: "node-existing",
+        },
+        reason: "wire after setup",
+      },
+    });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "add an auth node after setup" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(Object.values(runtime.workflow?.graph.nodes ?? {})).toHaveLength(2);
+    const edges = runtime.workflow?.graph.edges ?? [];
+    expect(edges.length).toBe(1);
+    expect(edges[0]?.from).toBe("node-existing");
+  });
+
+  it("leaves rt.workflow null when modification.action is no_action", async () => {
+    handleChatMock.mockResolvedValue({
+      response: "Nothing to change.",
+      category: "question",
+      modification: { action: "no_action", reason: "just answering" },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "how is it going?" },
+    });
+
+    expect(runtime.workflow).toBeNull();
+  });
+
+  it("applies modify_node instructions on an existing graph", async () => {
+    const node: Node = {
+      id: "node-a",
+      title: "A",
+      status: "pending",
+      instructions: "old",
+      delay: "0",
+      resumeAt: null,
+      agents: [],
+      fileOwnership: {},
+      retryCount: 0,
+      maxRetries: 3,
+      reviewReport: null,
+      cost: 0,
+      startedAt: null,
+      completedAt: null,
+      providerRetryState: null,
+    };
+    runtime.workflow = {
+      id: "wf-a",
+      status: "building",
+      description: "d",
+      projectPath: "/test/project",
+      graph: { nodes: { "node-a": node }, edges: [], topology: "linear" },
+      config: DEFAULT_CONFIG,
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      totalCost: 0,
+    };
+
+    handleChatMock.mockResolvedValue({
+      response: "Updated.",
+      category: "graph_change",
+      modification: {
+        action: "modify_node",
+        nodeId: "node-a",
+        modifiedInstructions: "new instructions",
+        reason: "user asked",
+      },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "update the first node" },
+    });
+
+    expect(runtime.workflow?.graph.nodes["node-a"]?.instructions).toBe("new instructions");
+  });
+});
+
+// ===========================================================================
 // Events routes
 // ===========================================================================
 
