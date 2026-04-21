@@ -584,6 +584,124 @@ describe("chat routes", () => {
 });
 
 // ===========================================================================
+// Chat routes (per-project runtime path)
+// ===========================================================================
+
+/**
+ * Tests for the per-project runtime path used when chat routes are mounted
+ * under `/projects/:id` with a preValidation hook that attaches
+ * `request.runtime`. This exercises the regression fix where `chatRoutes({})`
+ * had no wiring and returned 501.
+ */
+describe("chat routes (runtime-scoped)", () => {
+  let server: FastifyInstance;
+  let handleChatMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    handleChatMock = vi.fn().mockResolvedValue({
+      response: "Hello from Loom",
+      category: "question",
+      modification: null,
+    });
+
+    vi.mocked(LoomAgent).mockImplementation(
+      () =>
+        ({
+          handleChat: handleChatMock,
+        }) as unknown as InstanceType<typeof LoomAgent>,
+    );
+
+    const fakeRuntime = {
+      id: "project-1",
+      name: "test",
+      projectPath: "/test/project",
+      providerProfileId: "default",
+      workflow: null,
+      provider: { complete: vi.fn() } as unknown,
+      config: { ...DEFAULT_CONFIG },
+      costTracker: {} as unknown,
+      messageBus: {} as unknown,
+      sharedMemory: {} as unknown,
+      startedAt: "2026-03-24T00:00:00.000Z",
+      status: "idle",
+    };
+
+    server = Fastify();
+    addAuthHook(server);
+    server.addHook("preValidation", async (req: FastifyRequest): Promise<void> => {
+      (req as FastifyRequest & { runtime?: unknown }).runtime = fakeRuntime;
+    });
+    await server.register(chatRoutes({}));
+    await server.ready();
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  it("wires handleChat via request.runtime (no 501)", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "What is this project?" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body: Record<string, unknown> = res.json();
+    expect(body.response).toBe("Hello from Loom");
+    expect(body.category).toBe("question");
+    expect(body.action).toBeNull();
+    expect(handleChatMock).toHaveBeenCalledTimes(1);
+    expect(handleChatMock).toHaveBeenCalledWith("What is this project?", "");
+  });
+
+  it("records user and assistant messages in per-runtime history", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "ping" },
+    });
+
+    const res = await server.inject({
+      method: "GET",
+      url: "/chat/history",
+      headers: { authorization: BEARER },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body: { messages: ChatHistoryEntry[] } = res.json();
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("user");
+    expect(body.messages[0].content).toBe("ping");
+    expect(body.messages[1].role).toBe("assistant");
+    expect(body.messages[1].content).toBe("Hello from Loom");
+  });
+
+  it("passes accumulated history on subsequent calls", async () => {
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "first" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { authorization: BEARER, "content-type": "application/json" },
+      payload: { message: "second" },
+    });
+
+    expect(handleChatMock).toHaveBeenCalledTimes(2);
+    const secondCall = handleChatMock.mock.calls[1] as [string, string];
+    expect(secondCall[0]).toBe("second");
+    expect(secondCall[1]).toContain("user: first");
+    expect(secondCall[1]).toContain("assistant: Hello from Loom");
+  });
+});
+
+// ===========================================================================
 // Events routes
 // ===========================================================================
 
