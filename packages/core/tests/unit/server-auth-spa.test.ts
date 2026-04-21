@@ -38,7 +38,13 @@ describe("auth hook — SPA fallback for browser navigations", () => {
     );
   });
 
-  it("serves index.html for unauthenticated GET /projects/:id with Accept: text/html", async () => {
+  it.each([
+    "/projects/proj_abcdef01",
+    "/projects/proj_abcdef01/graph",
+    "/projects/proj_abcdef01/specs",
+    "/projects/proj_abcdef01/memory",
+    "/projects/proj_abcdef01/chat",
+  ])("short-circuits unauthenticated SPA navigation %s to index.html", async (url) => {
     const { server } = await createServer({
       token: "t",
       projectPath: "/tmp",
@@ -47,15 +53,21 @@ describe("auth hook — SPA fallback for browser navigations", () => {
     try {
       const res = await server.inject({
         method: "GET",
-        url: "/projects/proj_abcdef01",
+        url,
         headers: { accept: "text/html,*/*" },
       });
-      // The auth hook must let this request through. The SPA fallback
-      // then serves index.html from disk; under server.inject() the
-      // static plugin may stream asynchronously, so we only assert the
-      // non-401 outcome here. Integration tests cover the body.
+      // The auth hook must short-circuit the response with index.html,
+      // BEFORE any API route gets a chance to run and leak JSON (several
+      // of these URLs collide with real API routes of the same shape).
+      // server.inject() streams sendFile asynchronously, so we only
+      // assert that the response is non-401 and not the JSON payload a
+      // real API handler would produce.
       expect(res.statusCode).not.toBe(401);
       expect(res.statusCode).toBeLessThan(500);
+      const contentType = res.headers["content-type"];
+      if (typeof contentType === "string") {
+        expect(contentType).not.toMatch(/application\/json/);
+      }
     } finally {
       await server.close();
     }

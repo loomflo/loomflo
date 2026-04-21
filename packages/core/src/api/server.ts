@@ -323,11 +323,13 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       // paths. Static assets and SPA client-side routes do not carry a Bearer
       // token; the dashboard includes it only in its API fetch/XHR calls.
       //
-      // Browser navigations (address-bar, refresh, new-tab, deep links) always
-      // send `Accept: text/html` — we let those fall through to the static
-      // handler or the SPA fallback even when the URL prefix matches an API
-      // route (e.g. `/projects/:id`). The dashboard's own fetch() calls send
-      // `Accept: */*` by default and remain authenticated.
+      // Browser navigations (address-bar, refresh, new-tab, deep links) to
+      // SPA routes under `/projects/:id/*` collide with real API routes of
+      // the same shape (e.g. `/projects/:id/specs`, `/projects/:id/memory`).
+      // For those we short-circuit the response with `index.html` BEFORE
+      // route matching, so the React app mounts and reads the token from
+      // the URL hash / sessionStorage instead of leaking API JSON to an
+      // unauthenticated HTTP client that happens to send Accept: text/html.
       if (dashboardRoot && request.method === "GET") {
         const isApiRoute = API_ROUTE_PREFIXES.some(
           (p) =>
@@ -335,7 +337,10 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
         );
         if (!isApiRoute) return;
         const accept = request.headers.accept ?? "";
-        if (accept.includes("text/html")) return;
+        if (accept.includes("text/html")) {
+          await reply.sendFile("index.html");
+          return reply;
+        }
       }
 
       const header = request.headers.authorization;
