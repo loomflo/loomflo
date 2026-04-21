@@ -1,6 +1,6 @@
 // packages/cli/src/commands/daemon.ts
 import { Command } from "commander";
-import { ensureDaemonRunning, getRunningDaemon } from "../daemon-control.js";
+import { ensureDaemonRunning, findOrphanDaemonPid, getRunningDaemon } from "../daemon-control.js";
 import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
 import { theme } from "../theme/index.js";
 
@@ -39,6 +39,26 @@ export function createDaemonCommand(): Command {
   stopCmd.action(async (opts: { force?: boolean; json?: boolean }) => {
     const info = await getRunningDaemon();
     if (!info) {
+      // daemon.json missing — before declaring "not running", check for an
+      // orphaned daemon process whose state file was lost (unclean shutdown).
+      const orphanPid = await findOrphanDaemonPid();
+      if (orphanPid !== null) {
+        const signal = opts.force ? "SIGKILL" : "SIGTERM";
+        process.kill(orphanPid, signal);
+        if (isJsonMode(opts)) {
+          writeJson({ action: "stop", pid: orphanPid, signal, orphan: true });
+        } else {
+          process.stdout.write(
+            theme.line(
+              theme.glyph.check,
+              "accent",
+              `sent ${signal} to orphaned daemon`,
+              `pid ${String(orphanPid)} (daemon.json was missing)`,
+            ) + "\n",
+          );
+        }
+        return;
+      }
       if (isJsonMode(opts)) {
         writeJson({ action: "stop", status: "not_running" });
       } else {
