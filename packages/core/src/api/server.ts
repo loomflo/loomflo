@@ -322,12 +322,20 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       // When the dashboard is active, skip auth for GET requests to non-API
       // paths. Static assets and SPA client-side routes do not carry a Bearer
       // token; the dashboard includes it only in its API fetch/XHR calls.
+      //
+      // Browser navigations (address-bar, refresh, new-tab, deep links) always
+      // send `Accept: text/html` — we let those fall through to the static
+      // handler or the SPA fallback even when the URL prefix matches an API
+      // route (e.g. `/projects/:id`). The dashboard's own fetch() calls send
+      // `Accept: */*` by default and remain authenticated.
       if (dashboardRoot && request.method === "GET") {
         const isApiRoute = API_ROUTE_PREFIXES.some(
           (p) =>
             request.url === p || request.url.startsWith(p + "/") || request.url.startsWith(p + "?"),
         );
         if (!isApiRoute) return;
+        const accept = request.headers.accept ?? "";
+        if (accept.includes("text/html")) return;
       }
 
       const header = request.headers.authorization;
