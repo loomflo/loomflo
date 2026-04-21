@@ -14,8 +14,9 @@ import { theme } from "../theme/index.js";
 import { printLogo } from "../theme/logo.js";
 import {
   defaultWorkflowInitDeps,
-  runWorkflowInit,
+  kickoffWorkflowInit,
   type WorkflowInitDeps,
+  type WorkflowInitResponse,
 } from "../workflow-init.js";
 
 // ============================================================================
@@ -253,36 +254,38 @@ export function createInitCommand(workflowDeps?: WorkflowInitDeps): Command {
         //   * --description provided → run straight through
         //   * interactive            → confirm + inquirer editor
         //   * non-interactive        → fail (explicit opt-in required)
+        // Onboarding fire-and-forgets the spec generation: the CLI
+        // returns to the shell immediately after the daemon accepts the
+        // POST /workflow/init, and the user runs
+        // `loomflo workflow watch` (or `loomflo status`) to follow the
+        // spec's progress. Blocking for many minutes inside `init`
+        // ties up the terminal and makes the CLI feel hung.
         let workflowSummary:
-          | { id: string; status: string; nodeCount: number }
+          | { id: string; status: string }
           | null = null;
 
         const runWorkflowStep = async (description: string): Promise<void> => {
-          const sp = interactive ? theme.spinner("generating spec…") : null;
-          sp?.start();
-          try {
-            const wf = await runWorkflowInit(
-              { info, projectId: identity.id, projectPath: cwd, description },
-              workflowDeps ?? defaultWorkflowInitDeps(),
+          const wf: WorkflowInitResponse = await kickoffWorkflowInit(
+            { info, projectId: identity.id, projectPath: cwd, description },
+            workflowDeps ?? defaultWorkflowInitDeps(),
+          );
+          workflowSummary = { id: wf.id, status: wf.status };
+          if (!json) {
+            process.stdout.write(
+              `${theme.line(
+                theme.glyph.check,
+                "accent",
+                `workflow ${theme.muted(wf.id)} queued`,
+                "spec generation running in the background",
+              )}\n`,
             );
-            sp?.succeed();
-            workflowSummary = wf;
-            if (!json) {
-              process.stdout.write(
-                `${theme.line(
-                  theme.glyph.check,
-                  "accent",
-                  `workflow ${theme.muted(wf.id)} ready`,
-                  `${String(wf.nodeCount)} nodes`,
-                )}\n`,
-              );
-              process.stdout.write(
-                `${theme.line(theme.glyph.arrow, "muted", "run loomflo start to execute")}\n`,
-              );
-            }
-          } catch (wfErr) {
-            sp?.fail();
-            throw wfErr;
+            process.stdout.write(
+              `${theme.line(
+                theme.glyph.arrow,
+                "muted",
+                "run loomflo workflow watch to follow progress",
+              )}\n`,
+            );
           }
         };
 

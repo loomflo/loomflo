@@ -1,14 +1,24 @@
 // packages/cli/src/workflow-init.ts
 //
-// Shared helper that seeds a workflow on an existing loomflo project.
-// Used by both `loomflo init` (end-of-onboarding auto-kick) and the
-// top-level `loomflo workflow init <description>` command.
+// Shared helpers that seed a workflow on an existing loomflo project.
+// Used by `loomflo init` (end-of-onboarding auto-kick, fire-and-forget),
+// `loomflo workflow init <description>` (one-shot), and
+// `loomflo workflow watch` (follow an already-kicked spec).
 //
-// Flow:
-//   1. POST /projects/:id/workflow/init  (201 created, background spec gen)
-//   2. Poll GET /projects/:id/workflow every POLL_INTERVAL_MS until the
-//      workflow transitions out of "spec" (i.e. to "building" or "failed").
-//   3. Return a structured result; surface the daemon error on failure.
+// The flow is split into two phases so callers can choose whether to
+// block until completion:
+//
+//   1. kickoffWorkflowInit()   — POST /projects/:id/workflow/init,
+//                                 returns immediately with the stub
+//                                 response (201). 409 becomes
+//                                 E_WORKFLOW_CONFLICT.
+//   2. pollWorkflowSpec()       — GET /projects/:id/workflow every
+//                                 POLL_INTERVAL_MS until the workflow
+//                                 transitions out of "spec". Honours
+//                                 `timeoutMs` (0 = no deadline).
+//
+// `runWorkflowInit()` is a thin kickoff+poll wrapper kept for callers
+// (and existing tests) that want both phases in one await.
 //
 // The caller owns the UI (spinner, log lines, JSON emission).
 
@@ -152,28 +162,19 @@ export function defaultWorkflowInitDeps(): WorkflowInitDeps {
 // ============================================================================
 
 /**
- * Seed a workflow and block until spec generation reaches a terminal
- * state (building or failed).
+ * Fire the `POST /projects/:id/workflow/init` request and return the
+ * stub response. Does not poll — the caller can return to the shell
+ * and use `pollWorkflowSpec()` (or `loomflo workflow watch`) later.
  *
  * @throws Error tagged with `code === "E_WORKFLOW_CONFLICT"` when the
  *   daemon returns 409 because a workflow already exists.
- * @throws Error tagged with `code === "E_WORKFLOW_TIMEOUT"` when the poll
- *   loop exceeds `timeoutMs`.
- * @throws Error tagged with `code === "E_WORKFLOW_FAILED"` when the
- *   daemon reports a failed workflow.
  */
-export async function runWorkflowInit(
+export async function kickoffWorkflowInit(
   args: WorkflowInitArgs,
-  deps: WorkflowInitDeps = defaultWorkflowInitDeps(),
-): Promise<WorkflowInitResult> {
-  const sleep = deps.sleep ?? ((ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)));
-  const pollInterval = deps.pollIntervalMs ?? POLL_INTERVAL_MS;
-  const timeout = deps.timeoutMs ?? POLL_TIMEOUT_MS;
-  const now = deps.now ?? ((): number => Date.now());
-
-  let created: WorkflowInitResponse;
+  deps: Pick<WorkflowInitDeps, "postInit"> = defaultWorkflowInitDeps(),
+): Promise<WorkflowInitResponse> {
   try {
-    created = await deps.postInit(args.info, args.projectId, {
+    return await deps.postInit(args.info, args.projectId, {
       description: args.description,
       projectPath: args.projectPath,
     });
@@ -188,6 +189,40 @@ export async function runWorkflowInit(
     }
     throw err;
   }
+}
+
+/** Arguments to `pollWorkflowSpec`. */
+export interface PollWorkflowSpecArgs {
+  info: DaemonInfo;
+  projectId: string;
+  /**
+   * Id of the workflow being watched. Used in the timeout error
+   * message; the poll loop itself reads the current workflow state
+   * from the daemon and ignores this id.
+   */
+  workflowId: string;
+}
+
+/**
+ * Poll `GET /projects/:id/workflow` until the workflow transitions
+ * out of "spec" (to "building" or "failed").
+ *
+ * @throws Error tagged with `code === "E_WORKFLOW_TIMEOUT"` when the
+ *   poll loop exceeds `timeoutMs` (and `timeoutMs > 0`).
+ * @throws Error tagged with `code === "E_WORKFLOW_FAILED"` when the
+ *   daemon reports a failed workflow.
+ */
+export async function pollWorkflowSpec(
+  args: PollWorkflowSpecArgs,
+  deps: Pick<
+    WorkflowInitDeps,
+    "getWorkflow" | "sleep" | "pollIntervalMs" | "timeoutMs" | "now"
+  > = defaultWorkflowInitDeps(),
+): Promise<WorkflowInitResult> {
+  const sleep = deps.sleep ?? ((ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)));
+  const pollInterval = deps.pollIntervalMs ?? POLL_INTERVAL_MS;
+  const timeout = deps.timeoutMs ?? POLL_TIMEOUT_MS;
+  const now = deps.now ?? ((): number => Date.now());
 
   // `timeout === 0` means "no deadline" — match the per-node budget
   // convention elsewhere in the CLI.
@@ -213,7 +248,7 @@ export async function runWorkflowInit(
     }
     if (hasDeadline && now() >= deadline) {
       const timedOut = new Error(
-        `workflow ${created.id} did not finish spec generation within ${String(
+        `workflow ${args.workflowId} did not finish spec generation within ${String(
           Math.round(timeout / 1000),
         )}s`,
       ) as Error & { code?: string };
@@ -222,4 +257,28 @@ export async function runWorkflowInit(
     }
     await sleep(pollInterval);
   }
+}
+
+/**
+ * Seed a workflow and block until spec generation reaches a terminal
+ * state. Thin wrapper over `kickoffWorkflowInit` + `pollWorkflowSpec`
+ * kept so callers that want both phases in one await don't have to
+ * stitch the two halves themselves.
+ *
+ * @throws Error tagged with `code === "E_WORKFLOW_CONFLICT"` when the
+ *   daemon returns 409 because a workflow already exists.
+ * @throws Error tagged with `code === "E_WORKFLOW_TIMEOUT"` when the poll
+ *   loop exceeds `timeoutMs`.
+ * @throws Error tagged with `code === "E_WORKFLOW_FAILED"` when the
+ *   daemon reports a failed workflow.
+ */
+export async function runWorkflowInit(
+  args: WorkflowInitArgs,
+  deps: WorkflowInitDeps = defaultWorkflowInitDeps(),
+): Promise<WorkflowInitResult> {
+  const created = await kickoffWorkflowInit(args, deps);
+  return pollWorkflowSpec(
+    { info: args.info, projectId: args.projectId, workflowId: created.id },
+    deps,
+  );
 }

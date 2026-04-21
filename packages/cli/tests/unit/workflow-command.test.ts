@@ -178,4 +178,104 @@ describe("loomflo workflow init", () => {
     };
     expect(parsed.workflow).toEqual({ id: "wf_9", status: "building", nodeCount: 1 });
   });
+
+  it("--no-wait returns after the kickoff without polling", async () => {
+    const deps = {
+      postInit: vi.fn().mockResolvedValue({ id: "wf_nw", status: "spec", description: "x" }),
+      getWorkflow: vi.fn(),
+      sleep: (): Promise<void> => Promise.resolve(),
+      pollIntervalMs: 10,
+      timeoutMs: 10_000,
+      now: (): number => 0,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync([
+      "node",
+      "workflow",
+      "init",
+      "x",
+      "--no-wait",
+    ]);
+    expect(deps.postInit).toHaveBeenCalledTimes(1);
+    expect(deps.getWorkflow).not.toHaveBeenCalled();
+    const out = stdoutWrites.join("");
+    expect(out).toContain("queued");
+    expect(out).toContain("loomflo workflow watch");
+    expect(process.exitCode).not.toBe(1);
+  });
+});
+
+describe("loomflo workflow watch", () => {
+  it("polls until the workflow exits spec state and reports the node count", async () => {
+    const states = [
+      {
+        id: "wf_w",
+        status: "spec",
+        description: "x",
+        graph: { nodes: {}, edges: [], topology: "linear" },
+      },
+      {
+        id: "wf_w",
+        status: "building",
+        description: "x",
+        graph: { nodes: { a: {}, b: {} }, edges: [], topology: "linear" },
+      },
+    ];
+    const getWorkflow = vi
+      .fn()
+      .mockImplementation(async () => states.shift() ?? states[states.length - 1]);
+    const deps = {
+      postInit: vi.fn(),
+      getWorkflow,
+      sleep: (): Promise<void> => Promise.resolve(),
+      pollIntervalMs: 10,
+      timeoutMs: 10_000,
+      now: (): number => 0,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync(["node", "workflow", "watch"]);
+    const out = stdoutWrites.join("");
+    expect(out).toContain("ready");
+    expect(out).toContain("2 nodes");
+    expect(deps.postInit).not.toHaveBeenCalled();
+    expect(process.exitCode).not.toBe(1);
+  });
+
+  it("reports current status and exits when the workflow is already past spec", async () => {
+    const deps = {
+      postInit: vi.fn(),
+      getWorkflow: vi.fn().mockResolvedValue({
+        id: "wf_done",
+        status: "building",
+        description: "x",
+        graph: { nodes: { a: {} }, edges: [], topology: "linear" },
+      }),
+      sleep: (): Promise<void> => Promise.resolve(),
+      pollIntervalMs: 10,
+      timeoutMs: 10_000,
+      now: (): number => 0,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync(["node", "workflow", "watch"]);
+    expect(deps.getWorkflow).toHaveBeenCalledTimes(1); // no polling loop
+    const out = stdoutWrites.join("");
+    expect(out).toContain("wf_done");
+    expect(out).toContain("building");
+  });
+
+  it("fails with E_NO_WORKFLOW when no workflow is active", async () => {
+    const deps = {
+      postInit: vi.fn(),
+      getWorkflow: vi.fn().mockResolvedValue(null),
+      sleep: (): Promise<void> => Promise.resolve(),
+      pollIntervalMs: 10,
+      timeoutMs: 10_000,
+      now: (): number => 0,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync(["node", "workflow", "watch"]);
+    expect(process.exitCode).toBe(1);
+    const err = stderrWrites.join("");
+    expect(err).toContain("E_NO_WORKFLOW");
+  });
 });

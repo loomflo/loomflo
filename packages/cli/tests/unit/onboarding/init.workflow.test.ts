@@ -121,7 +121,7 @@ afterEach(() => {
 });
 
 describe("loomflo init — workflow seeding", () => {
-  it("non-interactive with --description runs workflow init and reports nodes", async () => {
+  it("non-interactive with --description fires kickoff and exits immediately", async () => {
     const { createInitCommand } = await import("../../../src/commands/init.js");
     await createInitCommand().parseAsync([
       "node",
@@ -131,12 +131,15 @@ describe("loomflo init — workflow seeding", () => {
       "--yes",
     ]);
     const out = stdoutWrites.join("");
+    // kickoff-only: we report the workflow is queued and point the
+    // user at `loomflo workflow watch`, rather than blocking on polls.
     expect(out).toContain("workflow");
-    expect(out).toContain("ready");
-    expect(out).toContain("2 nodes");
-    // POST /workflow/init was called
+    expect(out).toContain("queued");
+    expect(out).toContain("loomflo workflow watch");
+    // POST /workflow/init was called; GET /workflow was NOT (no poll loop).
     const calls = mockFetch.mock.calls.map((c) => String(c[0] as string));
     expect(calls.some((u) => u.endsWith("/workflow/init"))).toBe(true);
+    expect(calls.some((u) => u.endsWith("/workflow"))).toBe(false);
     expect(process.exitCode).not.toBe(1);
   });
 
@@ -157,7 +160,7 @@ describe("loomflo init — workflow seeding", () => {
     expect(err).toContain("--description");
   });
 
-  it("json mode with --description emits the workflow in the payload", async () => {
+  it("json mode with --description emits the kickoff stub in the payload", async () => {
     const { createInitCommand } = await import("../../../src/commands/init.js");
     await createInitCommand().parseAsync([
       "node",
@@ -169,9 +172,12 @@ describe("loomflo init — workflow seeding", () => {
     ]);
     const raw = stdoutWrites.join("").trim();
     const parsed = JSON.parse(raw) as {
-      workflow: { id: string; status: string; nodeCount: number } | null;
+      workflow: { id: string; status: string } | null;
     };
-    expect(parsed.workflow).toEqual({ id: "wf_1", status: "building", nodeCount: 2 });
+    // Onboarding returns as soon as the daemon accepts the request,
+    // so the reported status reflects the kickoff stub (status: spec)
+    // — not the terminal state of the generator.
+    expect(parsed.workflow).toEqual({ id: "wf_1", status: "spec" });
   });
 
   it("surfaces 409 conflict from /workflow/init as an error exit", async () => {
