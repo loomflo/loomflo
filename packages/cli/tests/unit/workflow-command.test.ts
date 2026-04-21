@@ -94,6 +94,63 @@ describe("loomflo workflow init", () => {
     expect(err).toContain("E_WORKFLOW_CONFLICT");
   });
 
+  it("--timeout overrides the default poll deadline", async () => {
+    // Make the deps never advance out of "spec" so the wall must kick
+    // in. A caller-supplied --timeout of 1 second is passed through and
+    // trips E_WORKFLOW_TIMEOUT quickly under the fake clock.
+    let t = 0;
+    const deps = {
+      postInit: vi.fn().mockResolvedValue({ id: "wf_t", status: "spec", description: "x" }),
+      getWorkflow: vi.fn().mockResolvedValue({
+        id: "wf_t",
+        status: "spec",
+        description: "x",
+        graph: { nodes: {}, edges: [], topology: "linear" },
+      }),
+      sleep: (ms: number): Promise<void> => {
+        t += ms;
+        return Promise.resolve();
+      },
+      pollIntervalMs: 100,
+      now: (): number => t,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync([
+      "node",
+      "workflow",
+      "init",
+      "x",
+      "--timeout",
+      "1",
+    ]);
+    expect(process.exitCode).toBe(1);
+    const err = stderrWrites.join("");
+    expect(err).toContain("E_WORKFLOW_TIMEOUT");
+  });
+
+  it("rejects non-numeric --timeout", async () => {
+    const deps = {
+      postInit: vi.fn(),
+      getWorkflow: vi.fn(),
+      sleep: (): Promise<void> => Promise.resolve(),
+      pollIntervalMs: 10,
+      now: (): number => 0,
+    };
+    const { createWorkflowCommand } = await import("../../src/commands/workflow.js");
+    await createWorkflowCommand(deps).parseAsync([
+      "node",
+      "workflow",
+      "init",
+      "x",
+      "--timeout",
+      "abc",
+    ]);
+    expect(process.exitCode).toBe(1);
+    const err = stderrWrites.join("");
+    expect(err).toContain("E_WORKFLOW_FLAG");
+    expect(deps.postInit).not.toHaveBeenCalled();
+  });
+
   it("emits JSON payload under --json", async () => {
     const deps = {
       postInit: vi.fn().mockResolvedValue({ id: "wf_9", status: "spec", description: "x" }),

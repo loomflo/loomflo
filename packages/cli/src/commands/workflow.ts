@@ -28,6 +28,7 @@ import {
 interface WorkflowInitFlags {
   projectPath?: string;
   json?: boolean;
+  timeout?: string;
 }
 
 // ============================================================================
@@ -50,6 +51,10 @@ export function createWorkflowCommand(overrideDeps?: WorkflowInitDeps): Command 
     .argument("<description>", "Natural-language description of the workflow to generate")
     .option("--project-path <path>", "Project directory path")
     .option("--json", "Emit machine-readable JSON (no spinner, no colours)")
+    .option(
+      "--timeout <seconds>",
+      "Abort polling after this many seconds (0 = no deadline, default)",
+    )
     .action(async (description: string, opts: WorkflowInitFlags): Promise<void> => {
       const json = isJsonMode(opts);
       const sp = json ? null : theme.spinner("generating spec…");
@@ -59,9 +64,13 @@ export function createWorkflowCommand(overrideDeps?: WorkflowInitDeps): Command 
         const info = await ensureDaemonRunning();
         sp?.start();
 
+        const timeoutMs = parseTimeoutSeconds(opts.timeout);
+        const baseDeps = overrideDeps ?? defaultWorkflowInitDeps();
+        const deps = timeoutMs !== undefined ? { ...baseDeps, timeoutMs } : baseDeps;
+
         const result = await runWorkflowInit(
           { info, projectId: identity.id, projectPath: cwd, description },
-          overrideDeps ?? defaultWorkflowInitDeps(),
+          deps,
         );
         sp?.succeed();
 
@@ -93,4 +102,24 @@ export function createWorkflowCommand(overrideDeps?: WorkflowInitDeps): Command 
 
   cmd.addCommand(withJsonSupport(init));
   return cmd;
+}
+
+/**
+ * Parse `--timeout <seconds>` into milliseconds.
+ *
+ * Returns `undefined` when the flag was not provided (caller keeps the
+ * default), `0` when the caller asked for no deadline, otherwise the
+ * value in ms. Throws a tagged Error on non-numeric / negative input.
+ */
+function parseTimeoutSeconds(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) {
+    const e = new Error(
+      `invalid --timeout ${JSON.stringify(raw)} — expected a non-negative number of seconds (0 = no deadline)`,
+    ) as Error & { code?: string };
+    e.code = "E_WORKFLOW_FLAG";
+    throw e;
+  }
+  return Math.round(n * 1000);
 }

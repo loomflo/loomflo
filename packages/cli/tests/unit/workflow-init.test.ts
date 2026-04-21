@@ -90,6 +90,47 @@ describe("runWorkflowInit", () => {
     expect(getWorkflow).not.toHaveBeenCalled();
   });
 
+  it("treats timeoutMs === 0 as no deadline — keeps polling until terminal state", async () => {
+    // Simulate a long-running spec: 50 "spec" responses before flipping
+    // to "building". With a 10s wall the old default would have killed
+    // this; with 0 we expect it to complete.
+    let calls = 0;
+    const deps = makeDeps({
+      getWorkflow: vi.fn().mockImplementation(async () => {
+        calls += 1;
+        const status = calls < 50 ? "spec" : "building";
+        return {
+          id: "wf_1",
+          status,
+          description: "d",
+          graph: {
+            nodes: status === "building" ? { a: {}, b: {}, c: {} } : {},
+            edges: [],
+            topology: "linear",
+          },
+        } satisfies WorkflowState;
+      }),
+      // Ever-advancing clock would trip a >0 deadline; we advance it
+      // explicitly to prove the loop ignores it when timeoutMs === 0.
+      now: ((): (() => number) => {
+        let t = 0;
+        return () => {
+          t += 10_000_000;
+          return t;
+        };
+      })(),
+      timeoutMs: 0,
+    });
+
+    const result = await runWorkflowInit(
+      { info: INFO, projectId: "p", projectPath: "/tmp/p", description: "x" },
+      deps,
+    );
+
+    expect(result).toEqual({ id: "wf_1", status: "building", nodeCount: 3 });
+    expect(calls).toBe(50);
+  });
+
   it("throws E_WORKFLOW_TIMEOUT when spec generation never advances", async () => {
     let t = 0;
     const deps = makeDeps({

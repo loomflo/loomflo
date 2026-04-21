@@ -21,8 +21,14 @@ import type { DaemonInfo } from "./daemon-control.js";
 /** Interval in milliseconds between GET /workflow polls. */
 export const POLL_INTERVAL_MS = 2000;
 
-/** Upper bound on total wait time before giving up (spec gen can be long). */
-export const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+/**
+ * Default poll timeout. Following the same convention as the per-node
+ * budget, `0` means "no deadline — poll until the daemon reaches a
+ * terminal state or the user Ctrl-C's". Spec generation can legitimately
+ * take 10+ minutes for complex workflows; a hard 10-minute wall caused
+ * real user runs to be killed mid-spec.
+ */
+export const POLL_TIMEOUT_MS = 0;
 
 // ============================================================================
 // Types
@@ -74,7 +80,11 @@ export interface WorkflowInitDeps {
   sleep?: (ms: number) => Promise<void>;
   /** Override the poll interval (ms). Defaults to POLL_INTERVAL_MS. */
   pollIntervalMs?: number;
-  /** Override the total timeout (ms). Defaults to POLL_TIMEOUT_MS. */
+  /**
+   * Override the total timeout (ms). Defaults to POLL_TIMEOUT_MS.
+   * Pass `0` for no deadline — the loop will poll until the workflow
+   * reaches a terminal state.
+   */
   timeoutMs?: number;
   /** Override the clock (ms since epoch). */
   now?: () => number;
@@ -179,7 +189,10 @@ export async function runWorkflowInit(
     throw err;
   }
 
-  const deadline = now() + timeout;
+  // `timeout === 0` means "no deadline" — match the per-node budget
+  // convention elsewhere in the CLI.
+  const hasDeadline = timeout > 0;
+  const deadline = hasDeadline ? now() + timeout : 0;
   for (;;) {
     const state = await deps.getWorkflow(args.info, args.projectId);
     if (state !== null) {
@@ -198,7 +211,7 @@ export async function runWorkflowInit(
         };
       }
     }
-    if (now() >= deadline) {
+    if (hasDeadline && now() >= deadline) {
       const timedOut = new Error(
         `workflow ${created.id} did not finish spec generation within ${String(
           Math.round(timeout / 1000),
