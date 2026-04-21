@@ -80,6 +80,8 @@ describe("DEFAULT_CONFIG", () => {
       maxLoomasPerLoomi: null,
       retryStrategy: "adaptive",
       retryDelay: "0",
+      validatorRetryDelay: null,
+      validatorMaxAttempts: null,
       models: {
         loom: "claude-opus-4-6",
         loomi: "claude-sonnet-4-6",

@@ -16,11 +16,12 @@ interface ScheduledEntry {
   callback: () => void;
 }
 
-/** Regex for parsing delay strings: digits followed by an optional unit (s, m, h, d). */
-const DELAY_PATTERN = /^(\d+)([smhd])?$/;
+/** Regex for parsing delay strings: digits followed by an optional unit (ms, s, m, h, d). */
+const DELAY_PATTERN = /^(\d+)(ms|[smhd])?$/;
 
 /** Multipliers to convert delay units to milliseconds. */
 const UNIT_MS: Readonly<Record<string, number>> = {
+  ms: 1,
   s: 1_000,
   m: 60_000,
   h: 3_600_000,
@@ -28,22 +29,34 @@ const UNIT_MS: Readonly<Record<string, number>> = {
 };
 
 /**
- * Parses a delay string into milliseconds.
+ * Parses a delay value into milliseconds.
  *
- * @param delay - Delay string (e.g., "30s", "5m", "1h", "1d", "0", "").
- * @returns Milliseconds represented by the delay string.
- * @throws Error if the delay string format is invalid.
+ * Accepts a number (interpreted as milliseconds) or a string with an optional
+ * unit suffix (ms, s, m, h, d). Strings without a unit default to seconds.
+ *
+ * @param delay - Delay value (e.g., 1000, "30s", "500ms", "5m", "1h", "0").
+ * @returns Milliseconds represented by the delay value.
+ * @throws Error if the delay value is invalid.
  */
-export function parseDelay(delay: string | undefined): number {
-  if (delay === undefined || delay === "" || delay === "0") {
+export function parseDelay(delay: string | number | undefined): number {
+  if (delay === undefined || delay === "" || delay === "0" || delay === 0) {
     return 0;
+  }
+
+  if (typeof delay === "number") {
+    if (!Number.isFinite(delay) || delay < 0) {
+      throw new Error(
+        `Invalid delay number: ${String(delay)}. Expected a non-negative finite number of milliseconds.`,
+      );
+    }
+    return Math.floor(delay);
   }
 
   const match = DELAY_PATTERN.exec(delay);
   if (!match) {
     throw new Error(
       `Invalid delay format: "${delay}". ` +
-        'Expected "0", "", or a number followed by s/m/h/d (e.g., "30s", "5m", "1h", "1d").',
+        'Expected "0", "", a non-negative number of milliseconds, or a string with optional unit (ms/s/m/h/d), e.g. "500ms", "30s", "5m", "1h", "1d".',
     );
   }
 

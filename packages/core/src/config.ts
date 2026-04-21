@@ -41,6 +41,20 @@ export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 // ============================================================================
 
 /**
+ * Schema for delay fields that accept either a number (interpreted as
+ * milliseconds) or a string with an optional unit suffix (ms, s, m, h, d).
+ *
+ * Numbers are normalized to `"<n>ms"` strings so downstream consumers always
+ * see a string. Strings are passed through unchanged.
+ *
+ * Examples accepted: `1000` (1s), `"500ms"`, `"30s"`, `"5m"`, `"1h"`, `"0"`.
+ */
+const DelaySchema = z.preprocess(
+  (v) => (typeof v === "number" ? `${String(v)}ms` : v),
+  z.string().default("0"),
+);
+
+/**
  * Zod schema for the full Loomflo configuration.
  *
  * Every field has a `.default()` so the schema can validate partial configs.
@@ -50,16 +64,20 @@ export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 export const ConfigSchema = z.object({
   /** Preset level controlling default agent topology and behavior. */
   level: LevelSchema.default(3),
-  /** Default delay between node activations (e.g., "0", "30m", "1h", "1d"). */
-  defaultDelay: z.string().default("0"),
+  /** Default delay between node activations (number of ms or "30m"/"1h"/"1d"). */
+  defaultDelay: DelaySchema,
   /** Whether the Loomex reviewer agent is enabled. */
   reviewerEnabled: z.boolean().default(true),
   /** Maximum retry cycles allowed per node before marking as failed. */
   maxRetriesPerNode: z.number().int().nonnegative().default(3),
   /** Maximum retries allowed per individual task within a node. */
   maxRetriesPerTask: z.number().int().nonnegative().default(2),
-  /** Delay between node retry attempts (e.g., "0", "30m", "2h"). Useful to avoid API overload. */
-  retryDelay: z.string().default("0"),
+  /** Delay between node retry attempts (number of ms or "30m"/"2h"). */
+  retryDelay: DelaySchema,
+  /** Base delay between profile-validator retries (ms). Used by the onboarding wizard. */
+  validatorRetryDelay: z.number().int().nonnegative().nullable().default(null),
+  /** Maximum profile-validator retry attempts. Used by the onboarding wizard. */
+  validatorMaxAttempts: z.number().int().positive().nullable().default(null),
   /** Maximum worker agents (Loomas) per orchestrator (Loomi). Null means unlimited. */
   maxLoomasPerLoomi: z.number().int().positive().nullable().default(null),
   /** Strategy for modifying prompts on retry: 'adaptive' adjusts the prompt, 'same' retries as-is. */
