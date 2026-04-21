@@ -1,6 +1,6 @@
 // packages/cli/src/commands/init.ts
 import { Command } from "commander";
-import { editor } from "@inquirer/prompts";
+import { input } from "@inquirer/prompts";
 import { chmod, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -319,9 +319,13 @@ export function createInitCommand(workflowDeps?: WorkflowInitDeps): Command {
               )}\n`,
             );
           } else {
-            const description = await editor({
+            // Use an inline single-line prompt rather than the inquirer
+            // `editor` prompt which spawns $EDITOR (vim) — jarring in a
+            // terminal-native onboarding flow. Users who need multi-line
+            // specs can pass --description or run
+            // `loomflo workflow init "<long description>"` afterwards.
+            const description = await input({
               message: "Décris le workflow que tu veux générer",
-              waitForUseInput: false,
             });
             const trimmed = description.trim();
             if (trimmed.length === 0) {
