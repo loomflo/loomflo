@@ -24,5 +24,9 @@ export type LoomfloAgentDefinition = {
   allowedTools: string[];
 };
 
-// Re-exports populated as the role files land in commit 2.
 export const AGENTS_CONFIG_VERSION = "0.1.0";
+
+export { createLoomAgentDefinition, LOOM_ALLOWED_TOOLS } from "./loom.js";
+export { createLoomiAgentDefinition, LOOMI_ALLOWED_TOOLS } from "./loomi.js";
+export { createLoomaAgentDefinition, LOOMA_ALLOWED_TOOLS } from "./looma.js";
+export { createLoomexAgentDefinition, LOOMEX_ALLOWED_TOOLS } from "./loomex.js";
