@@ -20,7 +20,7 @@ export const LOOMEX_ALLOWED_TOOLS: readonly string[] = [
   t("read_file"),
   t("list_files"),
   t("search_files"),
-  t("memory_read"),
+  t("read_memory"),
   // No write_file, no shell_exec — Loomex must remain side-effect-free.
 ];
 

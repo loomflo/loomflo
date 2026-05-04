@@ -13,3 +13,9 @@
 
 export const MCP_LOOMFLO_VERSION = "0.1.0";
 export const MCP_TOOL_PREFIX = "mcp__loomflo__";
+
+export {
+  createLoomfloMcpServer,
+  listToolNamesForRole,
+  type CreateLoomfloMcpServerOpts,
+} from "./loomflo-tools.js";

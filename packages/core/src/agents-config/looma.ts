@@ -23,9 +23,9 @@ export const LOOMA_ALLOWED_TOOLS: readonly string[] = [
   t("edit_file"),
   t("list_files"),
   t("search_files"),
-  t("shell_exec"),
-  t("memory_read"),
-  t("memory_write"),
+  t("exec_command"),
+  t("read_memory"),
+  t("write_memory"),
   t("send_message"),
   t("report_complete"),
 ];
