@@ -13,6 +13,14 @@ export {
   buildAgentDefinitionForRole,
 } from "./claude-agent.js";
 
+export {
+  MockAgentRuntime,
+  DEFAULT_MOCK_SCENARIOS,
+  type MockAgentRuntimeOptions,
+  type MockScenario,
+  type MockScenarioStep,
+} from "./mock.js";
+
 export type {
   AgentRuntime,
   AgentRole,
