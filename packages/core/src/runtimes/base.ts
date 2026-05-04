@@ -10,10 +10,12 @@
  * @module runtimes/base
  */
 
-import type { CostTracker } from "../costs/index.js";
-import type { SharedMemory } from "../memory/index.js";
+import type { CostTracker } from "../costs/tracker.js";
+import type { SharedMemoryManager } from "../memory/shared-memory.js";
 import type { MessageBus } from "../agents/message-bus.js";
-import type { Workflow } from "../workflow/types.js";
+import type { Workflow } from "../types.js";
+import type { CompletionHandlerLike } from "../tools/report-complete.js";
+import type { EscalationHandlerLike } from "../tools/escalate.js";
 
 // ============================================================================
 // Capabilities & identity
@@ -117,8 +119,12 @@ export interface SessionContext {
   nodeId: string;
   agentId: string;
   costTracker: CostTracker;
-  sharedMemory: SharedMemory;
+  sharedMemory: SharedMemoryManager;
   messageBus: MessageBus;
+  /** Invoked when a Looma worker reports completion via report_complete. */
+  completionHandler: CompletionHandlerLike;
+  /** Invoked when Loomi escalates to Loom via escalate. */
+  escalationHandler: EscalationHandlerLike;
 }
 
 // ============================================================================

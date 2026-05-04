@@ -6,6 +6,13 @@
  * @module runtimes
  */
 
+export {
+  ClaudeAgentRuntime,
+  buildSdkOptions,
+  buildSdkAuthEnv,
+  buildAgentDefinitionForRole,
+} from "./claude-agent.js";
+
 export type {
   AgentRuntime,
   AgentRole,
