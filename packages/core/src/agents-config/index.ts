@@ -28,5 +28,13 @@ export const AGENTS_CONFIG_VERSION = "0.1.0";
 
 export { createLoomAgentDefinition, LOOM_ALLOWED_TOOLS } from "./loom.js";
 export { createLoomiAgentDefinition, LOOMI_ALLOWED_TOOLS } from "./loomi.js";
-export { createLoomaAgentDefinition, LOOMA_ALLOWED_TOOLS } from "./looma.js";
-export { createLoomexAgentDefinition, LOOMEX_ALLOWED_TOOLS } from "./loomex.js";
+export {
+  createLoomaAgentDefinition,
+  createLoomaSubagentDefinition,
+  LOOMA_ALLOWED_TOOLS,
+} from "./looma.js";
+export {
+  createLoomexAgentDefinition,
+  createLoomexSubagentDefinition,
+  LOOMEX_ALLOWED_TOOLS,
+} from "./loomex.js";

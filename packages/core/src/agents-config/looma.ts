@@ -50,3 +50,34 @@ export function createLoomaAgentDefinition(params: LoomaPromptParams): LoomfloAg
     allowedTools: [...LOOMA_ALLOWED_TOOLS],
   };
 }
+
+/**
+ * Build a Looma `AgentDefinition` for SDK subagent registration.
+ *
+ * Used when populating `Options.agents` so the main loop (Loomi) can spawn a
+ * subagent of type `looma` via the SDK's built-in `Agent` tool. The actual
+ * task description and team context are supplied by Loomi at dispatch time
+ * via the Agent tool's `prompt` parameter — this skeleton just sets the
+ * persona and the available tool palette.
+ *
+ * Phase 2.2: scope enforcement is session-wide (canUseTool sees every write
+ * regardless of which subagent issued it). True per-subagent scope isolation
+ * requires either spawn-time canUseTool override (not currently supported by
+ * the SDK) or loomflo-orchestrated parallel sessions (planned for Phase 3+).
+ */
+export function createLoomaSubagentDefinition(): LoomfloAgentDefinition {
+  return {
+    role: "looma",
+    description:
+      "Worker exécutant une tâche atomique déléguée par Loomi : lecture/écriture de fichiers, commandes shell, tests.",
+    prompt: buildLoomaPrompt({
+      taskDescription:
+        "Tu reçois une tâche précise via le prompt initial du dispatcher. Lis-le attentivement.",
+      fileScope: [],
+      nodeInstructions:
+        "Le périmètre d'écriture autorisé t'est communiqué par le dispatcher et appliqué automatiquement par le runtime.",
+    }),
+    defaultModel: "claude-sonnet-4-6",
+    allowedTools: [...LOOMA_ALLOWED_TOOLS],
+  };
+}

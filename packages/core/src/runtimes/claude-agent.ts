@@ -16,10 +16,16 @@
 
 import { randomUUID } from "node:crypto";
 import { query, type Options as SdkOptions } from "@anthropic-ai/claude-agent-sdk";
-import { createLoomaAgentDefinition } from "../agents-config/looma.js";
+import {
+  createLoomaAgentDefinition,
+  createLoomaSubagentDefinition,
+} from "../agents-config/looma.js";
 import { createLoomiAgentDefinition } from "../agents-config/loomi.js";
 import { createLoomAgentDefinition } from "../agents-config/loom.js";
-import { createLoomexAgentDefinition } from "../agents-config/loomex.js";
+import {
+  createLoomexAgentDefinition,
+  createLoomexSubagentDefinition,
+} from "../agents-config/loomex.js";
 import type { LoomfloAgentDefinition } from "../agents-config/index.js";
 import { createLoomfloMcpServer } from "../mcp/loomflo-tools.js";
 import { buildCanUseTool } from "./can-use-tool.js";
@@ -91,6 +97,27 @@ export function buildAgentDefinitionForRole(config: SessionConfig): LoomfloAgent
         tasksToVerify: [],
       });
   }
+}
+
+/**
+ * Convert a loomflo `LoomfloAgentDefinition` to the SDK's `AgentDefinition`
+ * shape. Optional overrides for prompt and model let the caller customize a
+ * specific agent (e.g. the main thread) without touching the underlying
+ * factory output.
+ *
+ * Exported for unit testing.
+ */
+export function toSdkAgentDef(
+  def: LoomfloAgentDefinition,
+  promptOverride?: string,
+  modelOverride?: string,
+): { description: string; prompt: string; tools: string[]; model: string } {
+  return {
+    description: def.description,
+    prompt: promptOverride ?? def.prompt,
+    tools: [...def.allowedTools],
+    model: modelOverride && modelOverride.length > 0 ? modelOverride : def.defaultModel,
+  };
 }
 
 // ============================================================================
@@ -176,12 +203,28 @@ export function buildSdkOptions(config: SessionConfig): BuiltSdkOptions {
     // sse/http silently ignored in Phase 1.
   }
 
-  const sdkAgentDef = {
-    description: agentDef.description,
-    prompt: config.systemPromptOverride ?? agentDef.prompt,
-    tools: agentDef.allowedTools,
-    model: config.model || agentDef.defaultModel,
+  const sdkAgentDef = toSdkAgentDef(agentDef, config.systemPromptOverride, config.model);
+
+  // Phase 2.2: when the main agent is `loomi` (or `loom`), register the
+  // looma + loomex subagent skeletons so the SDK's built-in `Agent` tool
+  // can dispatch to them. The skeleton prompts establish the persona; the
+  // actual task is supplied by the dispatcher via Agent({prompt: ...}).
+  //
+  // Limitation: canUseTool is session-wide in the SDK, so per-subagent file
+  // scope isolation is NOT enforced here. The loomi-native runtime remains
+  // the path for strict multi-agent isolation; phase 3+ will explore
+  // loomflo-orchestrated parallel sessions for the SDK runtimes.
+  const agentsMap: Record<string, ReturnType<typeof toSdkAgentDef>> = {
+    [config.agentRole]: sdkAgentDef,
   };
+  if (config.agentRole === "loomi" || config.agentRole === "loom") {
+    if (!agentsMap["looma"]) {
+      agentsMap["looma"] = toSdkAgentDef(createLoomaSubagentDefinition());
+    }
+    if (!agentsMap["loomex"]) {
+      agentsMap["loomex"] = toSdkAgentDef(createLoomexSubagentDefinition());
+    }
+  }
 
   // Allow pointing the SDK at a Claude Code binary outside its bundled
   // optional package (useful when the user already has `claude` installed
@@ -198,7 +241,7 @@ export function buildSdkOptions(config: SessionConfig): BuiltSdkOptions {
       loomflo: loomfloMcp as never,
       ...userMcpServers,
     } as SdkOptions["mcpServers"],
-    agents: { [config.agentRole]: sdkAgentDef } as SdkOptions["agents"],
+    agents: agentsMap as SdkOptions["agents"],
     agent: config.agentRole,
     env: { ...process.env, ...buildSdkAuthEnv(config.credentials) },
     ...(pathOverride ? { pathToClaudeCodeExecutable: pathOverride } : {}),

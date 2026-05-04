@@ -40,3 +40,26 @@ export function createLoomexAgentDefinition(params: LoomexPromptParams): Loomflo
     allowedTools: [...LOOMEX_ALLOWED_TOOLS],
   };
 }
+
+/**
+ * Build a Loomex `AgentDefinition` for SDK subagent registration.
+ *
+ * Mirrors createLoomaSubagentDefinition: a generic persona/tool skeleton
+ * usable when populating `Options.agents`. The concrete tasks-to-verify list
+ * is supplied by the dispatcher at invocation time.
+ */
+export function createLoomexSubagentDefinition(): LoomfloAgentDefinition {
+  return {
+    role: "loomex",
+    description:
+      "Reviewer en lecture seule. Vérifie le travail produit dans le node et émet un verdict PASS/FAIL/BLOCKED.",
+    prompt: buildLoomexPrompt({
+      nodeTitle: "(provided by dispatcher)",
+      nodeInstructions:
+        "Le node sous review et la liste des tâches à vérifier te sont transmis par le dispatcher.",
+      tasksToVerify: [],
+    }),
+    defaultModel: "claude-sonnet-4-6",
+    allowedTools: [...LOOMEX_ALLOWED_TOOLS],
+  };
+}

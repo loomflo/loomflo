@@ -204,6 +204,7 @@ function buildNodeFromFragment(
     startedAt: null,
     completedAt: null,
     providerRetryState: null,
+    runtime: "loomi-native",
   };
 }
 
