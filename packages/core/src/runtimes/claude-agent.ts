@@ -22,6 +22,7 @@ import { createLoomAgentDefinition } from "../agents-config/loom.js";
 import { createLoomexAgentDefinition } from "../agents-config/loomex.js";
 import type { LoomfloAgentDefinition } from "../agents-config/index.js";
 import { createLoomfloMcpServer } from "../mcp/loomflo-tools.js";
+import { buildCanUseTool } from "./can-use-tool.js";
 import type {
   AgentRuntime,
   ModelInfo,
@@ -192,6 +193,7 @@ export function buildSdkOptions(config: SessionConfig): BuiltSdkOptions {
     cwd: config.workspacePath,
     tools: [], // Disable built-in Claude Code tools — only MCP tools allowed.
     allowedTools: agentDef.allowedTools,
+    canUseTool: buildCanUseTool(config.fileScope ?? []),
     mcpServers: {
       loomflo: loomfloMcp as never,
       ...userMcpServers,

@@ -35,6 +35,38 @@ import type {
 } from "./base.js";
 
 // ============================================================================
+// File scope derivation
+// ============================================================================
+
+/**
+ * Derive the file write scope for an agent from `node.fileOwnership`.
+ *
+ * Rules (Phase 2):
+ *  - loom / loomi / loomex : never write project files → empty scope.
+ *  - looma                 : use `node.fileOwnership[agentId]` when present;
+ *                            else use the union of all entries; else default
+ *                            to `["**\/*"]` (broad — same as Phase 1).
+ *
+ * Exported for unit testing.
+ */
+export function deriveFileScope(
+  node: { fileOwnership?: Record<string, string[]> },
+  agentRole: AgentRole,
+  agentId: string,
+): string[] {
+  if (agentRole !== "looma") return [];
+
+  const ownerships = node.fileOwnership ?? {};
+  const own = ownerships[agentId];
+  if (own && own.length > 0) return own;
+
+  const union = Object.values(ownerships).flat();
+  if (union.length > 0) return union;
+
+  return ["**/*"];
+}
+
+// ============================================================================
 // Credentials resolution
 // ============================================================================
 
@@ -128,9 +160,10 @@ export async function runNodeWithRuntime(
   const agentRole: AgentRole = deps.agentRole ?? "loomi";
   const agentId = `${agentRole}-${node.id}`;
 
-  // Phase 1: broad scope. Phase 2 will derive per-agent scope from
-  // node.fileOwnership and pass it to canUseTool.
-  const fileScope = ["**/*"];
+  // Derive the effective file scope for this agent (Phase 2).
+  // Loom / Loomi / Loomex: empty scope (no project file writes allowed).
+  // Looma: from node.fileOwnership[agentId] or fallback.
+  const fileScope = deriveFileScope(node, agentRole, agentId);
 
   const config: SessionConfig = {
     workspacePath: deps.workspacePath,
