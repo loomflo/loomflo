@@ -668,6 +668,7 @@ function createNodeFromDefinition(def: GraphNodeDefinition, defaultDelay: string
     startedAt: null,
     completedAt: null,
     providerRetryState: null,
+    runtime: "loomi-native",
   };
 }
 

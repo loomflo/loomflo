@@ -19,7 +19,7 @@ const stubContext = {
   costTracker: {} as unknown as CostTracker,
   sharedMemory: {} as unknown as SharedMemoryManager,
   messageBus: { async send() {} },
-  completionHandler: { async handleCompletion() {} },
+  completionHandler: { async reportComplete() {} },
   escalationHandler: { async escalate() {} },
 };
 

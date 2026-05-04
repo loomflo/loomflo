@@ -25,6 +25,8 @@ import { shellExecTool } from "./tools/shell-exec.js";
 import { memoryReadTool } from "./tools/memory-read.js";
 import { memoryWriteTool } from "./tools/memory-write.js";
 import { loadConfig } from "./config.js";
+import { runNodeWithRuntime } from "./runtimes/run-node.js";
+import { resolveNodeRuntime } from "./runtimes/registry.js";
 import type { NodeExecutor } from "./workflow/execution-engine.js";
 import type { Workflow } from "./types.js";
 import type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
@@ -257,7 +259,33 @@ export class Daemon {
       async (node) => {
         const nodeConfig = await loadConfig({ projectPath: workflow.projectPath });
         const messageBus = new MessageBus();
+        const nodeData = node.toJSON();
+        const escalationHandler = {
+          escalate: async (): Promise<void> => {
+            /* no-op in daemon — agents self-manage */
+          },
+        };
 
+        // Multi-runtime routing (spec 003): if the node declares a non-native
+        // runtime, dispatch to AgentRuntime instead of the legacy runLoomi loop.
+        const runtimeName = resolveNodeRuntime(nodeData);
+        if (runtimeName !== "loomi-native") {
+          const runtimeResult = await runNodeWithRuntime(nodeData, {
+            workflowId: workflow.id,
+            workspacePath: workflow.projectPath,
+            costTracker: rt.costTracker,
+            sharedMemory: rt.sharedMemory,
+            messageBus,
+            completionHandler: { reportComplete: async () => {} },
+            escalationHandler,
+            agentRole: "loomi",
+            model: nodeConfig.models.loomi,
+          });
+          // runNodeWithRuntime returns null only for "loomi-native" — already filtered.
+          if (runtimeResult) return runtimeResult;
+        }
+
+        // Default path: legacy runLoomi multi-agent loop.
         const result = await runLoomi({
           nodeId: node.id,
           nodeTitle: node.title,
@@ -270,11 +298,7 @@ export class Daemon {
           eventLog: { workflowId: workflow.id },
           costTracker: rt.costTracker,
           sharedMemory: rt.sharedMemory,
-          escalationHandler: {
-            escalate: async () => {
-              /* no-op in daemon — agents self-manage */
-            },
-          },
+          escalationHandler,
           workerTools,
         });
 

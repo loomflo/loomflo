@@ -29,7 +29,7 @@ const stubMessageBus: MessageBusLike = {
   },
 };
 const stubCompletionHandler: CompletionHandlerLike = {
-  async handleCompletion(): Promise<void> {
+  async reportComplete(): Promise<void> {
     /* noop */
   },
 };

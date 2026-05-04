@@ -21,6 +21,20 @@ export {
   type MockScenarioStep,
 } from "./mock.js";
 
+export {
+  getAgentRuntime,
+  resolveNodeRuntime,
+  __setRuntimeInstanceForTest,
+  REGISTRY_RUNTIME_NAMES,
+  type NodeRuntimeName,
+} from "./registry.js";
+
+export {
+  runNodeWithRuntime,
+  resolveClaudeAgentCredentials,
+  type RunNodeWithRuntimeDeps,
+} from "./run-node.js";
+
 export type {
   AgentRuntime,
   AgentRole,

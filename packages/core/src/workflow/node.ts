@@ -381,6 +381,7 @@ export class WorkflowNode {
       startedAt: null,
       completedAt: null,
       providerRetryState: null,
+      runtime: "loomi-native",
     });
   }
 }

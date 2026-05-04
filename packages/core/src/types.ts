@@ -351,6 +351,17 @@ export const NodeSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   /** Provider retry state for rate-limit backoff, or null if not in retry. */
   providerRetryState: ProviderRetryStateSchema.default(null),
+  /**
+   * Agent runtime to execute this node (spec 003 multi-runtime).
+   *
+   * Defaults to "loomi-native" (the legacy `runLoomi` orchestrator).
+   * "claude-agent" routes through `@anthropic-ai/claude-agent-sdk`.
+   * "mock" routes through MockAgentRuntime (no LLM cost — for tests/demos).
+   *
+   * Optional + defaulted so existing persisted workflows.json files load
+   * unchanged.
+   */
+  runtime: z.enum(["loomi-native", "claude-agent", "mock"]).default("loomi-native"),
 });
 
 /** A workflow node representing one major step in the execution graph. */
