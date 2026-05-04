@@ -69,6 +69,53 @@ describe("runNodeWithRuntime routing", () => {
 // ---------------------------------------------------------------------------
 
 describe("runNodeWithRuntime + MockAgentRuntime", () => {
+  it("feeds CostTracker.recordCall on each cost_update event", async () => {
+    const runtime = new MockAgentRuntime({
+      forceScenario: "happy-path-with-write",
+      timingMultiplier: 0,
+    });
+    __setRuntimeInstanceForTest("mock", runtime);
+
+    const calls: Array<{
+      model: string;
+      input: number;
+      output: number;
+      agentId: string;
+      nodeId: string;
+    }> = [];
+    const fakeCostTracker = {
+      recordCall: (
+        model: string,
+        input: number,
+        output: number,
+        agentId: string,
+        nodeId: string,
+      ): unknown => {
+        calls.push({ model, input, output, agentId, nodeId });
+        return {};
+      },
+    } as unknown as CostTracker;
+
+    try {
+      await runNodeWithRuntime(
+        { ...baseNode, runtime: "mock" },
+        {
+          ...stubDeps,
+          costTracker: fakeCostTracker,
+          model: "claude-sonnet-4-6",
+          credentialsOverride: { kind: "oauth-claude-code" },
+        },
+      );
+
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[0]?.model).toBe("claude-sonnet-4-6");
+      expect(calls[0]?.nodeId).toBe(baseNode.id);
+      expect(calls[0]?.agentId.startsWith("loomi-")).toBe(true);
+    } finally {
+      __setRuntimeInstanceForTest("mock", null);
+    }
+  });
+
   it("runs a happy-path scenario and returns status=done with accumulated cost", async () => {
     // Inject a deterministic mock runtime instance into the registry.
     const runtime = new MockAgentRuntime({

@@ -196,6 +196,21 @@ export async function runNodeWithRuntime(
 
       if (event.kind === "cost_update") {
         totalCostUsd += event.usd;
+        // Phase 2.4: feed the daemon's CostTracker so per-node / per-agent
+        // accounting and budget enforcement see runtime-driven costs the same
+        // way they see legacy runLoomi costs.
+        try {
+          deps.costTracker.recordCall(
+            deps.model ?? "",
+            event.inputTokens,
+            event.outputTokens,
+            agentId,
+            node.id,
+          );
+        } catch {
+          // recordCall should never throw, but isolate just in case so the
+          // session continues to terminate cleanly.
+        }
       } else if (event.kind === "error") {
         lastErrorMessage = event.message;
       } else if (event.kind === "session_ended") {
