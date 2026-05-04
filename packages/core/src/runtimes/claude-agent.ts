@@ -182,6 +182,12 @@ export function buildSdkOptions(config: SessionConfig): BuiltSdkOptions {
     model: config.model || agentDef.defaultModel,
   };
 
+  // Allow pointing the SDK at a Claude Code binary outside its bundled
+  // optional package (useful when the user already has `claude` installed
+  // globally, e.g. via the official native installer).
+  const pathOverride =
+    process.env["LOOMFLO_CLAUDE_CODE_PATH"] ?? process.env["CLAUDE_CODE_PATH"];
+
   const options: SdkOptions = {
     cwd: config.workspacePath,
     tools: [], // Disable built-in Claude Code tools — only MCP tools allowed.
@@ -193,6 +199,7 @@ export function buildSdkOptions(config: SessionConfig): BuiltSdkOptions {
     agents: { [config.agentRole]: sdkAgentDef } as SdkOptions["agents"],
     agent: config.agentRole,
     env: { ...process.env, ...buildSdkAuthEnv(config.credentials) },
+    ...(pathOverride ? { pathToClaudeCodeExecutable: pathOverride } : {}),
     ...(config.budget?.maxTokens !== undefined ? { maxTokens: config.budget.maxTokens } : {}),
     ...(config.resumeSessionId !== undefined ? { resume: config.resumeSessionId } : {}),
   };
