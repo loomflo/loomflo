@@ -270,6 +270,52 @@ export class Daemon {
         // runtime, dispatch to AgentRuntime instead of the legacy runLoomi loop.
         const runtimeName = resolveNodeRuntime(nodeData);
         if (runtimeName !== "loomi-native") {
+          // Phase 4b: bridge SessionEvents to the dashboard WS so the session
+          // viewer + cost panel update live. The broadcaster carries projectId
+          // for routing in multi-project mode.
+          const projectId = rt.id;
+          const agentId = `loomi-${node.id}`;
+          let sessionStartedSent = false;
+          const broadcaster = this.broadcastForProject.bind(this);
+          const onRuntimeEvent = (ev: { kind: string } & Record<string, unknown>): void => {
+            if (!sessionStartedSent && ev.kind === "session_started") {
+              sessionStartedSent = true;
+              broadcaster(projectId, {
+                type: "runtime_session_started",
+                timestamp: new Date().toISOString(),
+                projectId,
+                nodeId: node.id,
+                agentId,
+                runtimeName,
+                sessionId: String(ev["sessionId"] ?? ""),
+                model: nodeConfig.models.loomi,
+              });
+            }
+            if (ev.kind === "tool_call") {
+              broadcaster(projectId, {
+                type: "mcp_tool_called",
+                timestamp: new Date().toISOString(),
+                projectId,
+                nodeId: node.id,
+                agentId,
+                toolName: String(ev["toolName"] ?? "unknown"),
+                ...(typeof ev["toolUseId"] === "string"
+                  ? { toolUseId: ev["toolUseId"] }
+                  : {}),
+                input: (ev["input"] as Record<string, unknown>) ?? {},
+              });
+            }
+            broadcaster(projectId, {
+              type: "runtime_session_event",
+              timestamp: new Date().toISOString(),
+              projectId,
+              nodeId: node.id,
+              agentId,
+              sessionId: String(ev["sessionId"] ?? ""),
+              event: ev,
+            });
+          };
+
           const runtimeResult = await runNodeWithRuntime(nodeData, {
             workflowId: workflow.id,
             workspacePath: workflow.projectPath,
@@ -280,6 +326,7 @@ export class Daemon {
             escalationHandler,
             agentRole: "loomi",
             model: nodeConfig.models.loomi,
+            onEvent: (e) => onRuntimeEvent(e as { kind: string } & Record<string, unknown>),
           });
           // runNodeWithRuntime returns null only for "loomi-native" — already filtered.
           if (runtimeResult) return runtimeResult;
