@@ -116,6 +116,36 @@ describe("runNodeWithRuntime + MockAgentRuntime", () => {
     }
   });
 
+  it("runs the multi-worker + review scenario and surfaces both Agent dispatches", async () => {
+    const runtime = new MockAgentRuntime({
+      forceScenario: "happy-path-multi-worker-with-review",
+      timingMultiplier: 0,
+    });
+    __setRuntimeInstanceForTest("mock", runtime);
+
+    try {
+      const seenAgentDispatches: string[] = [];
+      const result = await runNodeWithRuntime(
+        { ...baseNode, runtime: "mock" },
+        {
+          ...stubDeps,
+          credentialsOverride: { kind: "oauth-claude-code" },
+          onEvent: (e) => {
+            if (e.kind === "tool_call" && e.toolName === "Agent") {
+              const subagent = (e.input["subagent_type"] as string) ?? "";
+              seenAgentDispatches.push(subagent);
+            }
+          },
+        },
+      );
+
+      expect(result?.status).toBe("done");
+      expect(seenAgentDispatches).toEqual(["looma", "loomex"]);
+    } finally {
+      __setRuntimeInstanceForTest("mock", null);
+    }
+  });
+
   it("runs a happy-path scenario and returns status=done with accumulated cost", async () => {
     // Inject a deterministic mock runtime instance into the registry.
     const runtime = new MockAgentRuntime({

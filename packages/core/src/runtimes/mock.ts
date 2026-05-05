@@ -164,6 +164,82 @@ export const DEFAULT_MOCK_SCENARIOS: MockScenario[] = [
     ],
   },
   {
+    name: "happy-path-multi-worker-with-review",
+    steps: [
+      {
+        delayMs: 120,
+        event: {
+          kind: "assistant_text",
+          text: "Loomi : je délègue l'implémentation à Looma.",
+          isDelta: false,
+        },
+      },
+      {
+        delayMs: 80,
+        event: {
+          kind: "tool_call",
+          toolName: "Agent",
+          input: {
+            subagent_type: "looma",
+            prompt: "Implémente la feature et écrit les tests associés.",
+          },
+          toolUseId: "tu_dispatch_looma_1",
+        },
+      },
+      {
+        delayMs: 400,
+        event: {
+          kind: "tool_result",
+          toolUseId: "tu_dispatch_looma_1",
+          ok: true,
+          output: "Looma : 3 fichiers créés, 1 modifié, tests verts.",
+        },
+      },
+      {
+        delayMs: 100,
+        event: {
+          kind: "assistant_text",
+          text: "Loomi : workers terminés, je lance la review.",
+          isDelta: false,
+        },
+      },
+      {
+        delayMs: 80,
+        event: {
+          kind: "tool_call",
+          toolName: "Agent",
+          input: {
+            subagent_type: "loomex",
+            prompt: "Vérifie la conformité du travail vs les instructions du node.",
+          },
+          toolUseId: "tu_dispatch_loomex_1",
+        },
+      },
+      {
+        delayMs: 300,
+        event: {
+          kind: "tool_result",
+          toolUseId: "tu_dispatch_loomex_1",
+          ok: true,
+          output: "Loomex : verdict PASS — toutes les exigences satisfaites.",
+        },
+      },
+      {
+        delayMs: 100,
+        event: {
+          kind: "assistant_text",
+          text: "Loomi : node terminé avec succès (review PASS).",
+          isDelta: false,
+        },
+      },
+      {
+        delayMs: 50,
+        event: { kind: "cost_update", inputTokens: 4200, outputTokens: 380, usd: 0.052 },
+      },
+      { delayMs: 50, event: { kind: "session_idle" } },
+    ],
+  },
+  {
     name: "failure-rate-limit-then-succeed",
     steps: [
       {
