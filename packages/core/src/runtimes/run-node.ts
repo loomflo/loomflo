@@ -126,6 +126,14 @@ export interface RunNodeWithRuntimeDeps {
   model?: string;
   /** Credentials override — useful for tests. */
   credentialsOverride?: ResolvedCredentials;
+  /**
+   * Maximum cumulative cost (USD) for this single session.
+   * When exceeded, the session is aborted and the result is returned with
+   * status="blocked" + error="budget_exceeded". Default: no limit.
+   * The daemon-wide budget enforcement via CostTracker remains active in
+   * parallel (this is a per-session safety net).
+   */
+  maxCostUsd?: number;
   /** Optional callback invoked for each session event (telemetry / dashboard). */
   onEvent?: (event: SessionEvent) => void;
 }
@@ -190,6 +198,7 @@ export async function runNodeWithRuntime(
   return new Promise<NodeExecutionResult>((resolve) => {
     let totalCostUsd = 0;
     let lastErrorMessage: string | undefined;
+    let budgetExceededFlag = false;
 
     const unsubscribe = session.on((event) => {
       deps.onEvent?.(event);
@@ -211,6 +220,17 @@ export async function runNodeWithRuntime(
           // recordCall should never throw, but isolate just in case so the
           // session continues to terminate cleanly.
         }
+        // Phase 6.1: per-session budget enforcement.
+        // Check after each cost_update; abort once if exceeded so the session
+        // ends cleanly with reason="aborted" (mapped to budget_exceeded below).
+        if (
+          deps.maxCostUsd !== undefined &&
+          totalCostUsd >= deps.maxCostUsd &&
+          !budgetExceededFlag
+        ) {
+          budgetExceededFlag = true;
+          void session.abort();
+        }
       } else if (event.kind === "error") {
         lastErrorMessage = event.message;
       } else if (event.kind === "session_ended") {
@@ -224,7 +244,9 @@ export async function runNodeWithRuntime(
               break;
             case "aborted":
               status = "blocked";
-              error = "Session aborted before completion";
+              error = budgetExceededFlag
+                ? `Session aborted: budget exceeded (cost=$${totalCostUsd.toFixed(4)} >= max=$${(deps.maxCostUsd ?? 0).toFixed(4)})`
+                : "Session aborted before completion";
               break;
             case "budget_exceeded":
               status = "blocked";
