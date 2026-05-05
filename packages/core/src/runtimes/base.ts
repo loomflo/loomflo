@@ -22,7 +22,7 @@ import type { EscalationHandlerLike } from "../tools/escalate.js";
 // ============================================================================
 
 /** Identifier of the runtime family. */
-export type RuntimeName = "claude-agent" | "copilot";
+export type RuntimeName = "claude-agent" | "copilot" | "mock";
 
 /** Static capabilities advertised by a runtime. */
 export interface RuntimeCapabilities {

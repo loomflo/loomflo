@@ -16,12 +16,14 @@
 import type { Node } from "../types.js";
 import type { AgentRuntime, RuntimeName } from "./base.js";
 import { ClaudeAgentRuntime } from "./claude-agent.js";
+import { CopilotRuntime } from "./copilot.js";
 import { MockAgentRuntime } from "./mock.js";
 
 /** Discriminator value used by Node.runtime — wider than RuntimeName because it includes "loomi-native". */
-export type NodeRuntimeName = "loomi-native" | "claude-agent" | "mock";
+export type NodeRuntimeName = "loomi-native" | "claude-agent" | "copilot" | "mock";
 
 let claudeAgentInstance: ClaudeAgentRuntime | undefined;
+let copilotInstance: CopilotRuntime | undefined;
 let mockInstance: MockAgentRuntime | undefined;
 
 /**
@@ -40,6 +42,9 @@ export function getAgentRuntime(name: NodeRuntimeName): AgentRuntime | null {
     case "claude-agent":
       claudeAgentInstance ??= new ClaudeAgentRuntime();
       return claudeAgentInstance;
+    case "copilot":
+      copilotInstance ??= new CopilotRuntime();
+      return copilotInstance;
     case "mock":
       mockInstance ??= new MockAgentRuntime();
       return mockInstance;
@@ -64,10 +69,16 @@ export function __setRuntimeInstanceForTest(
 ): void {
   if (name === "claude-agent") {
     claudeAgentInstance = (instance as ClaudeAgentRuntime | null) ?? undefined;
+  } else if (name === "copilot") {
+    copilotInstance = (instance as CopilotRuntime | null) ?? undefined;
   } else if (name === "mock") {
     mockInstance = (instance as MockAgentRuntime | null) ?? undefined;
   }
 }
 
 /** All non-native runtime names available in the registry. */
-export const REGISTRY_RUNTIME_NAMES: ReadonlyArray<RuntimeName> = ["claude-agent", "mock" as RuntimeName];
+export const REGISTRY_RUNTIME_NAMES: ReadonlyArray<RuntimeName> = [
+  "claude-agent",
+  "copilot",
+  "mock" as RuntimeName,
+];

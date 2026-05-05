@@ -21,6 +21,13 @@ export {
   type MockScenarioStep,
 } from "./mock.js";
 
+export { CopilotRuntime, buildCopilotProvider } from "./copilot.js";
+export {
+  buildCopilotTools,
+  listCopilotToolNamesForRole,
+  type BuildCopilotToolsOpts,
+} from "./copilot-tools.js";
+
 export {
   getAgentRuntime,
   resolveNodeRuntime,

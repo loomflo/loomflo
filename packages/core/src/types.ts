@@ -361,7 +361,7 @@ export const NodeSchema = z.object({
    * Optional + defaulted so existing persisted workflows.json files load
    * unchanged.
    */
-  runtime: z.enum(["loomi-native", "claude-agent", "mock"]).default("loomi-native"),
+  runtime: z.enum(["loomi-native", "claude-agent", "copilot", "mock"]).default("loomi-native"),
 });
 
 /** A workflow node representing one major step in the execution graph. */
