@@ -18,6 +18,7 @@ import { projectsCrudRoutes } from "./routes/projects-crud.js";
 import { runtimesRoutes } from "./routes/runtimes.js";
 import { credentialsRoutes } from "./routes/credentials.js";
 import { mcpRoutes } from "./routes/mcp.js";
+import { mockRoutes, isMockApiEnabled } from "./routes/mock.js";
 import { ProviderProfiles } from "../providers/profiles.js";
 import { legacyGoneRoutes } from "./routes/legacy-gone.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
@@ -420,6 +421,12 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   await server.register(
     credentialsRoutes({ profiles: new ProviderProfiles(credentialsFilePath) }),
   );
+
+  // Optional: mock fixture routes for dashboard development. Disabled by
+  // default; opt-in via LOOMFLO_MOCK_API=1.
+  if (isMockApiEnabled()) {
+    await server.register(mockRoutes);
+  }
 
   if (options.registerProject && options.deregisterProject) {
     await server.register(projectsCrudRoutes, {
