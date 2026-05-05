@@ -16,6 +16,8 @@ import { specsRoutes } from "./routes/specs.js";
 import { daemonRoutes } from "./routes/daemon.js";
 import { projectsCrudRoutes } from "./routes/projects-crud.js";
 import { runtimesRoutes } from "./routes/runtimes.js";
+import { credentialsRoutes } from "./routes/credentials.js";
+import { ProviderProfiles } from "../providers/profiles.js";
 import { legacyGoneRoutes } from "./routes/legacy-gone.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 
@@ -407,6 +409,16 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
 
   // Daemon-level: runtimes catalog + CLI detection (Phase 4a + 4d of spec 003).
   await server.register(runtimesRoutes);
+
+  // Daemon-level: credentials CRUD. Profiles file path follows the daemon's
+  // existing ~/.loomflo/credentials.json convention; allow override via env
+  // for tests + alt deployments.
+  const credentialsFilePath =
+    process.env["LOOMFLO_CREDENTIALS_PATH"] ??
+    `${process.env["HOME"] ?? ""}/.loomflo/credentials.json`;
+  await server.register(
+    credentialsRoutes({ profiles: new ProviderProfiles(credentialsFilePath) }),
+  );
 
   if (options.registerProject && options.deregisterProject) {
     await server.register(projectsCrudRoutes, {
