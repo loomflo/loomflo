@@ -17,6 +17,7 @@ import { daemonRoutes } from "./routes/daemon.js";
 import { projectsCrudRoutes } from "./routes/projects-crud.js";
 import { runtimesRoutes } from "./routes/runtimes.js";
 import { credentialsRoutes } from "./routes/credentials.js";
+import { mcpRoutes } from "./routes/mcp.js";
 import { ProviderProfiles } from "../providers/profiles.js";
 import { legacyGoneRoutes } from "./routes/legacy-gone.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
@@ -468,6 +469,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       await scoped.register(costsRoutes({}));
       await scoped.register(configRoutes({}));
       await scoped.register(specsRoutes({}));
+      await scoped.register(mcpRoutes());
     },
     { prefix: "/projects/:projectId" },
   );
