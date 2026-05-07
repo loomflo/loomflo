@@ -99,14 +99,12 @@ beforeEach(() => {
       });
       return this;
     } as unknown as typeof WebSocket;
-  // Provide the readyState constants the client queries.
-  (globalThis as unknown as { WebSocket: typeof WebSocket & Record<string, number> }).WebSocket.OPEN = 1;
-  (
-    globalThis as unknown as { WebSocket: typeof WebSocket & Record<string, number> }
-  ).WebSocket.CONNECTING = 0;
-  (
-    globalThis as unknown as { WebSocket: typeof WebSocket & Record<string, number> }
-  ).WebSocket.CLOSED = 3;
+  // Provide the readyState constants the client queries. Bypass typing to
+  // mutate the read-only constants on the stubbed constructor.
+  const WS = (globalThis as unknown as { WebSocket: { [key: string]: unknown } }).WebSocket;
+  WS["OPEN"] = 1;
+  WS["CONNECTING"] = 0;
+  WS["CLOSED"] = 3;
   vi.useFakeTimers();
 });
 
