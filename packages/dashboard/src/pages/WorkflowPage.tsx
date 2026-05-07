@@ -5,10 +5,15 @@ import { LoomChatPanel } from "../components/loom/LoomChatPanel.js";
 import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { useChat } from "../hooks/useChat.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
-import type { BrainNode } from "../lib/loomBrain.js";
-import { SEED_HISTORY, SEED_MESSAGES } from "../lib/loomBrain.js";
-import type { Edge as WfEdge, Node as WfNode, NodeStatus } from "../lib/types.js";
+import type { BrainNode, SeedMessage } from "../lib/loomBrain.js";
+import type {
+  ChatHistoryEntry,
+  Edge as WfEdge,
+  Node as WfNode,
+  NodeStatus,
+} from "../lib/types.js";
 import "./WorkflowPage.css";
 
 /* ============================================================================
@@ -113,6 +118,15 @@ function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+function chatHistoryToSeedMessages(history: ChatHistoryEntry[]): SeedMessage[] {
+  return history.map((entry, idx) => ({
+    id: `c${idx}`,
+    from: entry.role === "user" ? "user" : "loom",
+    ts: new Date(entry.timestamp).getTime(),
+    text: entry.content,
+  }));
 }
 
 function durationFromNode(node: WfNode): number {
@@ -235,6 +249,7 @@ export function WorkflowPage() {
   const { projects } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
   const { workflow, loading, error } = useWorkflow(projectId ?? null);
+  const { messages: chatMessages } = useChat(projectId ?? null);
 
   const project = useMemo(
     () => projects.find((p) => p.id === projectId) ?? null,
@@ -495,8 +510,8 @@ export function WorkflowPage() {
               workflowState={
                 isPaused ? "idle" : wfStatus === "running" ? "running" : "idle"
               }
-              initialMessages={SEED_MESSAGES}
-              initialHistory={SEED_HISTORY}
+              initialMessages={chatHistoryToSeedMessages(chatMessages)}
+              initialHistory={[]}
             />
           </div>
         </aside>
