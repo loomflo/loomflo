@@ -9,6 +9,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { useStore } from "../context/ProjectStoreContext.js";
+import { useApi, useAppContext } from "../context/AppContext.js";
+import type { ProviderProfilePayload } from "../lib/types.js";
 import { useTheme } from "../context/ThemeContext.js";
 import "./WizardPage.css";
 
@@ -19,6 +21,23 @@ import "./WizardPage.css";
 type ApiProviderId = "anthropic" | "openai" | "moonshot";
 type CliAgentId = "claude-code" | "copilot" | "codex";
 type ProviderId = ApiProviderId | CliAgentId | null;
+
+function isApiProvider(p: ProviderId): p is ApiProviderId {
+  return p === "anthropic" || p === "openai" || p === "moonshot";
+}
+
+function buildProviderPayload(
+  provider: ApiProviderId,
+  apiKey: string,
+): ProviderProfilePayload {
+  switch (provider) {
+    case "anthropic":
+      return { type: "anthropic", apiKey };
+    case "openai":
+    case "moonshot":
+      return { type: provider, apiKey };
+  }
+}
 
 const PROVIDER_GLYPH: Record<NonNullable<ProviderId>, string> = {
   anthropic: "A",
@@ -908,9 +927,11 @@ interface Step6Props {
   draft: WizardDraft;
   onJumpTo: (step: number) => void;
   onCreate: () => void;
+  creating?: boolean;
+  createError?: string | null;
 }
 
-function Step6({ draft, onJumpTo, onCreate }: Step6Props) {
+function Step6({ draft, onJumpTo, onCreate, creating, createError }: Step6Props) {
   const providerLabels: Record<NonNullable<ProviderId>, string> = {
     anthropic: "Anthropic API",
     openai: "OpenAI API",
@@ -961,10 +982,25 @@ function Step6({ draft, onJumpTo, onCreate }: Step6Props) {
         ))}
       </div>
 
-      <button className="btn btn--primary create-cta" onClick={onCreate}>
-        Créer le projet et commencer le brainstorming{" "}
+      <button
+        className="btn btn--primary create-cta"
+        onClick={onCreate}
+        disabled={creating === true}
+      >
+        {creating === true
+          ? "Création du projet…"
+          : "Créer le projet et commencer le brainstorming"}{" "}
         <Icon.ChevronRight width="16" height="16" />
       </button>
+      {createError && (
+        <span
+          className="field-help"
+          style={{ textAlign: "center", color: "var(--color-loom-error, #c33)" }}
+          role="alert"
+        >
+          Création impossible — {createError}
+        </span>
+      )}
       <span className="field-help" style={{ textAlign: "center" }}>
         Le projet sera marqué <code className="mono">workflowStatus: 'init'</code> et tu seras
         redirigé vers <code className="mono">/projects/:id/brainstorm</code>.
@@ -1302,6 +1338,8 @@ function loadCreds(): Record<ApiProviderId, string> {
 export function WizardPage() {
   const navigate = useNavigate();
   const store = useStore();
+  const api = useApi();
+  const { token } = useAppContext();
   const { theme, toggleTheme } = useTheme();
 
   const [draft, setDraftState] = useState<WizardDraft>(loadDraft);
@@ -1393,21 +1431,52 @@ export function WizardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [step, credModal, installDrawer, confirmCancel, canNext, navigate, goNext]);
 
-  const finalize = () => {
-    const project = store.create({
-      name: draft.name,
-      projectPath: draft.folder,
-      workflowStatus: "init",
-      status: "pending",
-      createdBy: "user",
-      config: { template: draft.type, stack: [], level: 1 },
-    });
+  const [creating, setCreating] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const finalize = async () => {
+    setCreating(true);
+    setCreateError(null);
     try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      /* localStorage unavailable */
+      const provider = draft.primaryProvider;
+      const providerProfileId =
+        provider && isApiProvider(provider) ? provider : "default";
+
+      // When the user typed an API key in the wizard and we have a daemon
+      // token, push the credential first so POST /projects can attach it.
+      if (token && provider && isApiProvider(provider) && creds[provider]) {
+        const payload = buildProviderPayload(provider, creds[provider]);
+        try {
+          await api.upsertCredential(provider, payload);
+        } catch (err) {
+          throw new Error(
+            `Échec de l'enregistrement de la clé ${provider} — ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
+
+      const project = await store.create({
+        name: draft.name,
+        projectPath: draft.folder,
+        workflowStatus: "init",
+        status: "pending",
+        createdBy: "user",
+        config: { template: draft.type, stack: [], level: 1 },
+        providerProfileId,
+      });
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* localStorage unavailable */
+      }
+      setCreated({ id: project.id, name: project.name });
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreating(false);
     }
-    setCreated({ id: project.id, name: project.name });
   };
 
   if (created) {
@@ -1499,7 +1568,17 @@ export function WizardPage() {
               )}
               {step === 4 && <Step4 draft={draft} setDraft={setDraft} />}
               {step === 5 && <Step5 draft={draft} setDraft={setDraft} />}
-              {step === 6 && <Step6 draft={draft} onJumpTo={goTo} onCreate={finalize} />}
+              {step === 6 && (
+                <Step6
+                  draft={draft}
+                  onJumpTo={goTo}
+                  onCreate={() => {
+                    void finalize();
+                  }}
+                  creating={creating}
+                  createError={createError}
+                />
+              )}
             </div>
 
             <div className="actions">
