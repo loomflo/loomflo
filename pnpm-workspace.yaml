@@ -3,3 +3,6 @@ packages:
   - "packages/cli"
   - "packages/dashboard"
   - "packages/sdk"
+# packages/dashboard-legacy is intentionally excluded from the workspace
+# during the Phase A → Phase C dashboard migration. The directory is kept
+# on disk for git history and reference; it does not build or install.
