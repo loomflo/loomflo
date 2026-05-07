@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
+import { useApi, useAppContext } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import "./BrainstormPage.css";
@@ -454,6 +455,8 @@ function ConfirmReset({ onCancel, onConfirm }: { onCancel: () => void; onConfirm
 export function BrainstormPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const api = useApi();
+  const { token } = useAppContext();
   const { projects } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
 
@@ -667,20 +670,46 @@ export function BrainstormPage() {
     const idx = questionsAsked;
     if (idx < plan.length) {
       window.setTimeout(() => askNextQuestion(idx, plan), 350);
-    } else {
-      window.setTimeout(() => {
-        setThinking(true);
-        setThinkingLabel(
-          THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
-        );
-        window.setTimeout(() => {
+      return;
+    }
+
+    // Open-dialogue phase: if we have a daemon connection, route the
+    // user's free-form message through POST /chat. Otherwise fall back
+    // to the scripted closing message.
+    if (token && projectId) {
+      setThinking(true);
+      setThinkingLabel(
+        THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
+      );
+      api
+        .postChat(projectId, trimmed)
+        .then((res) => {
+          setThinking(false);
+          beginStream(res.response);
+        })
+        .catch((err) => {
           setThinking(false);
           beginStream(
-            `Bien noté. On a couvert l'essentiel — tu peux **lancer la génération de la spec** quand tu es prêt, ou continuer à approfondir ici.\n\nUn point que tu voudrais creuser ?`,
+            `Loom n'a pas répondu — ${
+              err instanceof Error ? err.message : String(err)
+            }. On peut continuer en local ou réessayer.`,
           );
-        }, 700);
-      }, 300);
+        });
+      return;
     }
+
+    window.setTimeout(() => {
+      setThinking(true);
+      setThinkingLabel(
+        THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
+      );
+      window.setTimeout(() => {
+        setThinking(false);
+        beginStream(
+          `Bien noté. On a couvert l'essentiel — tu peux **lancer la génération de la spec** quand tu es prêt, ou continuer à approfondir ici.\n\nUn point que tu voudrais creuser ?`,
+        );
+      }, 700);
+    }, 300);
   };
 
   const onResonanceChange = (id: ResonanceMode["id"]) => {

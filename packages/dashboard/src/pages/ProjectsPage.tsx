@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon, type IconName } from "../components/Icon.js";
+import { useAppContext, useWsStatus } from "../context/AppContext.js";
 import { useProjects, useStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import type { UiProject, UiProjectStatus } from "../lib/types.js";
@@ -949,6 +950,8 @@ export function ProjectsPage() {
   const store = useStore();
   const navigate = useNavigate();
   const { toggleTheme } = useTheme();
+  const { token, useMock } = useAppContext();
+  const wsStatus = useWsStatus();
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1009,8 +1012,21 @@ export function ProjectsPage() {
                 <div>
                   <h1>Projets</h1>
                   <p className="lf-projects-sub">
-                    {projects.length} projet{projects.length > 1 ? "s" : ""} · daemon{" "}
-                    <span className="lf-mono">loomflo</span> connecté
+                    {projects.length} projet{projects.length > 1 ? "s" : ""} ·{" "}
+                    {token ? (
+                      <>
+                        daemon <span className="lf-mono">loomflo</span>{" "}
+                        {wsStatus === "open"
+                          ? "connecté"
+                          : wsStatus === "connecting"
+                            ? "connexion…"
+                            : "hors-ligne"}
+                      </>
+                    ) : useMock ? (
+                      "mode mock — fixtures /mock/*"
+                    ) : (
+                      "hors-ligne — données locales"
+                    )}
                   </p>
                 </div>
                 <div className="lf-projects-actions" style={{ display: "flex", gap: 8 }}>
