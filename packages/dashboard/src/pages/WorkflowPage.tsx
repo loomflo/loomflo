@@ -1,204 +1,78 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { LoomChatPanel } from "../components/loom/LoomChatPanel.js";
+import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { useWorkflow } from "../hooks/useWorkflow.js";
 import type { BrainNode } from "../lib/loomBrain.js";
 import { SEED_HISTORY, SEED_MESSAGES } from "../lib/loomBrain.js";
+import type { Edge as WfEdge, Node as WfNode, NodeStatus } from "../lib/types.js";
 import "./WorkflowPage.css";
 
 /* ============================================================================
-   Static workflow data — Phase A renders without a simulator.
-   Phase B replaces these literals with live data from /workflow + WS events.
+   UI status mapping
    ============================================================================ */
 
-interface SpecNode {
-  id: string;
-  name: string;
-  description: string;
-  phase: "spec";
-  estimatedDurationSeconds: number;
-  agent: "loom" | "loomi" | "looma" | "loomex";
-  isFinalSpec?: boolean;
+type UiStatus = "pending" | "running" | "done" | "failed" | "waiting";
+
+function toUiStatus(status: NodeStatus): UiStatus {
+  switch (status) {
+    case "running":
+    case "review":
+      return "running";
+    case "done":
+      return "done";
+    case "failed":
+    case "blocked":
+    case "failed_provider_exhausted":
+      return "failed";
+    case "waiting":
+    case "waiting_for_provider":
+      return "waiting";
+    case "pending":
+    default:
+      return "pending";
+  }
 }
 
-interface WorkerNode {
-  id: string;
-  name: string;
-  description: string;
-  phase: "worker";
-  estimatedDurationSeconds: number;
-  agent: "looma";
-  parents: string[];
-}
+/* ============================================================================
+   Phase classification
+   ============================================================================ */
 
-type GraphNode = SpecNode | WorkerNode;
+type Phase = "spec" | "worker";
 
-const SPEC_NODES: SpecNode[] = [
-  {
-    id: "requirements",
-    name: "Requirements",
-    description: "Extrait les requirements à partir du brainstorm.",
-    phase: "spec",
-    estimatedDurationSeconds: 80,
-    agent: "loomi",
-  },
-  {
-    id: "architecture",
-    name: "Architecture",
-    description: "Conçoit l'architecture technique du projet.",
-    phase: "spec",
-    estimatedDurationSeconds: 140,
-    agent: "loomi",
-  },
-  {
-    id: "workflow-builder",
-    name: "Workflow builder",
-    description: "Génère le DAG des workers à partir de la spec.",
-    phase: "spec",
-    estimatedDurationSeconds: 120,
-    agent: "loomex",
-    isFinalSpec: true,
-  },
-];
-
-const WORKERS: WorkerNode[] = [
-  {
-    id: "setup-project",
-    name: "Setup project",
-    description: "Initialise le repo, installe les deps.",
-    phase: "worker",
-    estimatedDurationSeconds: 90,
-    agent: "looma",
-    parents: ["workflow-builder"],
-  },
-  {
-    id: "models",
-    name: "Models",
-    description: "Schémas Prisma + types partagés.",
-    phase: "worker",
-    estimatedDurationSeconds: 140,
-    agent: "looma",
-    parents: ["setup-project"],
-  },
-  {
-    id: "api",
-    name: "API REST",
-    description: "Endpoints CRUD + validation Zod.",
-    phase: "worker",
-    estimatedDurationSeconds: 220,
-    agent: "looma",
-    parents: ["models"],
-  },
-  {
-    id: "auth",
-    name: "Auth & sessions",
-    description: "Login, JWT, middleware d'auth.",
-    phase: "worker",
-    estimatedDurationSeconds: 180,
-    agent: "looma",
-    parents: ["models"],
-  },
-  {
-    id: "ui-base",
-    name: "UI base",
-    description: "Layout, theming, design tokens.",
-    phase: "worker",
-    estimatedDurationSeconds: 120,
-    agent: "looma",
-    parents: ["setup-project"],
-  },
-  {
-    id: "ui-pages",
-    name: "Pages",
-    description: "Routes principales et data fetching.",
-    phase: "worker",
-    estimatedDurationSeconds: 240,
-    agent: "looma",
-    parents: ["ui-base", "api"],
-  },
-  {
-    id: "ui-components",
-    name: "Composants",
-    description: "Boutons, formulaires, modals.",
-    phase: "worker",
-    estimatedDurationSeconds: 200,
-    agent: "looma",
-    parents: ["ui-base"],
-  },
-  {
-    id: "tests",
-    name: "Tests E2E",
-    description: "Playwright flows critiques.",
-    phase: "worker",
-    estimatedDurationSeconds: 160,
-    agent: "looma",
-    parents: ["ui-pages", "auth"],
-  },
-  {
-    id: "docs",
-    name: "Documentation",
-    description: "README, ADR, guide contrib.",
-    phase: "worker",
-    estimatedDurationSeconds: 110,
-    agent: "looma",
-    parents: ["ui-pages"],
-  },
-];
-
-const NODE_STATUS: Record<string, "pending" | "running" | "done" | "failed" | "waiting"> = {
-  requirements: "done",
-  architecture: "done",
-  "workflow-builder": "done",
-  "setup-project": "done",
-  models: "done",
-  api: "running",
-  auth: "running",
-  "ui-base": "done",
-  "ui-pages": "pending",
-  "ui-components": "pending",
-  tests: "pending",
-  docs: "pending",
-};
-
-function fmtDuration(sec: number): string {
-  if (sec < 60) return `${Math.round(sec)}s`;
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
+/**
+ * Classify a node as "spec" (planning agents) or "worker" (build agents).
+ *
+ * Falls back to "worker" when the agent roster is empty so freshly
+ * graph_built nodes still render in the worker column rather than getting
+ * pinned to the spec phase.
+ */
+function nodePhase(node: WfNode): Phase {
+  const roles = new Set(node.agents.map((a) => a.role));
+  if (roles.has("looma")) return "worker";
+  if (roles.has("loom") || roles.has("loomi") || roles.has("loomex")) return "spec";
+  return "worker";
 }
 
 /* ============================================================================
    Layout — column-by-rank
    ============================================================================ */
 
-interface Edge {
+interface UiEdge {
   source: string;
   target: string;
 }
 
-function buildEdges(nodes: GraphNode[]): Edge[] {
-  const edges: Edge[] = [];
-  for (const n of nodes) {
-    if (n.phase === "spec") continue;
-    for (const p of n.parents) {
-      edges.push({ source: p, target: n.id });
-    }
-  }
-  // Spec is sequential
-  for (let i = 0; i < SPEC_NODES.length - 1; i++) {
-    const a = SPEC_NODES[i];
-    const b = SPEC_NODES[i + 1];
-    if (a && b) edges.push({ source: a.id, target: b.id });
-  }
-  return edges;
+interface LaidOutGraph {
+  nodes: WfNode[];
+  edges: UiEdge[];
+  pos: Record<string, { x: number; y: number }>;
 }
 
-function layoutGraph(
-  nodes: GraphNode[],
-  edges: Edge[],
-): { pos: Record<string, { x: number; y: number }> } {
+function layoutGraph(nodes: WfNode[], edges: UiEdge[]): LaidOutGraph["pos"] {
   const incoming = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
   edges.forEach((e) => incoming.get(e.target)?.push(e.source));
   const rank = new Map<string, number>();
@@ -231,19 +105,32 @@ function layoutGraph(
       pos[id] = { x: startX + r * gapX, y: startY + i * rowHeight };
     });
   }
-  return { pos };
+  return pos;
+}
+
+function fmtDuration(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+function durationFromNode(node: WfNode): number {
+  if (node.startedAt && node.completedAt) {
+    return Math.max(
+      0,
+      (new Date(node.completedAt).getTime() - new Date(node.startedAt).getTime()) / 1000,
+    );
+  }
+  return 0;
 }
 
 /* ============================================================================
    Sub-components
    ============================================================================ */
 
-function StatusPill({
-  status,
-}: {
-  status: "pending" | "running" | "done" | "failed" | "waiting";
-}) {
-  const labels = {
+function StatusPill({ status }: { status: UiStatus }) {
+  const labels: Record<UiStatus, string> = {
     pending: "En attente",
     waiting: "En attente",
     running: "En cours",
@@ -259,21 +146,23 @@ function StatusPill({
 }
 
 interface NodeCardProps {
-  node: GraphNode;
-  status: "pending" | "running" | "done" | "failed" | "waiting";
+  node: WfNode;
+  phase: Phase;
+  status: UiStatus;
   x: number;
   y: number;
   selected: boolean;
   onClick: () => void;
 }
 
-function NodeCard({ node, status, x, y, selected, onClick }: NodeCardProps) {
+function NodeCard({ node, phase, status, x, y, selected, onClick }: NodeCardProps) {
   const idle = status !== "running";
-  const phaseLabel = node.phase === "spec" ? "SPEC" : "WORKER";
+  const phaseLabel = phase === "spec" ? "SPEC" : "WORKER";
+  const description = node.instructions.split("\n", 1)[0]?.slice(0, 120) ?? "";
   return (
     <div
       className="node"
-      data-phase={node.phase}
+      data-phase={phase}
       data-status={status}
       data-idle={idle}
       data-selected={selected}
@@ -282,7 +171,7 @@ function NodeCard({ node, status, x, y, selected, onClick }: NodeCardProps) {
     >
       <div className="node-head">
         <span className="node-phase">
-          {node.phase === "spec" ? (
+          {phase === "spec" ? (
             <Icon.FileText width="11" height="11" />
           ) : (
             <Icon.Tool width="11" height="11" />
@@ -293,11 +182,11 @@ function NodeCard({ node, status, x, y, selected, onClick }: NodeCardProps) {
           <Icon.Check width="14" height="14" style={{ color: "var(--status-done-fg)" }} />
         )}
       </div>
-      <h4 className="node-title">{node.name}</h4>
-      <p className="node-desc">{node.description}</p>
+      <h4 className="node-title">{node.title}</h4>
+      <p className="node-desc">{description}</p>
       <div className="node-foot">
         <StatusPill status={status} />
-        <span className="time">~{fmtDuration(node.estimatedDurationSeconds)}</span>
+        <span className="time">{node.cost > 0 ? `$${node.cost.toFixed(2)}` : "—"}</span>
       </div>
     </div>
   );
@@ -329,35 +218,86 @@ function EdgePath({
    WorkflowPage
    ============================================================================ */
 
+const WORKFLOW_BADGE: Record<string, { label: string; className: string }> = {
+  init: { label: "Initialisation", className: "init" },
+  spec: { label: "Spec en cours", className: "running" },
+  building: { label: "Construction", className: "running" },
+  running: { label: "En cours", className: "running" },
+  paused: { label: "En pause", className: "waiting" },
+  done: { label: "Terminé", className: "done" },
+  failed: { label: "Échec", className: "failed" },
+};
+
 export function WorkflowPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const api = useApi();
   const { projects } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
+  const { workflow, loading, error } = useWorkflow(projectId ?? null);
 
   const project = useMemo(
     () => projects.find((p) => p.id === projectId) ?? null,
     [projects, projectId],
   );
 
-  const allNodes: GraphNode[] = useMemo(() => [...SPEC_NODES, ...WORKERS], []);
-  const allEdges = useMemo(() => buildEdges(allNodes), [allNodes]);
+  const [actionPending, setActionPending] = useState<"pause" | "resume" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const allNodes: WfNode[] = useMemo(() => {
+    if (!workflow) return [];
+    return Object.values(workflow.graph.nodes);
+  }, [workflow]);
+
+  const allEdges: UiEdge[] = useMemo(() => {
+    if (!workflow) return [];
+    return workflow.graph.edges.map((e: WfEdge) => ({ source: e.from, target: e.to }));
+  }, [workflow]);
+
   const layout = useMemo(() => layoutGraph(allNodes, allEdges), [allNodes, allEdges]);
+  const phaseFor = useCallback((n: WfNode) => nodePhase(n), []);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
-  const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    if (selectedId && !allNodes.some((n) => n.id === selectedId)) setSelectedId(null);
+  }, [allNodes, selectedId]);
 
   const selectedNode = allNodes.find((n) => n.id === selectedId) ?? null;
-  const selectedStatus = selectedNode ? NODE_STATUS[selectedNode.id] ?? "pending" : null;
+  const selectedStatus = selectedNode ? toUiStatus(selectedNode.status) : null;
 
   const brainNodes: BrainNode[] = allNodes.map((n) => ({
     id: n.id,
-    name: n.name,
-    status: NODE_STATUS[n.id],
+    name: n.title,
+    status: toUiStatus(n.status),
   }));
 
-  if (!project) {
+  const onPause = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending("pause");
+    setActionError(null);
+    try {
+      await api.pauseWorkflow(projectId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionPending(null);
+    }
+  }, [api, projectId]);
+
+  const onResume = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending("resume");
+    setActionError(null);
+    try {
+      await api.resumeWorkflow(projectId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionPending(null);
+    }
+  }, [api, projectId]);
+
+  if (!project && !loading) {
     return (
       <div className="app">
         <header className="topbar">
@@ -366,11 +306,17 @@ export function WorkflowPage() {
           </Link>
         </header>
         <main style={{ padding: 32 }}>
-          <p>Projet introuvable. <Link to="/projects">Retour</Link>.</p>
+          <p>
+            Projet introuvable. <Link to="/projects">Retour</Link>.
+          </p>
         </main>
       </div>
     );
   }
+
+  const wfStatus = workflow?.status ?? project?.workflowStatus ?? "init";
+  const wfBadge = WORKFLOW_BADGE[wfStatus] ?? WORKFLOW_BADGE["running"]!;
+  const isPaused = wfStatus === "paused";
 
   return (
     <div className="app">
@@ -396,7 +342,9 @@ export function WorkflowPage() {
           <div className="crumbs">
             <Link to="/projects">Projets</Link>
             <span className="sep">›</span>
-            <Link to={`/projects/${project.id}/brainstorm`}>{project.name}</Link>
+            <Link to={`/projects/${project?.id ?? ""}/brainstorm`}>
+              {project?.name ?? "Projet"}
+            </Link>
             <span className="sep">›</span>
             <strong>Workflow</strong>
           </div>
@@ -419,28 +367,34 @@ export function WorkflowPage() {
 
       <div className="page-header">
         <div className="page-header-left">
-          <span className="workflow-status-badge running">
+          <span className={`workflow-status-badge ${wfBadge.className}`}>
             <span className="dot" />
-            En cours
+            {wfBadge.label}
           </span>
+          {error && (
+            <span className="workflow-status-badge failed" role="alert">
+              <span className="dot" /> {error.message.slice(0, 60)}
+            </span>
+          )}
         </div>
         <div className="page-header-right">
-          {paused ? (
-            <button className="btn" onClick={() => setPaused(false)}>
-              <Icon.Play width="14" height="14" /> Reprendre
+          {isPaused ? (
+            <button
+              className="btn"
+              onClick={onResume}
+              disabled={actionPending !== null || !projectId}
+            >
+              <Icon.Play width="14" height="14" />{" "}
+              {actionPending === "resume" ? "…" : "Reprendre"}
             </button>
           ) : (
-            <button className="btn" onClick={() => setPaused(true)}>
-              <Icon.Pause width="14" height="14" /> Pause
-            </button>
-          )}
-          {stopped ? (
-            <button className="btn" onClick={() => setStopped(false)}>
-              <Icon.RotateCcw width="14" height="14" /> Recommencer
-            </button>
-          ) : (
-            <button className="btn danger" onClick={() => setStopped(true)}>
-              <Icon.X width="14" height="14" /> Stop
+            <button
+              className="btn"
+              onClick={onPause}
+              disabled={actionPending !== null || !projectId}
+            >
+              <Icon.Pause width="14" height="14" />{" "}
+              {actionPending === "pause" ? "…" : "Pause"}
             </button>
           )}
           <button className="btn ghost">
@@ -448,7 +402,7 @@ export function WorkflowPage() {
           </button>
           <button
             className="btn ghost"
-            onClick={() => navigate(`/projects/${project.id}/settings`)}
+            onClick={() => navigate(`/projects/${project?.id ?? ""}/settings`)}
             aria-label="Configuration"
           >
             <Icon.Settings width="16" height="16" />
@@ -456,35 +410,65 @@ export function WorkflowPage() {
         </div>
       </div>
 
+      {actionError && (
+        <div className="page-header" role="alert">
+          <span className="workflow-status-badge failed">
+            <span className="dot" /> {actionError}
+          </span>
+        </div>
+      )}
+
       <div className="main">
         <aside className="left-panel">
           <div className="left-panel-detail" style={{ flex: 1 }}>
             <div className="panel-header">
               <span className="panel-title">Détail du nœud</span>
-              {selectedNode && <span className="panel-meta">{selectedNode.agent}</span>}
+              {selectedNode && (
+                <span className="panel-meta">
+                  {selectedNode.agents[0]?.role ?? "—"}
+                </span>
+              )}
             </div>
             <div className="panel-body">
               {selectedNode && selectedStatus ? (
                 <div className="detail-card">
                   <div className="dc-head">
-                    <span className={`dc-phase ${selectedNode.phase === "spec" ? "spec" : ""}`}>
-                      {selectedNode.phase === "spec" ? "SPEC" : "WORKER"}
+                    <span
+                      className={`dc-phase ${phaseFor(selectedNode) === "spec" ? "spec" : ""}`}
+                    >
+                      {phaseFor(selectedNode) === "spec" ? "SPEC" : "WORKER"}
                     </span>
                     <StatusPill status={selectedStatus} />
                   </div>
-                  <h3 className="dc-title">{selectedNode.name}</h3>
-                  <p className="dc-desc">{selectedNode.description}</p>
+                  <h3 className="dc-title">{selectedNode.title}</h3>
+                  <p className="dc-desc">
+                    {selectedNode.instructions.split("\n", 1)[0]}
+                  </p>
                   <dl className="dc-meta">
                     <dt>id</dt>
                     <dd>{selectedNode.id}</dd>
-                    <dt>agent</dt>
-                    <dd>{selectedNode.agent}</dd>
-                    <dt>durée estimée</dt>
-                    <dd>{fmtDuration(selectedNode.estimatedDurationSeconds)}</dd>
+                    <dt>agents</dt>
+                    <dd>
+                      {selectedNode.agents.map((a) => a.id).join(", ") || "—"}
+                    </dd>
+                    <dt>coût</dt>
+                    <dd>${selectedNode.cost.toFixed(4)}</dd>
+                    <dt>retry</dt>
+                    <dd>
+                      {selectedNode.retryCount}/{selectedNode.maxRetries}
+                    </dd>
+                    {durationFromNode(selectedNode) > 0 && (
+                      <>
+                        <dt>durée</dt>
+                        <dd>{fmtDuration(durationFromNode(selectedNode))}</dd>
+                      </>
+                    )}
                   </dl>
                   <button
                     className="btn"
-                    onClick={() => navigate(`/projects/${project.id}/nodes/${selectedNode.id}`)}
+                    onClick={() =>
+                      navigate(`/projects/${project?.id ?? ""}/nodes/${selectedNode.id}`)
+                    }
                   >
                     Voir le détail complet <Icon.ChevronRight width="11" height="11" />
                   </button>
@@ -494,8 +478,12 @@ export function WorkflowPage() {
                   <div className="empty-icon">
                     <Icon.GitBranch width="22" height="22" />
                   </div>
-                  <h3>Sélectionne un nœud</h3>
-                  <p>Clique sur un nœud du graphe pour voir son détail et sa progression.</p>
+                  <h3>{loading ? "Chargement du workflow…" : "Sélectionne un nœud"}</h3>
+                  <p>
+                    {loading
+                      ? "Connexion au daemon en cours."
+                      : "Clique sur un nœud du graphe pour voir son détail et sa progression."}
+                  </p>
                 </div>
               )}
             </div>
@@ -504,7 +492,9 @@ export function WorkflowPage() {
           <div className="left-panel-chat" style={{ flex: 1 }}>
             <LoomChatPanel
               nodes={brainNodes}
-              workflowState="running"
+              workflowState={
+                isPaused ? "idle" : wfStatus === "running" ? "running" : "idle"
+              }
               initialMessages={SEED_MESSAGES}
               initialHistory={SEED_HISTORY}
             />
@@ -545,10 +535,11 @@ export function WorkflowPage() {
               preserveAspectRatio="none"
             >
               {allEdges.map((e) => {
-                const from = layout.pos[e.source];
-                const to = layout.pos[e.target];
+                const from = layout[e.source];
+                const to = layout[e.target];
                 if (!from || !to) return null;
-                const sourceStatus = NODE_STATUS[e.source] ?? "pending";
+                const sourceNode = workflow?.graph.nodes[e.source];
+                const sourceStatus = sourceNode ? toUiStatus(sourceNode.status) : "pending";
                 return (
                   <EdgePath
                     key={`${e.source}->${e.target}`}
@@ -561,14 +552,14 @@ export function WorkflowPage() {
             </svg>
 
             {allNodes.map((n) => {
-              const pos = layout.pos[n.id];
+              const pos = layout[n.id];
               if (!pos) return null;
-              const status = NODE_STATUS[n.id] ?? "pending";
               return (
                 <NodeCard
                   key={n.id}
                   node={n}
-                  status={status}
+                  phase={phaseFor(n)}
+                  status={toUiStatus(n.status)}
                   x={pos.x}
                   y={pos.y}
                   selected={selectedId === n.id}
@@ -576,6 +567,19 @@ export function WorkflowPage() {
                 />
               );
             })}
+
+            {!loading && allNodes.length === 0 && (
+              <div className="empty-state" style={{ position: "absolute", left: 80, top: 0 }}>
+                <div className="empty-icon">
+                  <Icon.GitBranch width="22" height="22" />
+                </div>
+                <h3>Pas encore de graphe</h3>
+                <p>
+                  Lance le workflow ou attends que Loom ait construit le DAG —{" "}
+                  <Link to={`/projects/${project?.id ?? ""}/brainstorm`}>brainstorm</Link>.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
