@@ -1,53 +1,22 @@
-import { type ReactElement, useEffect } from "react";
-import { Routes, Route, useParams, Navigate, Outlet } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { ProjectsPage } from "./pages/ProjectsPage.js";
+import { WizardPage } from "./pages/WizardPage.js";
+import { BrainstormPage } from "./pages/BrainstormPage.js";
+import { WorkflowPage } from "./pages/WorkflowPage.js";
+import { NodeDetailPage } from "./pages/NodeDetailPage.js";
+import { SettingsPage } from "./pages/SettingsPage.js";
+import { NotFoundPage } from "./pages/NotFoundPage.js";
 
-import { useProject } from "./context/ProjectContext.js";
-import { HomePage } from "./pages/Home.js";
-import { GraphPage } from "./pages/Graph.js";
-import { NodePage } from "./pages/Node.js";
-import { SpecsPage } from "./pages/Specs.js";
-import { MemoryPage } from "./pages/Memory.js";
-import { ChatPage } from "./pages/Chat.js";
-import { CostsPage } from "./pages/Costs.js";
-import { ConfigPage } from "./pages/Config.js";
-import { LandingPage } from "./pages/Landing.js";
-import { NotFoundPage } from "./pages/NotFound.js";
-import { Layout } from "./components/Layout.js";
-
-function ProjectGuard(): ReactElement {
-  const { projectId } = useParams<{ projectId: string }>();
-  const ctx = useProject();
-
-  useEffect(() => {
-    if (projectId !== undefined && projectId !== ctx.projectId) {
-      ctx.setProjectId(projectId);
-    }
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-  }, [projectId, ctx.projectId, ctx.setProjectId]);
-
-  if (projectId === undefined) return <Navigate to="/" replace />;
-  if (ctx.allProjects.length > 0 && !ctx.allProjects.some((p) => p.id === projectId)) {
-    return <Navigate to="/" replace />;
-  }
-  return <Outlet />;
-}
-
-export function App(): ReactElement {
+export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route element={<ProjectGuard />}>
-        <Route path="/projects/:projectId" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="graph" element={<GraphPage />} />
-          <Route path="node/:id" element={<NodePage />} />
-          <Route path="specs" element={<SpecsPage />} />
-          <Route path="memory" element={<MemoryPage />} />
-          <Route path="chat" element={<ChatPage />} />
-          <Route path="costs" element={<CostsPage />} />
-          <Route path="config" element={<ConfigPage />} />
-        </Route>
-      </Route>
+      <Route path="/" element={<Navigate to="/projects" replace />} />
+      <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/projects/new/wizard" element={<WizardPage />} />
+      <Route path="/projects/:projectId/brainstorm" element={<BrainstormPage />} />
+      <Route path="/projects/:projectId/workflow" element={<WorkflowPage />} />
+      <Route path="/projects/:projectId/nodes/:nodeId" element={<NodeDetailPage />} />
+      <Route path="/projects/:projectId/settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
