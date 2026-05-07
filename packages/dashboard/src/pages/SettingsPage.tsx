@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
+import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { useConfig } from "../hooks/useConfig.js";
+import { useMcp } from "../hooks/useMcp.js";
+import type { Config, McpServerConfigEntry, RetryStrategy } from "../lib/types.js";
 import "./SettingsPage.css";
 
 /* ============================================================================
@@ -64,6 +68,65 @@ function saveProject(id: string, p: ProjectConfig): void {
   } catch {
     /* localStorage unavailable */
   }
+}
+
+/* ============================================================================
+   Daemon Config <-> ProjectConfig (local UI shape) bridges
+   ============================================================================ */
+
+function localRetryStrategyFromConfig(s: RetryStrategy): "adaptive" | "identical" {
+  return s === "same" ? "identical" : "adaptive";
+}
+
+function configRetryStrategyFromLocal(s: "adaptive" | "identical"): RetryStrategy {
+  return s === "identical" ? "same" : "adaptive";
+}
+
+function localDelayFromConfig(d: string): string {
+  if (d === "0") return "Immédiat";
+  return d;
+}
+
+function configDelayFromLocal(s: string): string {
+  if (s === "Immédiat") return "0";
+  // Pass-through for shorthand like "10m", "1h" that the daemon already parses.
+  return s;
+}
+
+function mergeConfigIntoLocal(prev: ProjectConfig, c: Config): ProjectConfig {
+  return {
+    ...prev,
+    reviewer: c.reviewerEnabled,
+    maxRetries: c.maxRetriesPerNode,
+    retryStrategy: localRetryStrategyFromConfig(c.retryStrategy),
+    maxWorkers: c.maxLoomasPerLoomi ?? prev.maxWorkers,
+    budgetUsd: c.budgetLimit,
+    delayPreset: localDelayFromConfig(c.defaultDelay),
+    primaryProvider: c.provider || prev.primaryProvider,
+  };
+}
+
+function diffLocalConfig(prev: ProjectConfig, next: ProjectConfig): Partial<Config> {
+  const out: Partial<Config> = {};
+  if (prev.reviewer !== next.reviewer) out.reviewerEnabled = next.reviewer;
+  if (prev.maxRetries !== next.maxRetries) out.maxRetriesPerNode = next.maxRetries;
+  if (prev.retryStrategy !== next.retryStrategy)
+    out.retryStrategy = configRetryStrategyFromLocal(next.retryStrategy);
+  if (prev.maxWorkers !== next.maxWorkers) out.maxLoomasPerLoomi = next.maxWorkers;
+  if (prev.budgetUsd !== next.budgetUsd) out.budgetLimit = next.budgetUsd;
+  if (prev.delayPreset !== next.delayPreset)
+    out.defaultDelay = configDelayFromLocal(next.delayPreset);
+  if (prev.primaryProvider !== next.primaryProvider) out.provider = next.primaryProvider;
+  return out;
+}
+
+function toLocalMcp(name: string, entry: McpServerConfigEntry): McpServer {
+  return {
+    name,
+    type: entry.type,
+    command: entry.type === "stdio" ? (entry.command ?? "") : (entry.url ?? ""),
+    enabled: entry.enabled,
+  };
 }
 
 interface SectionDef {
@@ -205,6 +268,7 @@ interface SectionProps {
   danger?: boolean;
   editing: boolean;
   canEdit?: boolean;
+  saving?: boolean;
   onEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -219,6 +283,7 @@ function Section({
   danger,
   editing,
   canEdit = true,
+  saving = false,
   onEdit,
   onSave,
   onCancel,
@@ -238,11 +303,12 @@ function Section({
           <div className="st-section-actions">
             {editing ? (
               <>
-                <button className="btn ghost" onClick={onCancel}>
+                <button className="btn ghost" onClick={onCancel} disabled={saving}>
                   Annuler
                 </button>
-                <button className="btn primary" onClick={onSave}>
-                  <Icon.Check width="11" height="11" /> Enregistrer
+                <button className="btn primary" onClick={onSave} disabled={saving}>
+                  <Icon.Check width="11" height="11" />{" "}
+                  {saving ? "Enregistrement…" : "Enregistrer"}
                 </button>
               </>
             ) : (
@@ -412,17 +478,23 @@ function DelaysSection({ data, draft, setDraft, editing }: SectionEditProps) {
 function ToolsSection({
   data,
   draft,
-  setDraft,
   editing,
   onAddMcp,
-}: SectionEditProps & { onAddMcp: () => void }) {
-  const list = editing ? draft.mcpServers : data.mcpServers;
+  onRemoveMcp,
+}: SectionEditProps & {
+  onAddMcp: () => void;
+  onRemoveMcp: (name: string) => void;
+}) {
+  // The MCP list is owned by the daemon — even in edit mode, mutations
+  // hit /projects/:id/mcp directly so we always show the live list.
+  const list = data.mcpServers;
+  void draft;
   return (
     <>
       <div className="st-mcp-list">
         {list.length === 0 && <p className="st-empty">Aucun serveur MCP configuré.</p>}
-        {list.map((srv, i) => (
-          <div key={i} className="st-mcp-row">
+        {list.map((srv) => (
+          <div key={srv.name} className="st-mcp-row">
             <div>
               <code className="mono">{srv.name}</code>{" "}
               <span className="st-mcp-type">{srv.type}</span>
@@ -436,9 +508,7 @@ function ToolsSection({
               <button
                 className="icon-btn"
                 aria-label="Supprimer"
-                onClick={() =>
-                  setDraft({ ...draft, mcpServers: draft.mcpServers.filter((_, j) => j !== i) })
-                }
+                onClick={() => onRemoveMcp(srv.name)}
               >
                 <Icon.Trash width="11" height="11" />
               </button>
@@ -586,6 +656,7 @@ function DangerSection({
 export function SettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const api = useApi();
   const { projects, store } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
 
@@ -594,9 +665,34 @@ export function SettingsPage() {
     [projects, projectId],
   );
 
+  const { config, update: updateConfig } = useConfig(projectId ?? null);
+  const {
+    servers: mcpServers,
+    upsert: upsertMcp,
+    remove: removeMcp,
+  } = useMcp(projectId ?? null);
+
   const [data, setData] = useState<ProjectConfig>(() =>
     projectId ? loadProject(projectId) : { ...DEFAULT_CONFIG },
   );
+
+  // Hydrate from the daemon when the live Config arrives.
+  useEffect(() => {
+    if (!config) return;
+    setData((prev) => mergeConfigIntoLocal(prev, config));
+  }, [config]);
+
+  // Hydrate MCP list from the daemon (CRUD lives on the daemon, not in
+  // localStorage anymore).
+  useEffect(() => {
+    setData((prev) => ({
+      ...prev,
+      mcpServers: Object.entries(mcpServers).map(([name, entry]) =>
+        toLocalMcp(name, entry),
+      ),
+    }));
+  }, [mcpServers]);
+
   const [editingId, setEditingId] = useState<SectionDef["id"] | null>(null);
   const [draft, setDraft] = useState<ProjectConfig | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -609,6 +705,8 @@ export function SettingsPage() {
     enabled: true,
   });
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const contentRef = useRef<HTMLElement | null>(null);
 
   const startEdit = (id: SectionDef["id"]) => {
@@ -619,13 +717,30 @@ export function SettingsPage() {
     setEditingId(null);
     setDraft(null);
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!draft || !projectId) return;
-    setData(draft);
-    saveProject(projectId, draft);
-    setEditingId(null);
-    setDraft(null);
-    showToast("Configuration mise à jour");
+    setSaving(true);
+    try {
+      const partial = diffLocalConfig(data, draft);
+      if (Object.keys(partial).length > 0) {
+        try {
+          await updateConfig(partial);
+        } catch (err) {
+          showToast(
+            `Le daemon a refusé la mise à jour — sauvegarde locale uniquement (${
+              err instanceof Error ? err.message : String(err)
+            })`,
+          );
+        }
+      }
+      setData(draft);
+      saveProject(projectId, draft);
+      setEditingId(null);
+      setDraft(null);
+      showToast("Configuration mise à jour");
+    } finally {
+      setSaving(false);
+    }
   };
   const showToast = (msg: string) => {
     setToast(msg);
@@ -638,11 +753,33 @@ export function SettingsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const addMcp = () => {
-    if (!draft || !mcpForm.name || !mcpForm.command) return;
-    setDraft({ ...draft, mcpServers: [...draft.mcpServers, { ...mcpForm }] });
-    setMcpForm({ name: "", type: "stdio", command: "", enabled: true });
-    setModal(null);
+  const addMcp = async () => {
+    if (!mcpForm.name || !mcpForm.command) return;
+    const entry: McpServerConfigEntry =
+      mcpForm.type === "stdio"
+        ? { type: "stdio", command: mcpForm.command, enabled: mcpForm.enabled }
+        : { type: mcpForm.type, url: mcpForm.command, enabled: mcpForm.enabled };
+    try {
+      await upsertMcp(mcpForm.name, entry);
+      setMcpForm({ name: "", type: "stdio", command: "", enabled: true });
+      setModal(null);
+      showToast("Serveur MCP ajouté");
+    } catch (err) {
+      showToast(
+        `Échec de l'ajout MCP — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  };
+
+  const onRemoveMcp = async (name: string) => {
+    try {
+      await removeMcp(name);
+      showToast("Serveur MCP supprimé");
+    } catch (err) {
+      showToast(
+        `Échec de la suppression MCP — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   };
 
   // Scroll-spy
@@ -698,7 +835,13 @@ export function SettingsPage() {
       case "delays":
         return <DelaysSection {...editProps} />;
       case "tools":
-        return <ToolsSection {...editProps} onAddMcp={() => setModal("mcp")} />;
+        return (
+          <ToolsSection
+            {...editProps}
+            onAddMcp={() => setModal("mcp")}
+            onRemoveMcp={onRemoveMcp}
+          />
+        );
       case "budget":
         return <BudgetSection {...editProps} />;
       case "advanced":
@@ -792,7 +935,10 @@ export function SettingsPage() {
               editing={editingId === s.id}
               canEdit={s.id !== "danger"}
               onEdit={() => startEdit(s.id)}
-              onSave={saveEdit}
+              onSave={() => {
+                void saveEdit();
+              }}
+              saving={saving}
               onCancel={cancelEdit}
             >
               {renderSection(s)}
@@ -822,12 +968,24 @@ export function SettingsPage() {
             </button>
             <button
               className="btn danger"
-              onClick={() => {
-                setModal(null);
-                showToast("Workflow mis en pause");
+              disabled={pausing || !projectId}
+              onClick={async () => {
+                if (!projectId) return;
+                setPausing(true);
+                try {
+                  await api.pauseWorkflow(projectId);
+                  showToast("Workflow mis en pause");
+                } catch (err) {
+                  showToast(
+                    `Échec — ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                } finally {
+                  setPausing(false);
+                  setModal(null);
+                }
               }}
             >
-              Pauser
+              {pausing ? "…" : "Pauser"}
             </button>
           </>
         }
@@ -901,11 +1059,17 @@ export function SettingsPage() {
             <button
               className="btn danger solid"
               disabled={deleteConfirmName !== data.name}
-              onClick={() => {
+              onClick={async () => {
                 setModal(null);
-                store.remove(project.id);
-                showToast("Projet supprimé");
-                navigate("/projects");
+                try {
+                  await store.remove(project.id);
+                  showToast("Projet supprimé");
+                  navigate("/projects");
+                } catch (err) {
+                  showToast(
+                    `Échec — ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                }
               }}
             >
               <Icon.Trash width="11" height="11" /> Supprimer définitivement
