@@ -1,97 +1,53 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
+import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { useNode } from "../hooks/useNode.js";
+import { useWorkflow } from "../hooks/useWorkflow.js";
+import type {
+  AgentInfo,
+  Node as WfNode,
+  NodeStatus,
+  WsRuntimeSessionEvent,
+} from "../lib/types.js";
 import "./NodeDetailPage.css";
 
 /* ============================================================================
-   Static node fixtures — Phase A renders without /nodes/:id wiring.
-   Phase B replaces these with daemon reads + WS streaming logs.
+   Status mapping
    ============================================================================ */
 
-type NodeStatus = "pending" | "waiting" | "running" | "done" | "failed" | "blocked";
+type UiStatus = "pending" | "waiting" | "running" | "done" | "failed" | "blocked";
 
-interface NodeFixture {
-  id: string;
-  name: string;
-  phase: "spec" | "worker";
-  description: string;
-  agent: string;
-  status: NodeStatus;
-  estimatedDurationSeconds: number;
-  parents: string[];
-  instructions: string;
-  tools: string[];
-  writeGlobs: string[];
-  files?: { path: string; lines: number }[];
-  cost?: { tokensInput: number; tokensOutput: number; usd: number; model: string };
-  logs?: { ts: number; level: "info" | "warn" | "error" | "debug"; text: string }[];
+function toUiStatus(status: NodeStatus): UiStatus {
+  switch (status) {
+    case "running":
+    case "review":
+      return "running";
+    case "done":
+      return "done";
+    case "failed":
+    case "failed_provider_exhausted":
+      return "failed";
+    case "blocked":
+      return "blocked";
+    case "waiting":
+    case "waiting_for_provider":
+      return "waiting";
+    case "pending":
+    default:
+      return "pending";
+  }
 }
 
-const NODE_FIXTURES: Record<string, NodeFixture> = {
-  api: {
-    id: "api",
-    name: "API REST",
-    phase: "worker",
-    description: "Endpoints CRUD + validation Zod sur tous les endpoints.",
-    agent: "looma",
-    status: "running",
-    estimatedDurationSeconds: 220,
-    parents: ["models"],
-    instructions:
-      "Implémente les endpoints CRUD pour les ressources principales du projet. Utilise Zod pour valider les requêtes. Respecte les conventions du projet pour le nommage et la structure des fichiers.",
-    tools: ["read", "write", "exec", "search"],
-    writeGlobs: ["src/api/**/*", "src/schemas/**/*"],
-    files: [
-      { path: "src/api/users.ts", lines: 142 },
-      { path: "src/api/orders.ts", lines: 98 },
-      { path: "src/schemas/user.ts", lines: 36 },
-    ],
-    cost: { tokensInput: 14820, tokensOutput: 3210, usd: 0.21, model: "claude-sonnet-4-6" },
-    logs: [
-      { ts: Date.now() - 180_000, level: "info", text: "Démarrage du worker — branche feature/api" },
-      { ts: Date.now() - 150_000, level: "info", text: "Lecture des dépendances depuis models" },
-      { ts: Date.now() - 120_000, level: "info", text: "Génération de src/api/users.ts (CRUD)" },
-      { ts: Date.now() - 90_000, level: "warn", text: "Conflit mineur sur src/schemas/user.ts (résolu)" },
-      { ts: Date.now() - 30_000, level: "info", text: "Ajout du middleware validate(schema)" },
-    ],
-  },
-  auth: {
-    id: "auth",
-    name: "Auth & sessions",
-    phase: "worker",
-    description: "Login, JWT, middleware d'auth.",
-    agent: "looma",
-    status: "running",
-    estimatedDurationSeconds: 180,
-    parents: ["models"],
-    instructions: "Implémente le login, la rotation des JWT et le middleware d'auth.",
-    tools: ["read", "write", "exec"],
-    writeGlobs: ["src/auth/**/*", "src/middleware/**/*"],
-    logs: [
-      { ts: Date.now() - 120_000, level: "info", text: "Démarrage du worker auth" },
-      { ts: Date.now() - 60_000, level: "info", text: "Implémentation de JWT rotation" },
-    ],
-  },
-  models: {
-    id: "models",
-    name: "Models",
-    phase: "worker",
-    description: "Schémas Prisma + types partagés.",
-    agent: "looma",
-    status: "done",
-    estimatedDurationSeconds: 140,
-    parents: ["setup-project"],
-    instructions: "Définit les schémas Prisma et exporte les types partagés.",
-    tools: ["read", "write"],
-    writeGlobs: ["prisma/**/*", "src/types/**/*"],
-    files: [
-      { path: "prisma/schema.prisma", lines: 88 },
-      { path: "src/types/db.ts", lines: 42 },
-    ],
-    cost: { tokensInput: 8210, tokensOutput: 1640, usd: 0.11, model: "claude-sonnet-4-6" },
-  },
+const STATUS_LABELS: Record<UiStatus, string> = {
+  pending: "En attente",
+  waiting: "En attente",
+  running: "En cours",
+  done: "Terminé",
+  failed: "Échec",
+  blocked: "Bloqué",
 };
 
 function fmtDuration(sec: number): string {
@@ -101,24 +57,95 @@ function fmtDuration(sec: number): string {
   return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
-function fmtClock(ts: number): string {
-  return new Date(ts).toTimeString().slice(0, 5);
+function fmtClock(ts: number | string): string {
+  const d = typeof ts === "number" ? new Date(ts) : new Date(ts);
+  return d.toTimeString().slice(0, 5);
 }
 
-const STATUS_LABELS: Record<NodeStatus, string> = {
-  pending: "En attente",
-  waiting: "En attente",
-  running: "En cours",
-  done: "Terminé",
-  failed: "Échec",
-  blocked: "Bloqué",
-};
+function nodePhase(node: WfNode): "spec" | "worker" {
+  const roles = new Set(node.agents.map((a) => a.role));
+  if (roles.has("looma")) return "worker";
+  if (roles.has("loom") || roles.has("loomi") || roles.has("loomex")) return "spec";
+  return "worker";
+}
+
+function durationFromNode(node: WfNode): number {
+  if (node.startedAt && node.completedAt) {
+    return Math.max(
+      0,
+      (new Date(node.completedAt).getTime() - new Date(node.startedAt).getTime()) / 1000,
+    );
+  }
+  return 0;
+}
+
+function aggregateAgents(agents: AgentInfo[]): {
+  totalInput: number;
+  totalOutput: number;
+  totalCost: number;
+  models: string[];
+} {
+  let totalInput = 0;
+  let totalOutput = 0;
+  let totalCost = 0;
+  const models = new Set<string>();
+  for (const a of agents) {
+    totalInput += a.tokenUsage.input;
+    totalOutput += a.tokenUsage.output;
+    totalCost += a.cost;
+    if (a.model) models.add(a.model);
+  }
+  return { totalInput, totalOutput, totalCost, models: [...models] };
+}
+
+/* ============================================================================
+   Live log derivation
+   ============================================================================ */
+
+interface LogLine {
+  ts: number;
+  level: "info" | "warn" | "error" | "debug";
+  text: string;
+}
+
+function eventToLogLine(ev: WsRuntimeSessionEvent): LogLine | null {
+  const kind = (ev.event as { kind?: string }).kind ?? "session";
+  const ts = new Date(ev.timestamp).getTime();
+  // Best-effort log shaping. The runtime SessionEvent payload varies per
+  // runtime (claude-agent vs copilot vs mock); stringify whatever lives
+  // under common fields so the user sees something.
+  const payload = ev.event as Record<string, unknown>;
+  const text =
+    typeof payload["text"] === "string"
+      ? (payload["text"] as string)
+      : typeof payload["message"] === "string"
+        ? (payload["message"] as string)
+        : typeof payload["content"] === "string"
+          ? (payload["content"] as string)
+          : `[${kind}] ${JSON.stringify(payload).slice(0, 280)}`;
+
+  let level: LogLine["level"] = "info";
+  if (kind === "error") level = "error";
+  else if (kind === "tool_call" || kind === "tool_result") level = "debug";
+  else if (kind === "warning") level = "warn";
+  return { ts, level, text };
+}
 
 /* ============================================================================
    Sub-components
    ============================================================================ */
 
-function NodeHeader({ node, onClose }: { node: NodeFixture; onClose: () => void }) {
+function NodeHeader({
+  node,
+  phase,
+  onClose,
+}: {
+  node: WfNode;
+  phase: "spec" | "worker";
+  onClose: () => void;
+}) {
+  const ui = toUiStatus(node.status);
+  const agentLabel = node.agents[0]?.role ?? "—";
   return (
     <header className="nd-header">
       <div className="nd-header-left">
@@ -127,17 +154,17 @@ function NodeHeader({ node, onClose }: { node: NodeFixture; onClose: () => void 
         </button>
         <div className="nd-header-meta">
           <span className="eyebrow">
-            {node.phase === "spec" ? "Spec node" : "Worker"} · {node.id}
+            {phase === "spec" ? "Spec node" : "Worker"} · {node.id}
           </span>
-          <h1 className="nd-title">{node.name}</h1>
+          <h1 className="nd-title">{node.title}</h1>
         </div>
       </div>
       <div className="nd-header-right">
-        <span className={`status-pill ${node.status}`}>
+        <span className={`status-pill ${ui}`}>
           <span className="dot" />
-          {STATUS_LABELS[node.status]}
+          {STATUS_LABELS[ui]}
         </span>
-        <span className="agent-badge">{node.agent}</span>
+        <span className="agent-badge">{agentLabel}</span>
       </div>
     </header>
   );
@@ -161,7 +188,7 @@ function InstructionsSection({
 }) {
   return (
     <Section title="Instructions">
-      <p className="nd-instructions">{instructions}</p>
+      <p className="nd-instructions">{instructions || "Aucune instruction définie."}</p>
       <button className="btn ghost" onClick={onEdit}>
         <Icon.Edit width="11" height="11" /> Modifier les instructions
       </button>
@@ -191,6 +218,31 @@ function DependenciesSection({ parents }: { parents: string[] }) {
   );
 }
 
+function AgentsSection({ agents }: { agents: AgentInfo[] }) {
+  if (agents.length === 0) {
+    return (
+      <Section title="Agents">
+        <p className="nd-empty">Aucun agent assigné — le nœud n'a pas encore démarré.</p>
+      </Section>
+    );
+  }
+  return (
+    <Section title="Agents">
+      <ul className="nd-deps">
+        {agents.map((a) => (
+          <li key={a.id}>
+            <Icon.Tool width="11" height="11" />
+            <code>{a.id}</code>
+            <span className="lines">
+              {a.role} · {a.model} · {a.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
 function ToolsSection({
   tools,
   writeGlobs,
@@ -203,103 +255,91 @@ function ToolsSection({
       <div className="nd-tools">
         <span className="label">Tools</span>
         <div className="chips">
-          {tools.map((t) => (
-            <span key={t} className="chip mono">
-              {t}
-            </span>
-          ))}
+          {tools.length === 0 ? (
+            <span className="chip mono">—</span>
+          ) : (
+            tools.map((t) => (
+              <span key={t} className="chip mono">
+                {t}
+              </span>
+            ))
+          )}
         </div>
       </div>
       <div className="nd-tools">
         <span className="label">Write globs</span>
         <div className="chips">
-          {writeGlobs.map((g) => (
-            <span key={g} className="chip mono">
-              {g}
-            </span>
-          ))}
+          {writeGlobs.length === 0 ? (
+            <span className="chip mono">—</span>
+          ) : (
+            writeGlobs.map((g) => (
+              <span key={g} className="chip mono">
+                {g}
+              </span>
+            ))
+          )}
         </div>
       </div>
     </Section>
   );
 }
 
-function FilesSection({
-  files,
-}: {
-  files: { path: string; lines: number }[];
-}) {
-  return (
-    <Section title="Fichiers produits">
-      <ul className="nd-files">
-        {files.map((f) => (
-          <li key={f.path}>
-            <Icon.FileText width="11" height="11" />
-            <code>{f.path}</code>
-            <span className="lines">{f.lines} lignes</span>
-          </li>
-        ))}
-      </ul>
-    </Section>
-  );
-}
-
 function CostSection({
-  cost,
+  totalInput,
+  totalOutput,
+  totalCost,
+  models,
 }: {
-  cost: NodeFixture["cost"];
+  totalInput: number;
+  totalOutput: number;
+  totalCost: number;
+  models: string[];
 }) {
-  if (!cost) return null;
+  if (totalInput === 0 && totalOutput === 0 && totalCost === 0) return null;
   return (
     <Section title="Coût">
       <dl className="nd-cost">
         <dt>tokens entrée</dt>
-        <dd>{cost.tokensInput.toLocaleString("fr-FR")}</dd>
+        <dd>{totalInput.toLocaleString("fr-FR")}</dd>
         <dt>tokens sortie</dt>
-        <dd>{cost.tokensOutput.toLocaleString("fr-FR")}</dd>
+        <dd>{totalOutput.toLocaleString("fr-FR")}</dd>
         <dt>coût</dt>
-        <dd>${cost.usd.toFixed(2)}</dd>
-        <dt>modèle</dt>
+        <dd>${totalCost.toFixed(4)}</dd>
+        <dt>modèle{models.length > 1 ? "s" : ""}</dt>
         <dd>
-          <code>{cost.model}</code>
+          <code>{models.length === 0 ? "—" : models.join(", ")}</code>
         </dd>
       </dl>
     </Section>
   );
 }
 
-function LogsSection({
-  logs,
-  onFullscreen,
-}: {
-  logs: NonNullable<NodeFixture["logs"]>;
-  onFullscreen: () => void;
-}) {
+function LogsSection({ logs, onFullscreen }: { logs: LogLine[]; onFullscreen: () => void }) {
   return (
     <Section title="Logs">
       <div className="nd-logs">
-        {logs.map((l, i) => (
-          <div key={i} className="nd-log-line" data-level={l.level}>
-            <span className="ts mono">{fmtClock(l.ts)}</span>
-            <span className="lvl">{l.level}</span>
-            <span className="msg">{l.text}</span>
-          </div>
-        ))}
+        {logs.length === 0 ? (
+          <p className="nd-empty">
+            Aucun log pour le moment — les events du runtime arrivent en direct.
+          </p>
+        ) : (
+          logs.map((l, i) => (
+            <div key={i} className="nd-log-line" data-level={l.level}>
+              <span className="ts mono">{fmtClock(l.ts)}</span>
+              <span className="lvl">{l.level}</span>
+              <span className="msg">{l.text}</span>
+            </div>
+          ))
+        )}
       </div>
-      <button className="btn ghost" onClick={onFullscreen}>
+      <button className="btn ghost" onClick={onFullscreen} disabled={logs.length === 0}>
         <Icon.ExternalLink width="11" height="11" /> Plein écran
       </button>
     </Section>
   );
 }
 
-function FullscreenLogs({
-  logs,
-  onClose,
-}: {
-  logs: NonNullable<NodeFixture["logs"]>;
-  onClose: () => void;
-}) {
+function FullscreenLogs({ logs, onClose }: { logs: LogLine[]; onClose: () => void }) {
   return (
     <div className="nd-modal-bg" onClick={onClose}>
       <div className="nd-fullscreen" onClick={(e) => e.stopPropagation()}>
@@ -359,30 +399,27 @@ function InstructionsModal({
 function NodeFooter({
   status,
   onAction,
+  pending,
 }: {
-  status: NodeStatus;
-  onAction: (kind: "stop" | "resume" | "retry" | "rollback") => void;
+  status: UiStatus;
+  onAction: (kind: "pause" | "resume" | "retry") => void;
+  pending: boolean;
 }) {
   return (
     <footer className="nd-footer">
       {status === "running" && (
-        <button className="btn danger" onClick={() => onAction("stop")}>
-          <Icon.Pause width="11" height="11" /> Stopper
+        <button className="btn danger" onClick={() => onAction("pause")} disabled={pending}>
+          <Icon.Pause width="11" height="11" /> Mettre le workflow en pause
         </button>
       )}
       {(status === "pending" || status === "waiting") && (
-        <button className="btn primary" onClick={() => onAction("resume")}>
-          <Icon.Play width="11" height="11" /> Démarrer
+        <button className="btn primary" onClick={() => onAction("resume")} disabled={pending}>
+          <Icon.Play width="11" height="11" /> Reprendre le workflow
         </button>
       )}
       {(status === "failed" || status === "blocked") && (
-        <button className="btn primary" onClick={() => onAction("retry")}>
-          <Icon.RefreshCw width="11" height="11" /> Réessayer
-        </button>
-      )}
-      {status === "done" && (
-        <button className="btn ghost" onClick={() => onAction("rollback")}>
-          <Icon.RotateCcw width="11" height="11" /> Rollback
+        <button className="btn primary" onClick={() => onAction("retry")} disabled={pending}>
+          <Icon.RefreshCw width="11" height="11" /> Reprendre le workflow
         </button>
       )}
     </footer>
@@ -396,6 +433,7 @@ function NodeFooter({
 export function NodeDetailPage() {
   const { projectId, nodeId } = useParams<{ projectId: string; nodeId: string }>();
   const navigate = useNavigate();
+  const api = useApi();
   const { projects } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
 
@@ -403,23 +441,110 @@ export function NodeDetailPage() {
     () => projects.find((p) => p.id === projectId) ?? null,
     [projects, projectId],
   );
-  const node = nodeId ? NODE_FIXTURES[nodeId] : undefined;
+
+  const { workflow } = useWorkflow(projectId ?? null);
+  const { node, loading, error, live } = useNode(projectId ?? null, nodeId ?? null);
 
   const [editing, setEditing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [instructions, setInstructions] = useState(node?.instructions ?? "");
   const [toast, setToast] = useState<string | null>(null);
+  const [actionPending, setActionPending] = useState(false);
 
-  const showToast = (msg: string) => {
+  // Workflow edges drive the dependency list (daemon Node has no parents field).
+  const parents = useMemo(() => {
+    if (!workflow || !nodeId) return [];
+    return workflow.graph.edges.filter((e) => e.to === nodeId).map((e) => e.from);
+  }, [workflow, nodeId]);
+
+  const phase = useMemo(() => (node ? nodePhase(node) : "worker"), [node]);
+  const duration = node ? durationFromNode(node) : 0;
+  const aggregate = useMemo(
+    () =>
+      node
+        ? aggregateAgents(node.agents)
+        : { totalInput: 0, totalOutput: 0, totalCost: 0, models: [] },
+    [node],
+  );
+
+  const tools = useMemo(() => {
+    if (!node) return [];
+    if (node.runtime) return [node.runtime];
+    return [];
+  }, [node]);
+  const writeGlobs = useMemo(() => {
+    if (!node) return [];
+    return [...new Set(Object.values(node.fileOwnership).flat())];
+  }, [node]);
+
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2400);
-  };
+  }, []);
 
-  const onAction = (kind: "stop" | "resume" | "retry" | "rollback") => {
-    showToast(`Action « ${kind} » envoyée — Phase B câble cette action au daemon`);
-  };
+  const onAction = useCallback(
+    async (kind: "pause" | "resume" | "retry") => {
+      if (!projectId) return;
+      setActionPending(true);
+      try {
+        if (kind === "pause") await api.pauseWorkflow(projectId);
+        else await api.resumeWorkflow(projectId);
+        showToast(`Action « ${kind} » envoyée au daemon`);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : String(err));
+      } finally {
+        setActionPending(false);
+      }
+    },
+    [api, projectId, showToast],
+  );
 
-  if (!project || !node) {
+  const onSaveInstructions = useCallback(
+    (next: string) => {
+      // Per-node instruction editing is not yet exposed by the daemon — we
+      // only echo the change locally and toast so the user knows the limit.
+      void next;
+      setEditing(false);
+      showToast("L'API ne supporte pas encore l'édition d'instructions — Phase C");
+    },
+    [showToast],
+  );
+
+  // Aggregate live runtime session events into a tail of log lines.
+  const logs = useMemo<LogLine[]>(() => {
+    return live.sessionEvents
+      .map(eventToLogLine)
+      .filter((line): line is LogLine => line !== null)
+      .slice(-200);
+  }, [live.sessionEvents]);
+
+  // Reset transient UI state when the node changes.
+  useEffect(() => {
+    setEditing(false);
+    setFullscreen(false);
+  }, [nodeId]);
+
+  if (!projectId || !nodeId) {
+    return (
+      <div className="nd-app">
+        <main style={{ padding: 32 }}>
+          <h2>URL invalide</h2>
+          <Link to="/projects">Retour</Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (loading && !node) {
+    return (
+      <div className="nd-app">
+        <main style={{ padding: 32 }}>
+          <h2>Chargement du nœud…</h2>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !node) {
     return (
       <div className="nd-app">
         <header className="nd-header">
@@ -430,16 +555,15 @@ export function NodeDetailPage() {
         <main style={{ padding: 32 }}>
           <h2>Nœud introuvable</h2>
           <p>
-            Le nœud <code>{nodeId}</code> n'a pas de fixture statique pour Phase A.{" "}
-            <Link to={projectId ? `/projects/${projectId}/workflow` : "/projects"}>
-              Retour au workflow
-            </Link>
-            .
+            {error?.message ?? "Le daemon ne renvoie pas ce nœud."}{" "}
+            <Link to={`/projects/${projectId}/workflow`}>Retour au workflow</Link>.
           </p>
         </main>
       </div>
     );
   }
+
+  const ui = toUiStatus(node.status);
 
   return (
     <div className="nd-app">
@@ -451,9 +575,9 @@ export function NodeDetailPage() {
           <div className="crumbs">
             <Link to="/projects">Projets</Link>
             <span className="sep">›</span>
-            <Link to={`/projects/${project.id}/workflow`}>{project.name}</Link>
+            <Link to={`/projects/${projectId}/workflow`}>{project?.name ?? "Projet"}</Link>
             <span className="sep">›</span>
-            <strong>{node.name}</strong>
+            <strong>{node.title}</strong>
           </div>
         </div>
         <button className="icon-btn" onClick={toggleTheme} aria-label="Basculer le thème">
@@ -465,55 +589,66 @@ export function NodeDetailPage() {
         </button>
       </div>
 
-      <NodeHeader node={node} onClose={() => navigate(`/projects/${project.id}/workflow`)} />
+      <NodeHeader
+        node={node}
+        phase={phase}
+        onClose={() => navigate(`/projects/${projectId}/workflow`)}
+      />
 
       <div className="nd-main">
         <div className="nd-summary">
-          <p className="nd-desc">{node.description}</p>
+          <p className="nd-desc">
+            {node.instructions.split("\n", 1)[0] ?? "Pas de description."}
+          </p>
           <dl className="nd-meta">
             <dt>id</dt>
             <dd>
               <code>{node.id}</code>
             </dd>
-            <dt>agent</dt>
-            <dd>{node.agent}</dd>
-            <dt>durée estimée</dt>
-            <dd>{fmtDuration(node.estimatedDurationSeconds)}</dd>
+            <dt>agents</dt>
+            <dd>{node.agents.length}</dd>
+            <dt>retry</dt>
+            <dd>
+              {node.retryCount}/{node.maxRetries}
+            </dd>
+            {duration > 0 && (
+              <>
+                <dt>durée</dt>
+                <dd>{fmtDuration(duration)}</dd>
+              </>
+            )}
             <dt>statut</dt>
-            <dd>{STATUS_LABELS[node.status]}</dd>
+            <dd>{STATUS_LABELS[ui]}</dd>
           </dl>
         </div>
 
         <InstructionsSection
-          instructions={instructions}
+          instructions={node.instructions}
           onEdit={() => setEditing(true)}
         />
-        <DependenciesSection parents={node.parents} />
-        <ToolsSection tools={node.tools} writeGlobs={node.writeGlobs} />
-        {node.files && <FilesSection files={node.files} />}
-        {node.cost && <CostSection cost={node.cost} />}
-        {node.logs && (
-          <LogsSection logs={node.logs} onFullscreen={() => setFullscreen(true)} />
-        )}
+        <DependenciesSection parents={parents} />
+        <AgentsSection agents={node.agents} />
+        <ToolsSection tools={tools} writeGlobs={writeGlobs} />
+        <CostSection
+          totalInput={aggregate.totalInput}
+          totalOutput={aggregate.totalOutput}
+          totalCost={aggregate.totalCost === 0 ? node.cost : aggregate.totalCost}
+          models={aggregate.models}
+        />
+        <LogsSection logs={logs} onFullscreen={() => setFullscreen(true)} />
       </div>
 
-      <NodeFooter status={node.status} onAction={onAction} />
+      <NodeFooter status={ui} onAction={onAction} pending={actionPending} />
 
       {editing && (
         <InstructionsModal
-          initial={instructions}
-          onSave={(next) => {
-            setInstructions(next);
-            setEditing(false);
-            showToast("Instructions sauvegardées localement");
-          }}
+          initial={node.instructions}
+          onSave={onSaveInstructions}
           onClose={() => setEditing(false)}
         />
       )}
 
-      {fullscreen && node.logs && (
-        <FullscreenLogs logs={node.logs} onClose={() => setFullscreen(false)} />
-      )}
+      {fullscreen && <FullscreenLogs logs={logs} onClose={() => setFullscreen(false)} />}
 
       {toast && <div className="nd-toast">{toast}</div>}
     </div>
