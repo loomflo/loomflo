@@ -19,7 +19,7 @@ export function useCosts(projectId: string | null | undefined): {
   const api = useApi();
   const ws = useWs();
 
-  const res = useAsyncResource<CostsResponse>(
+  const { data, loading, error, refresh, set } = useAsyncResource<CostsResponse>(
     async () => {
       if (!projectId) throw new Error("No projectId");
       return api.getCosts(projectId);
@@ -31,7 +31,7 @@ export function useCosts(projectId: string | null | undefined): {
     if (!projectId) return;
     const off = ws.on("cost_update", (ev) => {
       if (ev.projectId !== undefined && ev.projectId !== projectId) return;
-      res.set((prev) => {
+      set((prev) => {
         if (!prev) return prev;
         const nodes = prev.nodes.map((n) =>
           n.id === ev.nodeId ? { ...n, cost: ev.nodeCost } : n,
@@ -45,7 +45,7 @@ export function useCosts(projectId: string | null | undefined): {
       });
     });
     return off;
-  }, [ws, projectId, res]);
+  }, [ws, projectId, set]);
 
-  return { costs: res.data, loading: res.loading, error: res.error, refresh: res.refresh };
+  return { costs: data, loading, error, refresh };
 }

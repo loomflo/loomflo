@@ -18,27 +18,30 @@ export function useProjectsApi(): {
 } {
   const api = useApi();
   const ws = useWs();
-  const res = useAsyncResource<ProjectSummary[]>(() => api.listProjects(), [api]);
+  const { data, loading, error, refresh } = useAsyncResource<ProjectSummary[]>(
+    () => api.listProjects(),
+    [api],
+  );
 
   useEffect(() => {
     // No dedicated "project_added"/"project_removed" event yet — refresh on
     // graph_modified or runtime_session_started, which signal lifecycle activity.
     const off1 = ws.on("graph_modified", () => {
-      void res.refresh();
+      void refresh();
     });
     const off2 = ws.on("runtime_session_started", () => {
-      void res.refresh();
+      void refresh();
     });
     return () => {
       off1();
       off2();
     };
-  }, [ws, res]);
+  }, [ws, refresh]);
 
   return {
-    projects: res.data ?? [],
-    loading: res.loading,
-    error: res.error,
-    refresh: res.refresh,
+    projects: data ?? [],
+    loading,
+    error,
+    refresh,
   };
 }

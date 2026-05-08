@@ -21,7 +21,7 @@ export function useWorkflow(projectId: string | null | undefined): WorkflowResou
   const api = useApi();
   const ws = useWs();
 
-  const res = useAsyncResource<Workflow>(
+  const { data, loading, error, refresh, set } = useAsyncResource<Workflow>(
     async () => {
       if (!projectId) throw new Error("No projectId");
       return api.getWorkflow(projectId);
@@ -33,7 +33,7 @@ export function useWorkflow(projectId: string | null | undefined): WorkflowResou
     if (!projectId) return;
     const off1 = ws.on("node_status", (ev) => {
       if (ev.projectId !== undefined && ev.projectId !== projectId) return;
-      res.set((prev) => {
+      set((prev) => {
         if (!prev) return prev;
         const node = prev.graph.nodes[ev.nodeId];
         if (!node) return prev;
@@ -47,11 +47,11 @@ export function useWorkflow(projectId: string | null | undefined): WorkflowResou
     });
     const off2 = ws.on("graph_modified", (ev) => {
       if (ev.projectId !== undefined && ev.projectId !== projectId) return;
-      void res.refresh();
+      void refresh();
     });
     const off3 = ws.on("cost_update", (ev) => {
       if (ev.projectId !== undefined && ev.projectId !== projectId) return;
-      res.set((prev) => {
+      set((prev) => {
         if (!prev) return prev;
         const node = prev.graph.nodes[ev.nodeId];
         if (!node) return { ...prev, totalCost: ev.totalCost };
@@ -73,12 +73,12 @@ export function useWorkflow(projectId: string | null | undefined): WorkflowResou
       off2();
       off3();
     };
-  }, [ws, projectId, res]);
+  }, [ws, projectId, set, refresh]);
 
   return {
-    workflow: res.data,
-    loading: res.loading,
-    error: res.error,
-    refresh: res.refresh,
+    workflow: data,
+    loading,
+    error,
+    refresh,
   };
 }

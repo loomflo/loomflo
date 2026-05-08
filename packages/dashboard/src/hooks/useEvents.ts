@@ -5,10 +5,12 @@
 // entries when the daemon broadcasts the matching WS events.
 // ============================================================================
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useApi, useWs } from "../context/AppContext.js";
 import type { Event as WorkflowEvent, EventType } from "../lib/types.js";
 import { useAsyncResource } from "./useAsyncResource.js";
+
+const REFRESH_DEBOUNCE_MS = 250;
 
 export interface UseEventsArgs {
   projectId: string | null | undefined;
@@ -37,7 +39,10 @@ export function useEvents(args: UseEventsArgs): EventsResource {
     return f;
   }, [args.type, args.nodeId, args.limit]);
 
-  const res = useAsyncResource<{ events: WorkflowEvent[]; total: number }>(
+  const { data, loading, error, refresh } = useAsyncResource<{
+    events: WorkflowEvent[];
+    total: number;
+  }>(
     async () => {
       if (!projectId) throw new Error("No projectId");
       return api.getEvents(projectId, filter);
@@ -45,21 +50,35 @@ export function useEvents(args: UseEventsArgs): EventsResource {
     [api, projectId, filter.type, filter.nodeId, filter.limit],
   );
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!projectId) return;
+    // Coalesce bursty WS events (every node/agent/cost update) into one fetch.
+    // The /events endpoint persists to disk; the WS payload doesn't match the
+    // Event schema, so we re-read rather than mirroring locally.
+    const scheduleRefresh = (): void => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        void refresh();
+      }, REFRESH_DEBOUNCE_MS);
+    };
     const off = ws.on("*", (ev) => {
-      // Best-effort: refresh on any event affecting this project. The events
-      // endpoint persists to disk so we re-read instead of trying to mirror
-      // the WS-derived shape (the WS event payload differs from the Event
-      // schema returned by /events).
       if (ev.projectId !== undefined && ev.projectId !== projectId) return;
-      void res.refresh();
+      scheduleRefresh();
     });
-    return off;
-  }, [ws, projectId, res]);
+    return () => {
+      off();
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [ws, projectId, refresh]);
 
-  const events = res.data?.events ?? [];
-  const total = res.data?.total ?? 0;
+  const events = data?.events ?? [];
+  const total = data?.total ?? 0;
 
-  return { events, total, loading: res.loading, error: res.error, refresh: res.refresh };
+  return { events, total, loading, error, refresh };
 }

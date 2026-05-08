@@ -48,7 +48,7 @@ export function useNode(
   const api = useApi();
   const ws = useWs();
 
-  const res = useAsyncResource<Node>(
+  const { data, loading, error, refresh, set } = useAsyncResource<Node>(
     async () => {
       if (!projectId || !nodeId) throw new Error("Missing projectId/nodeId");
       return api.getNode(projectId, nodeId);
@@ -74,11 +74,11 @@ export function useNode(
 
     const off1 = ws.on("node_status", (ev) => {
       if (!matches(ev.projectId, ev.nodeId)) return;
-      res.set((prev) => (prev ? { ...prev, status: ev.status } : prev));
+      set((prev) => (prev ? { ...prev, status: ev.status } : prev));
     });
     const off2 = ws.on("agent_status", (ev) => {
       if (!matches(ev.projectId, ev.nodeId)) return;
-      res.set((prev) => {
+      set((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -90,7 +90,7 @@ export function useNode(
     });
     const off3 = ws.on("cost_update", (ev) => {
       if (!matches(ev.projectId, ev.nodeId)) return;
-      res.set((prev) => (prev ? { ...prev, cost: ev.nodeCost } : prev));
+      set((prev) => (prev ? { ...prev, cost: ev.nodeCost } : prev));
     });
     const off4 = ws.on("runtime_session_started", (ev) => {
       if (!matches(ev.projectId, ev.nodeId)) return;
@@ -113,13 +113,13 @@ export function useNode(
       off5();
       off6();
     };
-  }, [ws, projectId, nodeId, res]);
+  }, [ws, projectId, nodeId, set]);
 
   return {
-    node: res.data,
-    loading: res.loading,
-    error: res.error,
-    refresh: res.refresh,
+    node: data,
+    loading,
+    error,
+    refresh,
     live: { sessionEvents, mcpCalls, sessions },
   };
 }
