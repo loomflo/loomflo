@@ -15,6 +15,16 @@ import { saveWorkflowState } from "../persistence/state.js";
 import type { NodeStatus } from "../types.js";
 import type { WorkflowGraph } from "./graph.js";
 import type { WorkflowNode } from "./node.js";
+import {
+  classifyProviderError,
+  createCancellableSleep,
+  createProviderRetryState,
+  advanceProviderRetryState,
+  getProviderRetryDelay,
+  formatRetryMessage,
+  MAX_PROVIDER_RETRY_ATTEMPTS,
+  type CancellableSleep,
+} from "./provider-retry.js";
 import { Scheduler } from "./scheduler.js";
 import type { WorkflowManager } from "./workflow.js";
 
@@ -133,6 +143,9 @@ export class WorkflowExecutionEngine {
   /** IDs of nodes that ended with `failed` or `blocked`. */
   private readonly failedNodes: string[] = [];
 
+  /** Active provider retry sleeps, keyed by node ID. Used for cancellation on stop/Ctrl-C. */
+  private readonly providerRetrySleeps: Map<string, CancellableSleep> = new Map();
+
   /** Flag set by {@link stop} to halt the engine gracefully. */
   private stopped = false;
   /** Resolver for the main execution loop's wait-for-completion promise. */
@@ -201,6 +214,11 @@ export class WorkflowExecutionEngine {
   stop(): void {
     this.stopped = true;
     this.scheduler.cancelAll();
+    // Cancel all active provider retry sleeps
+    for (const sleep of this.providerRetrySleeps.values()) {
+      sleep.cancel();
+    }
+    this.providerRetrySleeps.clear();
     if (this.wakeUp) {
       this.wakeUp();
     }
@@ -304,7 +322,10 @@ export class WorkflowExecutionEngine {
       const predecessors = this.graph.getPredecessors(node.id);
       const blocked = predecessors.some((predId) => {
         const pred = this.manager.getNode(predId);
-        return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
+        return (
+          pred !== undefined &&
+          WorkflowExecutionEngine.FAILURE_NODE_STATUSES.has(pred.status)
+        );
       });
 
       if (!blocked) {
@@ -377,6 +398,32 @@ export class WorkflowExecutionEngine {
     try {
       result = await this.executor(node, this.manager);
     } catch (error: unknown) {
+      // Check if this is a rate-limit error eligible for provider retry
+      const classification = classifyProviderError(error);
+
+      if (classification.isRateLimit) {
+        const retryResult = await this.handleProviderRateLimit(
+          nodeId,
+          node,
+          classification.statusCode,
+          classification.retryAfterMs,
+          classification.message,
+        );
+
+        if (retryResult !== null) {
+          // Provider retry handled the error (either succeeded or exhausted)
+          await this.applyNodeResult(nodeId, node, retryResult);
+          this.activeNodes.delete(nodeId);
+          if (!this.stopped && !this.costTracker.isBudgetExceeded()) {
+            this.activateReadyNodes();
+          }
+          this.signalWakeUp();
+          return retryResult;
+        }
+        // retryResult === null means the sleep was cancelled (engine stopped)
+        // Fall through to treat as failure
+      }
+
       const message = error instanceof Error ? error.message : String(error);
       result = { status: "failed", cost: 0, error: message };
     }
@@ -392,6 +439,166 @@ export class WorkflowExecutionEngine {
     this.signalWakeUp();
 
     return result;
+  }
+
+  // ==========================================================================
+  // Provider Rate-Limit Retry
+  // ==========================================================================
+
+  /**
+   * Handles a provider rate-limit error by entering a retry loop with
+   * progressive backoff.
+   *
+   * Transitions the node to `waiting_for_provider`, sleeps for the computed
+   * duration, then re-executes. Repeats up to {@link MAX_PROVIDER_RETRY_ATTEMPTS}
+   * times. If all attempts are exhausted, transitions to `failed_provider_exhausted`.
+   *
+   * @param nodeId - The node that encountered the rate limit.
+   * @param node - The WorkflowNode instance.
+   * @param statusCode - The HTTP status code from the provider error.
+   * @param retryAfterMs - The Retry-After header value in ms, or null.
+   * @param reason - Human-readable error message.
+   * @returns The final NodeExecutionResult, or null if cancelled by engine stop.
+   */
+  private async handleProviderRateLimit(
+    nodeId: string,
+    node: WorkflowNode,
+    statusCode: number | null,
+    retryAfterMs: number | null,
+    reason: string,
+  ): Promise<NodeExecutionResult | null> {
+    // Initialize or advance the retry state
+    let retryState = node.providerRetryState;
+    if (retryState === null) {
+      retryState = createProviderRetryState(statusCode, reason);
+    } else {
+      retryState = advanceProviderRetryState(retryState, statusCode, reason);
+    }
+    node.setProviderRetryState(retryState);
+
+    // Log the rate-limit event
+    await this.logNodeEvent(nodeId, "provider_rate_limited", {
+      attempt: retryState.attempt,
+      maxAttempts: MAX_PROVIDER_RETRY_ATTEMPTS,
+      statusCode,
+      reason,
+    });
+
+    // Compute delay
+    const delayMs = getProviderRetryDelay(retryState.attempt, retryAfterMs);
+
+    if (delayMs === null) {
+      // Exhausted all retry attempts
+      return this.exhaustProviderRetry(nodeId, node, reason);
+    }
+
+    // Transition to waiting_for_provider
+    if (node.canTransition("waiting_for_provider")) {
+      node.transition("waiting_for_provider");
+    }
+
+    // Create cancellable sleep
+    const sleep = createCancellableSleep(delayMs);
+    this.providerRetrySleeps.set(nodeId, sleep);
+
+    // Update retry state with resumeAt for persistence
+    retryState = { ...retryState, resumeAt: sleep.resumeAt };
+    node.setProviderRetryState(retryState);
+
+    // Log the scheduled retry
+    const logMessage = formatRetryMessage(nodeId, retryState.attempt, sleep.resumeAt, reason);
+    console.error(logMessage);
+
+    await this.logNodeEvent(nodeId, "provider_retry_scheduled", {
+      attempt: retryState.attempt,
+      resumeAt: sleep.resumeAt,
+      delayMs,
+    });
+
+    // Persist state so restarts can recover
+    await this.persistState();
+
+    // Wait
+    const completed = await sleep.promise;
+    this.providerRetrySleeps.delete(nodeId);
+
+    if (!completed || this.stopped) {
+      // Sleep was cancelled (engine stopped or Ctrl-C)
+      return null;
+    }
+
+    // Transition back to running for retry
+    if (node.canTransition("running")) {
+      node.transition("running");
+    }
+
+    await this.logNodeEvent(nodeId, "provider_retry_resumed", {
+      attempt: retryState.attempt,
+    });
+
+    // Re-execute the node
+    try {
+      const result = await this.executor(node, this.manager);
+      // Success! Clear the provider retry state
+      node.setProviderRetryState(null);
+      return result;
+    } catch (retryError: unknown) {
+      // Check if the retry also hit a rate limit
+      const retryClassification = classifyProviderError(retryError);
+      if (retryClassification.isRateLimit) {
+        // Recurse to handle the next retry attempt
+        return this.handleProviderRateLimit(
+          nodeId,
+          node,
+          retryClassification.statusCode,
+          retryClassification.retryAfterMs,
+          retryClassification.message,
+        );
+      }
+      // Non-rate-limit error on retry: fail normally
+      const message = retryError instanceof Error ? retryError.message : String(retryError);
+      node.setProviderRetryState(null);
+      return { status: "failed", cost: 0, error: message };
+    }
+  }
+
+  /**
+   * Marks a node as exhausted after all provider retry attempts failed.
+   *
+   * Transitions the node to `failed_provider_exhausted` and logs the event.
+   *
+   * @param nodeId - The node that exhausted all retries.
+   * @param node - The WorkflowNode instance.
+   * @param reason - The last error reason.
+   * @returns A failed NodeExecutionResult.
+   */
+  private async exhaustProviderRetry(
+    nodeId: string,
+    node: WorkflowNode,
+    reason: string,
+  ): Promise<NodeExecutionResult> {
+    // Transition to failed_provider_exhausted
+    if (node.canTransition("failed_provider_exhausted")) {
+      node.transition("failed_provider_exhausted");
+    }
+
+    const errorMsg =
+      `Provider rate-limit exhausted after ${String(MAX_PROVIDER_RETRY_ATTEMPTS)} attempts. ` +
+      `Last error: ${reason}. Manual restart required.`;
+
+    await this.logNodeEvent(nodeId, "provider_exhausted", {
+      totalAttempts: MAX_PROVIDER_RETRY_ATTEMPTS,
+      lastReason: reason,
+    });
+
+    console.error(
+      `[provider-retry] Node "${nodeId}" EXHAUSTED all ${String(MAX_PROVIDER_RETRY_ATTEMPTS)} retry attempts. ` +
+        `Manual restart required. Last error: ${reason}`,
+    );
+
+    await this.persistState();
+
+    return { status: "failed", cost: 0, error: errorMsg };
   }
 
   /**
@@ -425,10 +632,14 @@ export class WorkflowExecutionEngine {
     } else {
       this.failedNodes.push(nodeId);
       const eventType = result.status === "blocked" ? "node_blocked" : "node_failed";
-      await this.logNodeEvent(nodeId, eventType, {
-        error: result.error ?? "Unknown error",
-        cost: result.cost,
-      });
+      // Only log the standard node event if the node is NOT already in
+      // failed_provider_exhausted (which has its own event logging).
+      if (node.status !== "failed_provider_exhausted") {
+        await this.logNodeEvent(nodeId, eventType, {
+          error: result.error ?? "Unknown error",
+          cost: result.cost,
+        });
+      }
       // Eagerly propagate blocked status to downstream pending nodes so that
       // isTerminal() can correctly detect the terminal state without waiting
       // for all chains to be explicitly checked. Without this, a chain like
@@ -475,12 +686,27 @@ export class WorkflowExecutionEngine {
    *
    * @returns `true` if no further progress is possible.
    */
+  /** Set of terminal node statuses. */
+  private static readonly TERMINAL_NODE_STATUSES: ReadonlySet<NodeStatus> = new Set([
+    "done",
+    "failed",
+    "blocked",
+    "failed_provider_exhausted",
+  ]);
+
+  /** Set of failure node statuses that block downstream nodes. */
+  private static readonly FAILURE_NODE_STATUSES: ReadonlySet<NodeStatus> = new Set([
+    "failed",
+    "blocked",
+    "failed_provider_exhausted",
+  ]);
+
   private isTerminal(): boolean {
     if (this.activeNodes.size > 0) return false;
 
     for (const node of this.manager.getAllNodes()) {
       const status = node.status;
-      if (status !== "done" && status !== "failed" && status !== "blocked") {
+      if (!WorkflowExecutionEngine.TERMINAL_NODE_STATUSES.has(status)) {
         if (this.activatedNodes.has(node.id)) {
           return false;
         }
@@ -488,7 +714,10 @@ export class WorkflowExecutionEngine {
         const predecessors = this.graph.getPredecessors(node.id);
         const hasFailedPredecessor = predecessors.some((predId) => {
           const pred = this.manager.getNode(predId);
-          return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
+          return (
+            pred !== undefined &&
+            WorkflowExecutionEngine.FAILURE_NODE_STATUSES.has(pred.status)
+          );
         });
 
         if (!hasFailedPredecessor) {
@@ -595,7 +824,10 @@ export class WorkflowExecutionEngine {
         const predecessors = this.graph.getPredecessors(node.id);
         const hasFailedPredecessor = predecessors.some((predId) => {
           const pred = this.manager.getNode(predId);
-          return pred !== undefined && (pred.status === "failed" || pred.status === "blocked");
+          return (
+            pred !== undefined &&
+            WorkflowExecutionEngine.FAILURE_NODE_STATUSES.has(pred.status)
+          );
         });
 
         if (hasFailedPredecessor) {
@@ -672,7 +904,15 @@ export class WorkflowExecutionEngine {
    */
   private async logNodeEvent(
     nodeId: string,
-    type: "node_started" | "node_completed" | "node_failed" | "node_blocked",
+    type:
+      | "node_started"
+      | "node_completed"
+      | "node_failed"
+      | "node_blocked"
+      | "provider_rate_limited"
+      | "provider_retry_scheduled"
+      | "provider_retry_resumed"
+      | "provider_exhausted",
     details: Record<string, unknown>,
   ): Promise<void> {
     const event = createEvent({

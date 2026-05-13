@@ -5,12 +5,15 @@ import tailwindcss from "@tailwindcss/vite";
 /**
  * Vite configuration for the Loomflo Dashboard.
  *
- * Proxies `/api`, `/ws`, and daemon routes to the backend.
- * Set `VITE_API_URL` to override the default daemon target (`http://127.0.0.1:3000`).
+ * Proxies REST + WS daemon routes to the backend so the SPA can talk
+ * to a locally running daemon during dev. Override the daemon target
+ * with VITE_API_URL.
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiUrl = env["VITE_API_URL"] ?? "http://127.0.0.1:3000";
+
+  const passthrough = (target: string) => ({ target, changeOrigin: true });
 
   return {
     plugins: [react(), tailwindcss()],
@@ -22,20 +25,23 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ""),
         },
-        "/ws": {
-          target: apiUrl,
-          ws: true,
-        },
-        "/health": { target: apiUrl, changeOrigin: true },
-        "/workflow": { target: apiUrl, changeOrigin: true },
-        "/nodes": { target: apiUrl, changeOrigin: true },
-        "/memory": { target: apiUrl, changeOrigin: true },
-        "/events": { target: apiUrl, changeOrigin: true },
-        "/specs": { target: apiUrl, changeOrigin: true },
-        "/chat": { target: apiUrl, changeOrigin: true },
-        "/config": { target: apiUrl, changeOrigin: true },
-        "/costs": { target: apiUrl, changeOrigin: true },
-        "/shutdown": { target: apiUrl, changeOrigin: true },
+        "/ws": { target: apiUrl, ws: true },
+        "/health": passthrough(apiUrl),
+        "/daemon": passthrough(apiUrl),
+        "/projects": passthrough(apiUrl),
+        "/runtimes": passthrough(apiUrl),
+        "/credentials": passthrough(apiUrl),
+        "/mock": passthrough(apiUrl),
+        "/workflow": passthrough(apiUrl),
+        "/nodes": passthrough(apiUrl),
+        "/memory": passthrough(apiUrl),
+        "/events": passthrough(apiUrl),
+        "/specs": passthrough(apiUrl),
+        "/chat": passthrough(apiUrl),
+        "/config": passthrough(apiUrl),
+        "/costs": passthrough(apiUrl),
+        "/mcp": passthrough(apiUrl),
+        "/shutdown": passthrough(apiUrl),
       },
     },
   };

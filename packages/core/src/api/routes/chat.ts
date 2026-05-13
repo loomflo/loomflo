@@ -1,6 +1,13 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { LoomAgent } from "../../agents/loom.js";
 import type { ChatResult, ChatMessageCategory } from "../../agents/loom.js";
+import type { GraphModification } from "../../agents/escalation.js";
+import type { ProjectRuntime } from "../../daemon-types.js";
+import { saveWorkflowState } from "../../persistence/state.js";
+import type { Node, Workflow } from "../../types.js";
+import { WorkflowGraph } from "../../workflow/graph.js";
 
 // ============================================================================
 // Types
@@ -24,6 +31,16 @@ export interface ChatRoutesOptions {
   getChatHistory?: () => ChatHistoryEntry[];
   /** Append an entry to the chat history. */
   addToHistory?: (entry: ChatHistoryEntry) => void;
+  /** Return the current workflow (used by the legacy / unit-test path). */
+  getWorkflow?: () => Workflow | null;
+  /** Persist an updated workflow (used by the legacy / unit-test path). */
+  setWorkflow?: (workflow: Workflow) => void;
+  /**
+   * Persist the workflow to disk. Defaults to
+   * {@link saveWorkflowState} in production. Primarily overridden in tests
+   * to assert the persistence call without touching disk.
+   */
+  persistWorkflow?: (projectPath: string, workflow: Workflow) => Promise<void>;
 }
 
 /** Shape of the POST /chat JSON response. */
@@ -52,6 +69,256 @@ const ChatMessageSchema = z.object({
 });
 
 // ============================================================================
+// Per-runtime Chat State
+// ============================================================================
+
+/** Per-runtime chat state (LoomAgent + in-memory history). */
+interface RuntimeChatState {
+  loom: LoomAgent;
+  history: ChatHistoryEntry[];
+}
+
+/**
+ * Per-runtime chat state cache.
+ *
+ * Keyed by {@link ProjectRuntime} so each project gets its own LoomAgent and
+ * isolated chat history. WeakMap ensures entries are garbage-collected along
+ * with the runtime when a project is deregistered.
+ *
+ * NOTE: Chat history is currently stored only in-memory — persistence across
+ * daemon restarts is tracked as technical debt.
+ */
+const runtimeStates: WeakMap<ProjectRuntime, RuntimeChatState> = new WeakMap();
+
+/** Get or lazily create the chat state for a given project runtime. */
+function getOrCreateRuntimeState(rt: ProjectRuntime): RuntimeChatState {
+  const existing = runtimeStates.get(rt);
+  if (existing !== undefined) return existing;
+
+  const loom = new LoomAgent({
+    provider: rt.provider,
+    projectPath: rt.projectPath,
+    eventLog: { workflowId: rt.workflow?.id ?? rt.id },
+    sharedMemory: rt.sharedMemory,
+    costTracker: rt.costTracker,
+    defaultDelay: rt.config.defaultDelay,
+  });
+
+  const state: RuntimeChatState = { loom, history: [] };
+  runtimeStates.set(rt, state);
+  return state;
+}
+
+/**
+ * Format a list of chat history entries into the plain-text transcript format
+ * expected by {@link LoomAgent.handleChat}.
+ */
+function formatChatHistory(entries: ChatHistoryEntry[]): string {
+  return entries.map((e) => `${e.role}: ${e.content}`).join("\n");
+}
+
+/** Resolved chat services for a single request. */
+interface ResolvedChatServices {
+  handleChat: ((message: string) => Promise<ChatResult>) | undefined;
+  getChatHistory: () => ChatHistoryEntry[];
+  addToHistory: (entry: ChatHistoryEntry) => void;
+  getWorkflow: () => Workflow | null;
+  setWorkflow: (workflow: Workflow) => void;
+  persistWorkflow: (projectPath: string, workflow: Workflow) => Promise<void>;
+  runtime: ProjectRuntime | undefined;
+}
+
+/**
+ * Resolve chat services from either `request.runtime` (multi-project daemon
+ * path) or the option closures (legacy/unit-test path).
+ */
+function resolveChatServices(
+  request: FastifyRequest,
+  options: ChatRoutesOptions,
+): ResolvedChatServices {
+  const rt = (request as FastifyRequest & { runtime?: ProjectRuntime }).runtime;
+
+  const persistWorkflow =
+    options.persistWorkflow ??
+    ((projectPath: string, wf: Workflow): Promise<void> => saveWorkflowState(projectPath, wf));
+
+  if (rt) {
+    const state = getOrCreateRuntimeState(rt);
+    // Snapshot history at resolve time so the current user message (appended
+    // just before handleChat is invoked) is not included in the "previous"
+    // transcript sent to the LoomAgent.
+    const priorHistory = state.history.slice();
+    return {
+      handleChat: (message: string): Promise<ChatResult> =>
+        state.loom.handleChat(message, formatChatHistory(priorHistory)),
+      getChatHistory: (): ChatHistoryEntry[] => state.history.slice(),
+      addToHistory: (entry: ChatHistoryEntry): void => {
+        state.history.push(entry);
+      },
+      getWorkflow: (): Workflow | null => rt.workflow,
+      setWorkflow: (wf: Workflow): void => {
+        rt.workflow = wf;
+      },
+      persistWorkflow,
+      runtime: rt,
+    };
+  }
+
+  return {
+    handleChat: options.handleChat,
+    getChatHistory: options.getChatHistory ?? ((): ChatHistoryEntry[] => []),
+    addToHistory: options.addToHistory ?? ((): void => undefined),
+    getWorkflow: options.getWorkflow ?? ((): Workflow | null => null),
+    setWorkflow: options.setWorkflow ?? ((): void => undefined),
+    persistWorkflow,
+    runtime: undefined,
+  };
+}
+
+// ============================================================================
+// Graph modification applier
+// ============================================================================
+
+/**
+ * Build a fully-populated {@link Node} from the fragment supplied by
+ * {@link GraphModification.newNode}. The LLM only provides a title and
+ * instructions; the daemon owns the remaining runtime fields.
+ */
+function buildNodeFromFragment(
+  fragment: NonNullable<GraphModification["newNode"]>,
+  defaultDelay: string,
+): Node {
+  return {
+    id: `node-${randomUUID().slice(0, 8)}`,
+    title: fragment.title,
+    status: "pending",
+    instructions: fragment.instructions,
+    delay: defaultDelay,
+    resumeAt: null,
+    agents: [],
+    fileOwnership: {},
+    retryCount: 0,
+    maxRetries: 3,
+    reviewReport: null,
+    cost: 0,
+    startedAt: null,
+    completedAt: null,
+    providerRetryState: null,
+    runtime: "loomi-native",
+  };
+}
+
+/**
+ * Apply a graph modification to a workflow in-place and return the updated
+ * workflow. Returns `null` when the modification cannot be applied (e.g.
+ * target node missing, cycle introduced, or add_node on a null workflow
+ * without enough context to scaffold one).
+ *
+ * Semantics:
+ *   - add_node on a null workflow creates a new single-node workflow in
+ *     "building" state so `loomflo status` stops returning null. The
+ *     description is taken from the modification reason or a default.
+ *   - add_node on an existing workflow inserts the node and wires edges
+ *     per insertAfter / insertBefore when supplied.
+ *   - modify_node updates the target's instructions.
+ *   - remove_node removes the target and its incident edges.
+ *   - skip_node marks the target as "done" (leaves it in the graph).
+ *   - no_action is a no-op; callers should not invoke the applier.
+ */
+export function applyChatModification(
+  workflow: Workflow | null,
+  modification: GraphModification,
+  context: { projectPath: string; defaultDelay: string; description: string },
+): Workflow | null {
+  if (modification.action === "no_action") return workflow;
+
+  // Creating a workflow from scratch via chat. Only "add_node" makes sense
+  // — we have no graph to point at for the other actions.
+  if (workflow === null) {
+    if (modification.action !== "add_node" || !modification.newNode) return null;
+    const node = buildNodeFromFragment(modification.newNode, context.defaultDelay);
+    const now = new Date().toISOString();
+    return {
+      id: randomUUID(),
+      status: "building",
+      description: context.description || modification.reason || "chat-seeded workflow",
+      projectPath: context.projectPath,
+      graph: {
+        nodes: { [node.id]: node },
+        edges: [],
+        topology: "linear",
+      },
+      // The daemon fills rt.config; the chat route does not have access to
+      // merged config without round-tripping loadConfig. We reuse the
+      // caller-supplied config snapshot via `workflow.config` only when an
+      // existing workflow is present — for the scaffold path we copy the
+      // default delay into a minimal Config-shaped object below. Keeping
+      // this untyped-but-checked to avoid pulling the full ConfigSchema
+      // here.
+      config: {} as Workflow["config"],
+      createdAt: now,
+      updatedAt: now,
+      totalCost: 0,
+    };
+  }
+
+  const graph = new WorkflowGraph(workflow.graph.nodes, workflow.graph.edges);
+
+  switch (modification.action) {
+    case "add_node": {
+      if (!modification.newNode) return null;
+      const node = buildNodeFromFragment(modification.newNode, context.defaultDelay);
+      graph.addNode(node);
+      if (modification.newNode.insertAfter) {
+        try {
+          graph.addEdge({ from: modification.newNode.insertAfter, to: node.id });
+        } catch {
+          /* ignore edge wiring failures — the node is still added */
+        }
+      }
+      if (modification.newNode.insertBefore) {
+        try {
+          graph.addEdge({ from: node.id, to: modification.newNode.insertBefore });
+        } catch {
+          /* ignore */
+        }
+      }
+      break;
+    }
+    case "modify_node": {
+      if (!modification.nodeId) return null;
+      if (!graph.getNode(modification.nodeId)) return null;
+      if (modification.modifiedInstructions !== undefined) {
+        graph.updateNode(modification.nodeId, {
+          instructions: modification.modifiedInstructions,
+        });
+      }
+      break;
+    }
+    case "remove_node": {
+      if (!modification.nodeId) return null;
+      if (!graph.getNode(modification.nodeId)) return null;
+      graph.removeNode(modification.nodeId);
+      break;
+    }
+    case "skip_node": {
+      if (!modification.nodeId) return null;
+      if (!graph.getNode(modification.nodeId)) return null;
+      graph.updateNode(modification.nodeId, { status: "done" });
+      break;
+    }
+    default:
+      return null;
+  }
+
+  return {
+    ...workflow,
+    graph: graph.toJSON(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// ============================================================================
 // Plugin Factory
 // ============================================================================
 
@@ -60,6 +327,11 @@ const ChatMessageSchema = z.object({
  *
  * - POST /chat — send a message to Loom and receive a response.
  * - GET /chat/history — retrieve the full chat history.
+ *
+ * When mounted under a per-project scope (`/projects/:id`), the plugin reads
+ * the {@link ProjectRuntime} from `request.runtime` and creates a dedicated
+ * {@link LoomAgent} plus in-memory history per project. When registered at
+ * the root (legacy/unit tests), the option closures are used instead.
  *
  * @param options - Callbacks that supply runtime data for the routes.
  * @returns A Fastify plugin suitable for `server.register()`.
@@ -85,31 +357,75 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
       }
 
       const { message } = parseResult.data;
-
-      const handleChat = options.handleChat;
-      const addToHistory = options.addToHistory;
+      const services = resolveChatServices(request, options);
+      const {
+        handleChat,
+        addToHistory,
+        getWorkflow,
+        setWorkflow,
+        persistWorkflow,
+        runtime,
+      } = services;
 
       if (!handleChat) {
         await reply.code(501).send({ error: "Chat not configured for this project" });
         return;
       }
 
-      if (addToHistory) {
-        addToHistory({
-          role: "user",
-          content: message,
-          timestamp: new Date().toISOString(),
-        });
-      }
+      addToHistory({
+        role: "user",
+        content: message,
+        timestamp: new Date().toISOString(),
+      });
 
       const result: ChatResult = await handleChat(message);
 
-      if (addToHistory) {
-        addToHistory({
-          role: "assistant",
-          content: result.response,
-          timestamp: new Date().toISOString(),
-        });
+      addToHistory({
+        role: "assistant",
+        content: result.response,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Persist graph_modified actions so `loomflo status` reflects chat-driven
+      // changes. Scaffolds a single-node workflow when `add_node` is returned
+      // against a project with no active workflow, otherwise mutates the
+      // existing graph in-place. The updated workflow is also written to disk
+      // (matching the /workflow/start and /workflow/pause persistence pattern)
+      // so chat-seeded workflows survive a daemon restart.
+      if (result.modification !== null && result.modification.action !== "no_action") {
+        let updated: Workflow | null = null;
+        try {
+          const current = getWorkflow();
+          updated = applyChatModification(current, result.modification, {
+            projectPath: runtime?.projectPath ?? current?.projectPath ?? "",
+            defaultDelay: runtime?.config.defaultDelay ?? current?.config.defaultDelay ?? "0",
+            description: current?.description ?? message,
+          });
+          if (updated !== null && updated !== current) {
+            // Merge runtime config into the scaffolded workflow when we just
+            // created one from scratch (current === null path).
+            if (current === null && runtime) {
+              updated.config = runtime.config;
+            }
+            setWorkflow(updated);
+          } else {
+            // No in-memory change, so nothing to persist.
+            updated = null;
+          }
+        } catch {
+          // Applier failure (e.g. cycle, duplicate node) — the in-memory
+          // state was not mutated, so there's nothing to persist either.
+          updated = null;
+        }
+
+        if (updated !== null && updated.projectPath.length > 0) {
+          // Matches /workflow/start and /workflow/pause: await the write and
+          // let any failure propagate as a 5xx. The in-memory state stays
+          // updated; the client is expected to retry. Skipping when
+          // projectPath is empty keeps the legacy/unit-test path — which
+          // supplies neither `request.runtime` nor a projectPath — working.
+          await persistWorkflow(updated.projectPath, updated);
+        }
       }
 
       const action: ChatResponse["action"] =
@@ -134,10 +450,9 @@ export function chatRoutes(options: ChatRoutesOptions): FastifyPluginAsync {
      *
      * Returns the full chat history in chronological order.
      */
-    fastify.get("/chat/history", async (_request, reply): Promise<void> => {
-      const getChatHistory = options.getChatHistory;
-      const messages = getChatHistory ? getChatHistory() : [];
-      const response: ChatHistoryResponse = { messages };
+    fastify.get("/chat/history", async (request, reply): Promise<void> => {
+      const { getChatHistory } = resolveChatServices(request, options);
+      const response: ChatHistoryResponse = { messages: getChatHistory() };
       await reply.code(200).send(response);
     });
     return Promise.resolve();

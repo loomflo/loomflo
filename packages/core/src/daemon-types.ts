@@ -29,6 +29,10 @@ export interface ProjectSummary {
   providerProfileId: string;
   status: ProjectRuntime["status"];
   startedAt: string;
+  /** Total accumulated cost in USD across this project's workflow. */
+  cost: number;
+  /** ID of the currently running node, or null when no workflow/node is active. */
+  currentNodeId: string | null;
 }
 
 /** Convert a ProjectRuntime into the public summary shape. */
@@ -40,5 +44,15 @@ export function toProjectSummary(rt: ProjectRuntime): ProjectSummary {
     providerProfileId: rt.providerProfileId,
     status: rt.status,
     startedAt: rt.startedAt,
+    cost: rt.costTracker.getTotalCost(),
+    currentNodeId: resolveCurrentNodeId(rt.workflow),
   };
+}
+
+function resolveCurrentNodeId(workflow: ProjectRuntime["workflow"]): string | null {
+  if (!workflow) return null;
+  for (const node of Object.values(workflow.graph.nodes)) {
+    if (node.status === "running") return node.id;
+  }
+  return null;
 }

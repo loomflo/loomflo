@@ -110,6 +110,17 @@ live in `~/.loomflo/credentials.json` as named profiles that projects reference
 by id. The registry of known projects is persisted in
 `~/.loomflo/projects.json` and reloaded when the daemon restarts.
 
+## Observing projects
+
+- `loomflo ps` — table of every registered project: status, current node, uptime, cost
+- `loomflo watch [projectId]` — same data, auto-refresh every 2s (configurable with `-n`)
+- `loomflo logs -f [--project <id>]` — follow events via WebSocket
+- `loomflo nodes [--project <id>] [--all]` — per-project node table
+- `loomflo inspect <nodeId>` — detail view of a node (agents, files, review, cost)
+- `loomflo tree [--project <id>]` — ASCII view of the workflow DAG
+
+Every command supports `--json` for machine-readable output.
+
 ## Installation
 
 ### From npm
@@ -133,6 +144,24 @@ pnpm build
 docker compose up -d
 ```
 
+## Onboarding a project
+
+```bash
+cd my-project
+loomflo init        # interactive wizard (or start — it delegates)
+```
+
+Flags for scripts / CI:
+
+```bash
+loomflo init \
+  --provider anthropic-oauth --profile default \
+  --level 2 --budget 0 --default-delay 1000 --retry-delay 2000 \
+  --yes
+```
+
+Re-running `loomflo init` on a configured project prints a one-line recap and asks whether to start.
+
 ## Usage Example
 
 ```bash
@@ -140,8 +169,8 @@ docker compose up -d
 cd /path/to/project
 loomflo start
 
-# Or generate specs from scratch
-loomflo init "Build a todo app with React frontend, Express backend, and SQLite"
+# Or run the interactive setup wizard
+loomflo init
 
 # Open the dashboard to review the spec and execution graph
 loomflo dashboard
@@ -168,18 +197,34 @@ loomflo project list
 loomflo daemon stop
 ```
 
+## CLI Output
+
+loomflo uses a pastel-green palette by default. Respect the standard
+environment signals:
+
+- `NO_COLOR=1` or `FORCE_COLOR=0` disables colours.
+- Piping / non-TTY stdout disables colours automatically.
+- `--json` on any command emits a single machine-readable JSON object
+  (or NDJSON for streams like `logs -f` and `watch`).
+
 ## CLI Commands
 
 | Command                                       | Description                                                        |
 | --------------------------------------------- | ------------------------------------------------------------------ |
 | `loomflo start`                               | Start this project's workflow (auto-starts the daemon + registers) |
 | `loomflo stop`                                | Stop this project's workflow (the daemon keeps running)            |
-| `loomflo init "description"`                  | Generate spec + execution graph from a description                 |
+| `loomflo init`                                | Interactive onboarding wizard (provider, level, budget, delays)    |
 | `loomflo chat "message"`                      | Chat with the Architect agent                                      |
 | `loomflo status`                              | Show workflow state, active nodes, costs                           |
 | `loomflo resume`                              | Resume an interrupted workflow                                     |
 | `loomflo dashboard`                           | Open the web dashboard in your browser                             |
 | `loomflo logs [node-id]`                      | View agent logs (optionally filtered by node)                      |
+| `loomflo logs -f`                             | Stream live events via WebSocket                                   |
+| `loomflo ps`                                  | List all registered projects with runtime state                    |
+| `loomflo watch [projectId]`                   | Auto-refresh runtime view (Ctrl-C to quit)                         |
+| `loomflo nodes [--project <id>] [--all]`      | Per-project node table (status, duration, cost, retries)           |
+| `loomflo inspect <nodeId> [--project <id>]`   | Detail view of a node (agents, files, review, cost)                |
+| `loomflo tree [--project <id>]`               | ASCII view of the workflow DAG                                     |
 | `loomflo config set <key> <value>`            | Set a configuration value                                          |
 | `loomflo config get <key>`                    | Get a configuration value                                          |
 | `loomflo daemon start\|stop\|status\|restart` | Control the daemon process lifecycle (independent of any project)  |
@@ -187,8 +232,18 @@ loomflo daemon stop
 
 ## Dashboard
 
-The web dashboard provides real-time visibility into the entire workflow:
+```bash
+loomflo dashboard
+```
 
+Opens the web dashboard. On a single-project daemon it jumps straight into that
+project; with multiple projects it shows a landing grid and a top-bar switcher
+to move between them. Every page is scoped under `/projects/:id/*`.
+
+The daemon token is passed via URL fragment (`#token=...`), never sent to the
+server; the fragment is cleared from the address bar at load.
+
+- **Landing** — Project cards with status, current node, and cost at a glance
 - **Graph View** — Interactive node graph with live status updates (React Flow)
 - **Node Detail** — Agent activity, file scopes, logs, review reports, costs
 - **Spec Viewer** — Browse all generated spec artifacts as formatted Markdown

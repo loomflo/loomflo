@@ -28,10 +28,12 @@ import {
 /** Minimal WebSocket mock supporting addEventListener, removeEventListener, close. */
 class MockWebSocket {
   readonly url: string;
+  readonly protocols: string[];
   private readonly _listeners: Map<string, Set<(arg: unknown) => void>> = new Map();
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols === undefined ? [] : Array.isArray(protocols) ? protocols : [protocols];
     capturedWebSockets.push(this);
   }
 
@@ -267,7 +269,7 @@ describe("health()", () => {
     const payload: HealthResponse = {
       status: "ok",
       uptime: 60,
-      version: "0.2.0",
+      version: "0.3.0",
       workflow: { id: "wf-1", status: "running", nodeCount: 3, activeNodes: ["n1"] },
     };
     mockFetch.mockResolvedValue(createMockResponse({ ok: true, status: 200, body: payload }));
@@ -755,7 +757,8 @@ describe("connect()", () => {
 
     expect(capturedWebSockets).toHaveLength(1);
     const ws = capturedWebSockets[0];
-    expect(ws.url).toBe("ws://127.0.0.1:4000/ws?token=test-token");
+    expect(ws.url).toBe("ws://127.0.0.1:4000/ws");
+    expect(ws.protocols).toEqual(["loomflo.bearer", "test-token"]);
 
     // Simulate the server sending the welcome message
     ws._emit("message", { data: JSON.stringify({ type: "connected", message: "ok" }) });
@@ -811,12 +814,13 @@ describe("connect()", () => {
     await expect(client.connect()).rejects.toThrow("Global WebSocket API is not available");
   });
 
-  it("should URL-encode the token in the WebSocket URL", async () => {
+  it("carries the token verbatim on the Sec-WebSocket-Protocol subprotocol list", async () => {
     const client = createClient({ token: "token with spaces&special=chars" });
     const connectPromise = client.connect();
 
     const ws = capturedWebSockets[0];
-    expect(ws.url).toContain("token=token%20with%20spaces%26special%3Dchars");
+    expect(ws.url).not.toContain("token=");
+    expect(ws.protocols).toEqual(["loomflo.bearer", "token with spaces&special=chars"]);
 
     ws._emit("message", { data: JSON.stringify({ type: "connected" }) });
     await connectPromise;

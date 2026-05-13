@@ -32,7 +32,7 @@ describe("GET /daemon/status", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as Record<string, unknown>;
     expect(body.port).toBe(3123);
-    expect(body.version).toBe("0.2.0");
+    expect(body.version).toBe("0.3.0");
     expect(body.projectCount).toBe(0);
     expect(typeof body.uptimeMs).toBe("number");
     expect(typeof body.pid).toBe("number");

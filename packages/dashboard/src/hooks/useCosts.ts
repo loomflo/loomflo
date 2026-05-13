@@ -1,130 +1,51 @@
 // ============================================================================
-// useCosts Hook
+// useCosts
 //
-// Fetches cost data via REST and keeps it in sync with real-time
-// WebSocket cost_update events from the Loomflo daemon.
+// Loads `GET /projects/:id/costs` and patches per-node + total cost from
+// `cost_update` WS events.
 // ============================================================================
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useApi, useWs } from "../context/AppContext.js";
+import type { CostsResponse } from "../lib/types.js";
+import { useAsyncResource } from "./useAsyncResource.js";
 
-import { apiClient, ApiError } from "../lib/api.js";
-import type { CostsResponse, NodeCostEntry } from "../lib/api.js";
-import type { UseWebSocketReturn } from "./useWebSocket.js";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** The subscribe function signature extracted from useWebSocket. */
-export type Subscribe = UseWebSocketReturn["subscribe"];
-
-/** Return value of the useCosts hook. */
-export interface UseCostsReturn {
-  /** Total accumulated cost in USD across all nodes. */
-  total: number;
-  /** Configured budget limit in USD, or null if no limit is set. */
-  budgetLimit: number | null;
-  /** Remaining budget in USD, or null if no limit is set. */
-  budgetRemaining: number | null;
-  /** Per-node cost breakdown entries. */
-  nodes: NodeCostEntry[];
-  /** Cost in USD attributed to the Loom architect agent. */
-  loomCost: number;
-  /** Whether the initial data fetch is in progress. */
+export function useCosts(projectId: string | null | undefined): {
+  costs: CostsResponse | null;
   loading: boolean;
-  /** Error message from the most recent fetch, or null. */
-  error: string | null;
-  /** Manually trigger a full refetch of cost data. */
-  refetch: () => void;
-}
+  error: Error | null;
+  refresh: () => Promise<void>;
+} {
+  const api = useApi();
+  const ws = useWs();
 
-// ============================================================================
-// Hook Implementation
-// ============================================================================
+  const { data, loading, error, refresh, set } = useAsyncResource<CostsResponse>(
+    async () => {
+      if (!projectId) throw new Error("No projectId");
+      return api.getCosts(projectId);
+    },
+    [api, projectId],
+  );
 
-/**
- * React hook that fetches cost data via REST and subscribes to
- * WebSocket cost_update events for real-time updates.
- *
- * The hook initially loads the full cost breakdown from GET /costs,
- * then incrementally updates per-node costs and totals as cost_update
- * events arrive over the WebSocket connection.
- *
- * @param subscribe - The subscribe function from {@link useWebSocket}.
- * @returns Cost state including totals, budget info, per-node breakdown, and controls.
- */
-export function useCosts(subscribe: Subscribe): UseCostsReturn {
-  const [total, setTotal] = useState(0);
-  const [budgetLimit, setBudgetLimit] = useState<number | null>(null);
-  const [budgetRemaining, setBudgetRemaining] = useState<number | null>(null);
-  const [nodes, setNodes] = useState<NodeCostEntry[]>([]);
-  const [loomCost, setLoomCost] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  /**
-   * Fetch full cost data from the REST API.
-   * A 404 means no active workflow — reset to zero state.
-   */
-  const fetchData = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data: CostsResponse = await apiClient.getCosts();
-      setTotal(data.total);
-      setBudgetLimit(data.budgetLimit);
-      setBudgetRemaining(data.budgetRemaining);
-      setNodes(data.nodes);
-      setLoomCost(data.loomCost);
-    } catch (err: unknown) {
-      if (err instanceof ApiError && err.status === 404) {
-        setTotal(0);
-        setBudgetLimit(null);
-        setBudgetRemaining(null);
-        setNodes([]);
-        setLoomCost(0);
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to fetch cost data");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /** Fetch data on mount. */
-  useEffect((): void => {
-    void fetchData();
-  }, [fetchData]);
-
-  /** Subscribe to WebSocket cost_update events and update state. */
-  useEffect((): (() => void) => {
-    const unsub = subscribe("cost_update", (event): void => {
-      setTotal(event.totalCost);
-
-      setBudgetRemaining(event.budgetRemaining);
-
-      setNodes((prev) =>
-        prev.map((node) => (node.id === event.nodeId ? { ...node, cost: event.nodeCost } : node)),
-      );
+  useEffect(() => {
+    if (!projectId) return;
+    const off = ws.on("cost_update", (ev) => {
+      if (ev.projectId !== undefined && ev.projectId !== projectId) return;
+      set((prev) => {
+        if (!prev) return prev;
+        const nodes = prev.nodes.map((n) =>
+          n.id === ev.nodeId ? { ...n, cost: ev.nodeCost } : n,
+        );
+        return {
+          ...prev,
+          total: ev.totalCost,
+          nodes,
+          budgetRemaining: ev.budgetRemaining ?? prev.budgetRemaining,
+        };
+      });
     });
+    return off;
+  }, [ws, projectId, set]);
 
-    return unsub;
-  }, [subscribe]);
-
-  /** Manual refetch trigger exposed to consumers. */
-  const refetch = useCallback((): void => {
-    void fetchData();
-  }, [fetchData]);
-
-  return {
-    total,
-    budgetLimit,
-    budgetRemaining,
-    nodes,
-    loomCost,
-    loading,
-    error,
-    refetch,
-  };
+  return { costs: data, loading, error, refresh };
 }

@@ -20,7 +20,7 @@ describe("WebSocket subscription", () => {
   afterEach(async () => await daemon.stop());
 
   it("forwards only subscribed project events", async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=tok`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ["loomflo.bearer", "tok"]);
     await once(ws, "open");
     ws.send(JSON.stringify({ type: "subscribe", projectIds: ["proj_a"] }));
     await new Promise((r) => setTimeout(r, 50));
@@ -47,7 +47,7 @@ describe("WebSocket subscription", () => {
   });
 
   it("forwards all events when subscribed with {all: true}", async () => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=tok`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ["loomflo.bearer", "tok"]);
     await once(ws, "open");
     ws.send(JSON.stringify({ type: "subscribe", all: true }));
     await new Promise((r) => setTimeout(r, 50));

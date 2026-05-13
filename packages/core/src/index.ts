@@ -52,6 +52,8 @@ export { AnthropicProvider } from "./providers/anthropic.js";
 export { OpenAIProvider } from "./providers/openai.js";
 export { OllamaProvider } from "./providers/ollama.js";
 export * from "./providers/credentials.js";
+export { ProviderProfiles } from "./providers/profiles.js";
+export type { ProviderProfile } from "./providers/profiles.js";
 
 // ============================================================================
 // Agents
@@ -114,6 +116,7 @@ export * from "./workflow/node.js";
 export * from "./workflow/scheduler.js";
 export * from "./workflow/workflow.js";
 export * from "./workflow/execution-engine.js";
+export * from "./workflow/provider-retry.js";
 
 // ============================================================================
 // API Server

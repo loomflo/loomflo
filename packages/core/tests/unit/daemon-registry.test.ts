@@ -47,7 +47,8 @@ describe("Daemon registry", () => {
       workflow: null,
       provider: {} as never,
       config: {} as never,
-      costTracker: {} as never,
+      // Minimal CostTracker surface used by toProjectSummary.
+      costTracker: { getTotalCost: () => 0 } as never,
       messageBus: {} as never,
       sharedMemory: {} as never,
       startedAt: new Date().toISOString(),

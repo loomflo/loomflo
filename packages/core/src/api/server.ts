@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
@@ -14,6 +15,11 @@ import { costsRoutes } from "./routes/costs.js";
 import { specsRoutes } from "./routes/specs.js";
 import { daemonRoutes } from "./routes/daemon.js";
 import { projectsCrudRoutes } from "./routes/projects-crud.js";
+import { runtimesRoutes } from "./routes/runtimes.js";
+import { credentialsRoutes } from "./routes/credentials.js";
+import { mcpRoutes } from "./routes/mcp.js";
+import { mockRoutes, isMockApiEnabled } from "./routes/mock.js";
+import { ProviderProfiles } from "../providers/profiles.js";
 import { legacyGoneRoutes } from "./routes/legacy-gone.js";
 import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 
@@ -22,10 +28,19 @@ import type { ProjectSummary, ProjectRuntime } from "../daemon-types.js";
 // ============================================================================
 
 /** Version string sent in the WebSocket welcome message. */
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 /** WebSocket close code for unauthorized connections. */
 const WS_CLOSE_UNAUTHORIZED = 4001;
+
+/**
+ * Subprotocol prefix used to carry the daemon auth token on WebSocket upgrade.
+ *
+ * Clients connect with `Sec-WebSocket-Protocol: loomflo.bearer, <token>` so the
+ * token never appears in URLs, access logs, or proxy buffers. The server echoes
+ * the prefix (not the token) so the handshake completes correctly.
+ */
+const WS_SUBPROTOCOL_PREFIX = "loomflo.bearer";
 
 /** Numeric value of WebSocket.OPEN readyState. */
 const WS_OPEN = 1;
@@ -147,6 +162,54 @@ export interface ServerResult {
 }
 
 // ============================================================================
+// Timing-safe token comparison
+// ============================================================================
+
+/**
+ * Compare two strings in constant time to prevent timing attacks.
+ *
+ * Uses `crypto.timingSafeEqual` under the hood. When the two strings differ
+ * in length, the comparison is still performed against a same-length buffer
+ * to avoid leaking length information, and the result is always `false`.
+ */
+function safeTokenEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf-8");
+  const bufB = Buffer.from(b, "utf-8");
+  if (bufA.length !== bufB.length) {
+    // Compare bufA against itself to keep constant time, then return false.
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+
+// ============================================================================
+// WebSocket subprotocol auth
+// ============================================================================
+
+/**
+ * Extract a bearer token carried by the `Sec-WebSocket-Protocol` upgrade header.
+ *
+ * Clients MUST offer two subprotocols: the literal identifier
+ * `loomflo.bearer` followed by the token value. The header is a
+ * comma-separated list (RFC 6455 §4.1); browsers normalize it.
+ *
+ * Returns `null` when the header is missing, empty, does not begin with the
+ * expected prefix, or does not include a token element.
+ */
+function extractBearerFromSubprotocol(header: string | string[] | undefined): string | null {
+  if (header === undefined) return null;
+  const raw = Array.isArray(header) ? header.join(",") : header;
+  const parts = raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length < 2) return null;
+  if (parts[0] !== WS_SUBPROTOCOL_PREFIX) return null;
+  return parts[1] ?? null;
+}
+
+// ============================================================================
 // preValidation hook factory
 // ============================================================================
 
@@ -187,7 +250,9 @@ function makeProjectRuntimeHook(getRuntime: (id: string) => ProjectRuntime | nul
  *
  * Authentication:
  * - HTTP routes use Bearer token in the `Authorization` header.
- * - WebSocket connections authenticate via `?token=xxx` query parameter.
+ * - WebSocket connections authenticate via the `Sec-WebSocket-Protocol`
+ *   upgrade header (`loomflo.bearer, <token>`) so credentials are never
+ *   written to URLs, access logs, or proxy buffers.
  * - `GET /health` is unauthenticated.
  *
  * @param options - Server configuration options.
@@ -208,7 +273,16 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   // Plugins
   // ---------------------------------------------------------------------------
 
-  await server.register(fastifyWebsocket);
+  // Accept the `loomflo.bearer` subprotocol offered by our clients so the
+  // handshake completes with the expected Sec-WebSocket-Protocol response
+  // header. Authorization is still enforced in the route handler — picking the
+  // subprotocol here only negotiates the framing, not the token.
+  await server.register(fastifyWebsocket, {
+    options: {
+      handleProtocols: (protocols: Set<string>): string | false =>
+        protocols.has(WS_SUBPROTOCOL_PREFIX) ? WS_SUBPROTOCOL_PREFIX : false,
+    },
+  });
   await server.register(fastifyCors, { origin: true });
 
   if (dashboardRoot) {
@@ -253,12 +327,25 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       // When the dashboard is active, skip auth for GET requests to non-API
       // paths. Static assets and SPA client-side routes do not carry a Bearer
       // token; the dashboard includes it only in its API fetch/XHR calls.
+      //
+      // Browser navigations (address-bar, refresh, new-tab, deep links) to
+      // SPA routes under `/projects/:id/*` collide with real API routes of
+      // the same shape (e.g. `/projects/:id/specs`, `/projects/:id/memory`).
+      // For those we short-circuit the response with `index.html` BEFORE
+      // route matching, so the React app mounts and reads the token from
+      // the URL hash / sessionStorage instead of leaking API JSON to an
+      // unauthenticated HTTP client that happens to send Accept: text/html.
       if (dashboardRoot && request.method === "GET") {
         const isApiRoute = API_ROUTE_PREFIXES.some(
           (p) =>
             request.url === p || request.url.startsWith(p + "/") || request.url.startsWith(p + "?"),
         );
         if (!isApiRoute) return;
+        const accept = request.headers.accept ?? "";
+        if (accept.includes("text/html")) {
+          await reply.sendFile("index.html");
+          return reply;
+        }
       }
 
       const header = request.headers.authorization;
@@ -268,7 +355,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
         return;
       }
 
-      if (header.slice(BEARER_PREFIX.length) !== token) {
+      if (!safeTokenEquals(header.slice(BEARER_PREFIX.length), token)) {
         await reply.code(401).send({ error: "Unauthorized" });
         return;
       }
@@ -322,6 +409,25 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
     ),
   );
 
+  // Daemon-level: runtimes catalog + CLI detection (Phase 4a + 4d of spec 003).
+  await server.register(runtimesRoutes);
+
+  // Daemon-level: credentials CRUD. Profiles file path follows the daemon's
+  // existing ~/.loomflo/credentials.json convention; allow override via env
+  // for tests + alt deployments.
+  const credentialsFilePath =
+    process.env["LOOMFLO_CREDENTIALS_PATH"] ??
+    `${process.env["HOME"] ?? ""}/.loomflo/credentials.json`;
+  await server.register(
+    credentialsRoutes({ profiles: new ProviderProfiles(credentialsFilePath) }),
+  );
+
+  // Optional: mock fixture routes for dashboard development. Disabled by
+  // default; opt-in via LOOMFLO_MOCK_API=1.
+  if (isMockApiEnabled()) {
+    await server.register(mockRoutes);
+  }
+
   if (options.registerProject && options.deregisterProject) {
     await server.register(projectsCrudRoutes, {
       listProjects: options.listProjects ?? ((): ProjectSummary[] => []),
@@ -370,6 +476,7 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
       await scoped.register(costsRoutes({}));
       await scoped.register(configRoutes({}));
       await scoped.register(specsRoutes({}));
+      await scoped.register(mcpRoutes());
     },
     { prefix: "/projects/:projectId" },
   );
@@ -407,10 +514,11 @@ export async function createServer(options: ServerOptions): Promise<ServerResult
   const subscriptions = new Map<SocketClient, ClientSubscription>();
 
   server.get("/ws", { websocket: true }, (socket: SocketClient, _request: FastifyRequest): void => {
-    const url = new URL(_request.url, `http://${_request.headers.host ?? "localhost"}`);
-    const queryToken = url.searchParams.get("token");
+    const presentedToken = extractBearerFromSubprotocol(
+      _request.headers["sec-websocket-protocol"],
+    );
 
-    if (queryToken !== token) {
+    if (!presentedToken || !safeTokenEquals(presentedToken, token)) {
       socket.close(WS_CLOSE_UNAUTHORIZED, "Unauthorized");
       return;
     }

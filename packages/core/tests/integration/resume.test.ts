@@ -30,6 +30,7 @@ function makeNode(overrides: Partial<Node> & { id: string; title: string }): Nod
     cost: 0,
     startedAt: null,
     completedAt: null,
+    providerRetryState: null,
     ...overrides,
   };
 }

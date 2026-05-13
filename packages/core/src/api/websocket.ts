@@ -14,7 +14,10 @@ export type WsEventType =
   | "cost_update"
   | "chat_response"
   | "spec_artifact_ready"
-  | "memory_updated";
+  | "memory_updated"
+  | "runtime_session_started"
+  | "runtime_session_event"
+  | "mcp_tool_called";
 
 /** Base shape shared by all WebSocket events. */
 export interface WsEventBase {
@@ -143,6 +146,64 @@ export interface WsMemoryUpdatedEvent extends WsEventBase {
   agentId?: string;
 }
 
+/**
+ * Payload broadcast when an agent runtime session opens for a node.
+ *
+ * Phase 4b of spec 003 — lets the dashboard show "Session running" indicators
+ * with the runtime name + session ID + role, before the first cost_update or
+ * tool_call lands.
+ */
+export interface WsRuntimeSessionStartedEvent extends WsEventBase {
+  type: "runtime_session_started";
+  /** Project ID (only set when the daemon is running in multi-project mode). */
+  projectId?: string;
+  /** Workflow node the session is executing for. */
+  nodeId: string;
+  /** Agent identifier (role + node id). */
+  agentId: string;
+  /** Runtime name from `Node.runtime` ("claude-agent" | "copilot" | "mock"). */
+  runtimeName: string;
+  /** Session identifier returned by the AgentRuntime. */
+  sessionId: string;
+  /** Resolved model id (e.g. "claude-sonnet-4-6", "gpt-5"). */
+  model?: string;
+}
+
+/**
+ * Payload broadcast for every SessionEvent emitted by an AgentRuntime.
+ *
+ * The dashboard's session viewer listens to this stream to render assistant
+ * deltas, tool calls, tool results, cost updates, etc. The full SessionEvent
+ * is forwarded as-is so the front can switch on `event.kind`.
+ */
+export interface WsRuntimeSessionEvent extends WsEventBase {
+  type: "runtime_session_event";
+  projectId?: string;
+  nodeId: string;
+  agentId: string;
+  sessionId: string;
+  /** The runtime SessionEvent (see runtimes/base.ts) — discriminated by `kind`. */
+  event: Record<string, unknown>;
+}
+
+/**
+ * Payload broadcast when a loomflo MCP tool is invoked inside a session.
+ *
+ * Useful for the dashboard's tool inspector and audit log. Mirrors the
+ * runtime SessionEvent's `tool_call` shape but carries the project + node
+ * context so the dashboard can route it to the right view.
+ */
+export interface WsMcpToolCalledEvent extends WsEventBase {
+  type: "mcp_tool_called";
+  projectId?: string;
+  nodeId: string;
+  agentId: string;
+  toolName: string;
+  toolUseId?: string;
+  /** Sanitised tool input (front decides what to display / hide). */
+  input: Record<string, unknown>;
+}
+
 /** Union of all WebSocket event payloads. */
 export type WsEvent =
   | WsNodeStatusEvent
@@ -153,7 +214,10 @@ export type WsEvent =
   | WsCostUpdateEvent
   | WsChatResponseEvent
   | WsSpecArtifactReadyEvent
-  | WsMemoryUpdatedEvent;
+  | WsMemoryUpdatedEvent
+  | WsRuntimeSessionStartedEvent
+  | WsRuntimeSessionEvent
+  | WsMcpToolCalledEvent;
 
 /** Broadcast function signature matching the one returned by {@link createServer}. */
 export type BroadcastFn = (event: Record<string, unknown>) => void;
@@ -364,6 +428,68 @@ export class WebSocketBroadcaster {
       file,
       summary,
       ...(agentId !== undefined && { agentId }),
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast that an AgentRuntime session has just opened for a node.
+   *
+   * @param params - Session identity + runtime metadata.
+   */
+  emitRuntimeSessionStarted(params: {
+    projectId?: string;
+    nodeId: string;
+    agentId: string;
+    runtimeName: string;
+    sessionId: string;
+    model?: string;
+  }): void {
+    const event: WsRuntimeSessionStartedEvent = {
+      type: "runtime_session_started",
+      timestamp: new Date().toISOString(),
+      ...params,
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast a single SessionEvent emitted by an AgentRuntime session.
+   *
+   * @param params - Session identity + the underlying SessionEvent payload.
+   */
+  emitRuntimeSessionEvent(params: {
+    projectId?: string;
+    nodeId: string;
+    agentId: string;
+    sessionId: string;
+    event: Record<string, unknown>;
+  }): void {
+    const event: WsRuntimeSessionEvent = {
+      type: "runtime_session_event",
+      timestamp: new Date().toISOString(),
+      ...params,
+    };
+    this.emit(event);
+  }
+
+  /**
+   * Broadcast that an MCP tool was invoked inside an active session.
+   *
+   * @param params - Tool identity + sanitised input + project/node context.
+   */
+  emitMcpToolCalled(params: {
+    projectId?: string;
+    nodeId: string;
+    agentId: string;
+    toolName: string;
+    toolUseId?: string;
+    input: Record<string, unknown>;
+  }): void {
+    const event: WsMcpToolCalledEvent = {
+      type: "mcp_tool_called",
+      timestamp: new Date().toISOString(),
+      ...params,
     };
     this.emit(event);
   }

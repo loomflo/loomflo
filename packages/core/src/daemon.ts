@@ -25,6 +25,8 @@ import { shellExecTool } from "./tools/shell-exec.js";
 import { memoryReadTool } from "./tools/memory-read.js";
 import { memoryWriteTool } from "./tools/memory-write.js";
 import { loadConfig } from "./config.js";
+import { runNodeWithRuntime } from "./runtimes/run-node.js";
+import { resolveNodeRuntime } from "./runtimes/registry.js";
 import type { NodeExecutor } from "./workflow/execution-engine.js";
 import type { Workflow } from "./types.js";
 import type { ProjectRuntime, ProjectSummary } from "./daemon-types.js";
@@ -44,6 +46,12 @@ export interface DaemonConfig {
   projectPath?: string;
   /** Absolute path to the dashboard static files directory. */
   dashboardPath?: string;
+  /**
+   * Override the Loomflo home directory (where credentials.json and projects.json
+   * live). Defaults to `~/.loomflo`. Primarily intended for tests so they can
+   * exercise daemon start/stop against an isolated directory.
+   */
+  loomfloHome?: string;
 }
 
 /**
@@ -81,7 +89,7 @@ export interface DaemonInfo {
 // ============================================================================
 
 /** Current daemon version — written to daemon.json so clients can verify compatibility. */
-const DAEMON_VERSION = "0.2.0";
+const DAEMON_VERSION = "0.3.0";
 
 /** Directory name for global Loomflo config/state. */
 const LOOMFLO_HOME_DIR = ".loomflo";
@@ -114,6 +122,7 @@ export class Daemon {
   private readonly host: string;
   private readonly projectPath: string | undefined;
   private readonly dashboardPath: string | undefined;
+  private readonly loomfloHome: string;
   private server: FastifyInstance | null = null;
   private broadcast: ((event: Record<string, unknown>) => void) | null = null;
   /** Broadcast a project-scoped event to subscribed WebSocket clients. */
@@ -124,10 +133,8 @@ export class Daemon {
   private shutdownHooks: ShutdownHooks | null = null;
   private shuttingDown = false;
   private readonly projects: Map<string, ProjectRuntime> = new Map();
-  private readonly profiles = new ProviderProfiles(join(homedir(), ".loomflo", "credentials.json"));
-  private readonly projectsRegistry = new ProjectsRegistry(
-    join(homedir(), ".loomflo", "projects.json"),
-  );
+  private readonly profiles: ProviderProfiles;
+  private readonly projectsRegistry: ProjectsRegistry;
 
   /** Register or replace a project runtime. */
   upsertProject(rt: ProjectRuntime): void {
@@ -155,6 +162,20 @@ export class Daemon {
   }
 
   /**
+   * Ensure a stub `default` provider profile exists in credentials.json.
+   *
+   * When credentials.json is absent or contains no profiles, seed a single
+   * `default` profile of type `anthropic-oauth`. This makes cold-start of the
+   * daemon compatible with the S2 wizard's assumption that at least one
+   * profile is resolvable by name. Existing profiles are never overwritten.
+   */
+  private async ensureDefaultProfileStub(): Promise<void> {
+    const existing = await this.profiles.list();
+    if (Object.keys(existing).length > 0) return;
+    await this.profiles.upsert("default", { type: "anthropic-oauth" });
+  }
+
+  /**
    * Create a new Daemon instance.
    *
    * @param config - Daemon configuration options.
@@ -164,6 +185,9 @@ export class Daemon {
     this.host = config.host ?? DEFAULT_HOST;
     this.projectPath = config.projectPath;
     this.dashboardPath = config.dashboardPath;
+    this.loomfloHome = config.loomfloHome ?? join(homedir(), LOOMFLO_HOME_DIR);
+    this.profiles = new ProviderProfiles(join(this.loomfloHome, "credentials.json"));
+    this.projectsRegistry = new ProjectsRegistry(join(this.loomfloHome, "projects.json"));
 
     const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost", "0.0.0.0"]);
 
@@ -235,7 +259,80 @@ export class Daemon {
       async (node) => {
         const nodeConfig = await loadConfig({ projectPath: workflow.projectPath });
         const messageBus = new MessageBus();
+        const nodeData = node.toJSON();
+        const escalationHandler = {
+          escalate: async (): Promise<void> => {
+            /* no-op in daemon — agents self-manage */
+          },
+        };
 
+        // Multi-runtime routing (spec 003): if the node declares a non-native
+        // runtime, dispatch to AgentRuntime instead of the legacy runLoomi loop.
+        const runtimeName = resolveNodeRuntime(nodeData);
+        if (runtimeName !== "loomi-native") {
+          // Phase 4b: bridge SessionEvents to the dashboard WS so the session
+          // viewer + cost panel update live. The broadcaster carries projectId
+          // for routing in multi-project mode.
+          const projectId = rt.id;
+          const agentId = `loomi-${node.id}`;
+          let sessionStartedSent = false;
+          const broadcaster = this.broadcastForProject.bind(this);
+          const onRuntimeEvent = (ev: { kind: string } & Record<string, unknown>): void => {
+            if (!sessionStartedSent && ev.kind === "session_started") {
+              sessionStartedSent = true;
+              broadcaster(projectId, {
+                type: "runtime_session_started",
+                timestamp: new Date().toISOString(),
+                projectId,
+                nodeId: node.id,
+                agentId,
+                runtimeName,
+                sessionId: String(ev["sessionId"] ?? ""),
+                model: nodeConfig.models.loomi,
+              });
+            }
+            if (ev.kind === "tool_call") {
+              broadcaster(projectId, {
+                type: "mcp_tool_called",
+                timestamp: new Date().toISOString(),
+                projectId,
+                nodeId: node.id,
+                agentId,
+                toolName: String(ev["toolName"] ?? "unknown"),
+                ...(typeof ev["toolUseId"] === "string"
+                  ? { toolUseId: ev["toolUseId"] }
+                  : {}),
+                input: (ev["input"] as Record<string, unknown>) ?? {},
+              });
+            }
+            broadcaster(projectId, {
+              type: "runtime_session_event",
+              timestamp: new Date().toISOString(),
+              projectId,
+              nodeId: node.id,
+              agentId,
+              sessionId: String(ev["sessionId"] ?? ""),
+              event: ev,
+            });
+          };
+
+          const runtimeResult = await runNodeWithRuntime(nodeData, {
+            workflowId: workflow.id,
+            workspacePath: workflow.projectPath,
+            costTracker: rt.costTracker,
+            sharedMemory: rt.sharedMemory,
+            messageBus,
+            completionHandler: { reportComplete: async () => {} },
+            escalationHandler,
+            agentRole: "loomi",
+            model: nodeConfig.models.loomi,
+            onEvent: (e) => onRuntimeEvent(e as { kind: string } & Record<string, unknown>),
+          });
+          // runNodeWithRuntime returns null only for "loomi-native" — already filtered.
+          if (runtimeResult) return runtimeResult;
+        }
+
+        // Default path: legacy runLoomi multi-agent loop.
         const result = await runLoomi({
           nodeId: node.id,
           nodeTitle: node.title,
@@ -248,11 +345,7 @@ export class Daemon {
           eventLog: { workflowId: workflow.id },
           costTracker: rt.costTracker,
           sharedMemory: rt.sharedMemory,
-          escalationHandler: {
-            escalate: async () => {
-              /* no-op in daemon — agents self-manage */
-            },
-          },
+          escalationHandler,
           workerTools,
         });
 
@@ -302,6 +395,12 @@ export class Daemon {
       throw error;
     }
 
+    // Ensure the cold-start stub profile `default` exists before anything else.
+    // Spec §87 (S1 FR-9): when credentials.json is absent or empty, the daemon
+    // seeds a single `default` profile so the S2 onboarding wizard has a usable
+    // starting point out of the box.
+    await this.ensureDefaultProfileStub();
+
     // Reload projects persisted from a previous daemon session.
     const persisted = await this.projectsRegistry.list();
     for (const entry of persisted) {
@@ -320,7 +419,7 @@ export class Daemon {
       version: DAEMON_VERSION,
     };
 
-    await writeDaemonFile(this.info);
+    await writeDaemonFile(this.info, this.loomfloHome);
 
     return this.info;
   }
@@ -340,7 +439,7 @@ export class Daemon {
       this.server = null;
     }
 
-    await removeDaemonFile();
+    await removeDaemonFile(this.loomfloHome);
     this.info = null;
     this.shuttingDown = false;
   }
@@ -383,7 +482,7 @@ export class Daemon {
       await this.server.close();
       this.server = null;
     }
-    await removeDaemonFile();
+    await removeDaemonFile(this.loomfloHome);
     this.info = null;
     this.shuttingDown = false;
   }
@@ -550,39 +649,42 @@ export class Daemon {
 // ============================================================================
 
 /**
- * Get the path to `~/.loomflo/daemon.json`.
+ * Get the path to `daemon.json` under the given Loomflo home directory.
  *
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  * @returns Absolute path to the daemon info file.
  */
-function getDaemonFilePath(): string {
-  return join(homedir(), LOOMFLO_HOME_DIR, DAEMON_FILE);
+function getDaemonFilePath(loomfloHome: string): string {
+  return join(loomfloHome, DAEMON_FILE);
 }
 
 /**
- * Write daemon runtime info to `~/.loomflo/daemon.json`.
+ * Write daemon runtime info to `<loomfloHome>/daemon.json`.
  *
- * Creates the `~/.loomflo/` directory if it does not exist.
- * The file is written with mode 0o600 (owner read/write only).
+ * Creates the directory if it does not exist. The file is written with
+ * mode 0o600 (owner read/write only).
  *
  * @param info - The daemon runtime info to persist.
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  */
-async function writeDaemonFile(info: DaemonInfo): Promise<void> {
-  const dir = join(homedir(), LOOMFLO_HOME_DIR);
-  await mkdir(dir, { recursive: true });
-  await writeFile(getDaemonFilePath(), JSON.stringify(info, null, 2), {
+async function writeDaemonFile(info: DaemonInfo, loomfloHome: string): Promise<void> {
+  await mkdir(loomfloHome, { recursive: true });
+  await writeFile(getDaemonFilePath(loomfloHome), JSON.stringify(info, null, 2), {
     encoding: "utf-8",
     mode: 0o600,
   });
 }
 
 /**
- * Remove `~/.loomflo/daemon.json` from disk.
+ * Remove `<loomfloHome>/daemon.json` from disk.
  *
  * Silently ignores if the file does not exist.
+ *
+ * @param loomfloHome - Root directory (typically `~/.loomflo`).
  */
-async function removeDaemonFile(): Promise<void> {
+async function removeDaemonFile(loomfloHome: string): Promise<void> {
   try {
-    await unlink(getDaemonFilePath());
+    await unlink(getDaemonFilePath(loomfloHome));
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
     if (code !== "ENOENT") {
@@ -604,7 +706,7 @@ async function removeDaemonFile(): Promise<void> {
  * @throws If the file contains invalid JSON.
  */
 export async function loadDaemonInfo(): Promise<DaemonInfo | null> {
-  const filePath = getDaemonFilePath();
+  const filePath = getDaemonFilePath(join(homedir(), LOOMFLO_HOME_DIR));
 
   let content: string;
   try {

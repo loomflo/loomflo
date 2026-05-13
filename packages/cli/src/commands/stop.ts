@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { resolveProject } from "../project-resolver.js";
 import { openClient } from "../client.js";
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
 
 // ============================================================================
 // Command Factory
@@ -22,17 +24,27 @@ import { openClient } from "../client.js";
  * @returns A configured commander Command instance.
  */
 export function createStopCommand(): Command {
-  return new Command("stop")
+  const cmd = new Command("stop")
     .description("Stop this project's workflow (daemon keeps running)")
-    .action(async () => {
+    .action(async (options: { json?: boolean }): Promise<void> => {
       try {
         const { identity } = await resolveProject({ cwd: process.cwd(), createIfMissing: false });
         const client = await openClient(identity.id);
         await client.request("POST", "/workflow/stop");
-        console.log(`Project ${identity.name} (${identity.id}) stopped.`);
+
+        if (isJsonMode(options)) {
+          writeJson({ project: { id: identity.id, name: identity.name } });
+          return;
+        }
+
+        process.stdout.write(
+          `${theme.line(theme.glyph.check, "accent", `project ${identity.name} stopped`, identity.id)}\n`,
+        );
       } catch (err) {
-        console.error(`Error: ${(err as Error).message}`);
-        process.exit(1);
+        writeError(options, (err as Error).message, "E_STOP");
+        process.exitCode = 1;
       }
     });
+
+  return withJsonSupport(cmd);
 }

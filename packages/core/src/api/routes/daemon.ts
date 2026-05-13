@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ProjectSummary } from "../../daemon-types.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 export interface DaemonRoutesOptions {
   listProjects: () => ProjectSummary[];

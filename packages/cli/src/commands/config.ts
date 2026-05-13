@@ -6,6 +6,9 @@ import { Command } from "commander";
 import { ConfigSchema } from "@loomflo/core";
 import { ZodError } from "zod";
 
+import { withJsonSupport, isJsonMode, writeJson, writeError } from "../output.js";
+import { theme } from "../theme/index.js";
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -222,93 +225,121 @@ function formatValue(value: unknown): string {
 export function createConfigCommand(): Command {
   const cmd = new Command("config")
     .description("Get or set configuration (reads/writes local config files, no daemon required)")
-    .action(async (): Promise<void> => {
-      try {
-        const global = await readConfigFile(globalConfigPath());
-        const project = await readConfigFile(projectConfigPath());
-        const merged = deepMerge(global, project);
-        const resolved = ConfigSchema.parse(merged);
-        console.log(JSON.stringify(resolved, null, 2));
-      } catch (error: unknown) {
-        if (error instanceof ZodError) {
-          console.error(`Error: corrupted config - ${error.message}`);
-          process.exit(1);
+    .enablePositionalOptions()
+    .passThroughOptions();
+  withJsonSupport(cmd);
+  cmd.action(async (options: { json?: boolean }): Promise<void> => {
+    try {
+      const global = await readConfigFile(globalConfigPath());
+      const project = await readConfigFile(projectConfigPath());
+      const merged = deepMerge(global, project);
+      const resolved = ConfigSchema.parse(merged);
+      if (isJsonMode(options)) {
+        writeJson(resolved);
+      } else {
+        process.stdout.write(theme.heading("Configuration") + "\n");
+        const entries = Object.entries(resolved as Record<string, unknown>);
+        const maxKey = Math.max(...entries.map(([k]) => k.length));
+        for (const [key, value] of entries) {
+          process.stdout.write(theme.kv(key, formatValue(value), maxKey) + "\n");
         }
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error reading config: ${msg}`);
-        process.exit(1);
       }
-    });
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
+        writeError(options, `corrupted config - ${error.message}`, "CORRUPTED_CONFIG");
+        process.exitCode = 1;
+        return;
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      writeError(options, `reading config: ${msg}`);
+      process.exitCode = 1;
+    }
+  });
 
-  cmd
+  const getCmd = cmd
     .command("get")
     .description("Get a configuration value by key (supports dot notation)")
-    .argument("<key>", 'Configuration key (e.g. "models.loom")')
-    .action(async (key: string): Promise<void> => {
-      try {
-        const global = await readConfigFile(globalConfigPath());
-        const project = await readConfigFile(projectConfigPath());
-        const merged = deepMerge(global, project);
-        const resolved = ConfigSchema.parse(merged);
+    .argument("<key>", 'Configuration key (e.g. "models.loom")');
+  withJsonSupport(getCmd);
+  getCmd.action(async (key: string, options: { json?: boolean }): Promise<void> => {
+    try {
+      const global = await readConfigFile(globalConfigPath());
+      const project = await readConfigFile(projectConfigPath());
+      const merged = deepMerge(global, project);
+      const resolved = ConfigSchema.parse(merged);
 
-        const value = resolveKeyPath(resolved as unknown as Record<string, unknown>, key);
+      const value = resolveKeyPath(resolved as unknown as Record<string, unknown>, key);
 
-        if (value === undefined) {
-          console.error(`Error: unknown config key "${key}"`);
-          process.exit(1);
-        }
-
-        console.log(formatValue(value));
-      } catch (error: unknown) {
-        if (error instanceof ZodError) {
-          console.error(`Error: corrupted config - ${error.message}`);
-          process.exit(1);
-        }
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error reading config: ${msg}`);
-        process.exit(1);
+      if (value === undefined) {
+        writeError(options, `unknown config key "${key}"`, "UNKNOWN_KEY");
+        process.exitCode = 1;
+        return;
       }
-    });
 
-  cmd
+      if (isJsonMode(options)) {
+        writeJson({ key, value });
+      } else {
+        process.stdout.write(theme.kv(key, formatValue(value)) + "\n");
+      }
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
+        writeError(options, `corrupted config - ${error.message}`, "CORRUPTED_CONFIG");
+        process.exitCode = 1;
+        return;
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      writeError(options, `reading config: ${msg}`);
+      process.exitCode = 1;
+    }
+  });
+
+  const setCmd = cmd
     .command("set")
     .description(
       "Set a configuration value (writes to project config if in a project, else global config)",
     )
     .argument("<key>", 'Configuration key (e.g. "models.loom")')
     .argument("<value>", "Value to set (booleans, numbers, and null are auto-parsed)")
-    .option("--global", "Force writing to global config (~/.loomflo/config.json)")
-    .action(async (key: string, rawValue: string, options: { global?: boolean }): Promise<void> => {
-      try {
-        // Determine which config file to write to
-        const useGlobal = options.global === true;
-        const targetPath = useGlobal ? globalConfigPath() : projectConfigPath();
+    .option("--global", "Force writing to global config (~/.loomflo/config.json)");
+  withJsonSupport(setCmd);
+  setCmd.action(async (key: string, rawValue: string, options: { global?: boolean; json?: boolean }): Promise<void> => {
+    try {
+      // Determine which config file to write to
+      const useGlobal = options.global === true;
+      const targetPath = useGlobal ? globalConfigPath() : projectConfigPath();
 
-        // Read the existing config from the target file
-        const existing = await readConfigFile(targetPath);
+      // Read the existing config from the target file
+      const existing = await readConfigFile(targetPath);
 
-        // Validate that the key exists in the schema
-        const defaults = ConfigSchema.parse({}) as unknown as Record<string, unknown>;
-        if (resolveKeyPath(defaults, key) === undefined) {
-          console.error(`Error: unknown config key "${key}"`);
-          process.exit(1);
-        }
-
-        // Apply the new value
-        const parsed = parseValue(rawValue);
-        setKeyPath(existing, key, parsed);
-
-        // Write back
-        await writeConfigFile(targetPath, existing);
-
-        const scope = useGlobal ? "global" : "project";
-        console.log(`${key} = ${formatValue(parsed)} (saved to ${scope} config)`);
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error writing config: ${msg}`);
-        process.exit(1);
+      // Validate that the key exists in the schema
+      const defaults = ConfigSchema.parse({}) as unknown as Record<string, unknown>;
+      if (resolveKeyPath(defaults, key) === undefined) {
+        writeError(options, `unknown config key "${key}"`, "UNKNOWN_KEY");
+        process.exitCode = 1;
+        return;
       }
-    });
+
+      // Apply the new value
+      const parsed = parseValue(rawValue);
+      setKeyPath(existing, key, parsed);
+
+      // Write back
+      await writeConfigFile(targetPath, existing);
+
+      const scope = useGlobal ? "global" : "project";
+      if (isJsonMode(options)) {
+        writeJson({ key, value: parsed, scope });
+      } else {
+        process.stdout.write(
+          theme.line(theme.glyph.check, "accent", `${key} updated`, scope) + "\n",
+        );
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      writeError(options, `writing config: ${msg}`);
+      process.exitCode = 1;
+    }
+  });
 
   return cmd;
 }

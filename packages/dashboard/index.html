@@ -1,9 +1,18 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Loomflo Dashboard</title>
+    <title>Loomflo</title>
+    <script>
+      try {
+        var saved = localStorage.getItem('loomflo.theme');
+        if (saved === 'dark') document.documentElement.removeAttribute('data-theme');
+        else document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

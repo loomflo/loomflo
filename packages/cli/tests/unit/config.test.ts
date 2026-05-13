@@ -4,6 +4,7 @@
  * Covers config get with empty config (ENOENT), full display, and unknown key.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import stripAnsi from "strip-ansi";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks (hoisted by vitest)
@@ -52,17 +53,22 @@ async function runConfig(args: string[]): Promise<void> {
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
-let mockProcessExit: ReturnType<typeof vi.fn>;
-let mockConsoleLog: ReturnType<typeof vi.fn>;
-let mockConsoleError: ReturnType<typeof vi.fn>;
+let stdoutWrites: string[];
+let stderrWrites: string[];
 
 beforeEach(() => {
-  mockProcessExit = vi.spyOn(process, "exit").mockImplementation((): never => {
-    throw new Error("process.exit");
-  }) as unknown as ReturnType<typeof vi.fn>;
+  stdoutWrites = [];
+  stderrWrites = [];
 
-  mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-  mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(process.stdout, "write").mockImplementation((c) => {
+    stdoutWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
+
+  vi.spyOn(process.stderr, "write").mockImplementation((c) => {
+    stderrWrites.push(typeof c === "string" ? c : c.toString());
+    return true;
+  });
 
   // Default: empty config (ENOENT for both global and project config files)
   const enoent = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
@@ -70,6 +76,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  process.exitCode = undefined;
   vi.restoreAllMocks();
 });
 
@@ -81,29 +88,37 @@ describe("config get — empty config defaults", () => {
   it("should return 'anthropic' for 'config get provider'", async () => {
     await runConfig(["get", "provider"]);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("anthropic");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("provider");
+    expect(plain).toContain("anthropic");
+    expect(process.exitCode).toBeUndefined();
   });
 
   it("should return 'claude-opus-4-6' for 'config get models.loom'", async () => {
     await runConfig(["get", "models.loom"]);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("claude-opus-4-6");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("models.loom");
+    expect(plain).toContain("claude-opus-4-6");
+    expect(process.exitCode).toBeUndefined();
   });
 
   it("should return '0' for 'config get defaultDelay'", async () => {
     await runConfig(["get", "defaultDelay"]);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("0");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("defaultDelay");
+    expect(plain).toContain("0");
+    expect(process.exitCode).toBeUndefined();
   });
 
   it("should return 'null' for 'config get budgetLimit'", async () => {
     await runConfig(["get", "budgetLimit"]);
 
-    expect(mockConsoleLog).toHaveBeenCalledWith("null");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("budgetLimit");
+    expect(plain).toContain("null");
+    expect(process.exitCode).toBeUndefined();
   });
 });
 
@@ -112,14 +127,14 @@ describe("config get — empty config defaults", () => {
 // ===========================================================================
 
 describe("config — full display on empty config", () => {
-  it("should output JSON with provider: anthropic", async () => {
+  it("should output heading and kv pairs with provider: anthropic", async () => {
     await runConfig([]);
 
-    expect(mockConsoleLog).toHaveBeenCalledOnce();
-    const output = mockConsoleLog.mock.calls[0]![0] as string;
-    const parsed = JSON.parse(output) as Record<string, unknown>;
-    expect(parsed["provider"]).toBe("anthropic");
-    expect(mockProcessExit).not.toHaveBeenCalled();
+    const plain = stdoutWrites.map(stripAnsi).join("");
+    expect(plain).toContain("Configuration");
+    expect(plain).toContain("provider");
+    expect(plain).toContain("anthropic");
+    expect(process.exitCode).toBeUndefined();
   });
 });
 
@@ -128,10 +143,11 @@ describe("config — full display on empty config", () => {
 // ===========================================================================
 
 describe("config get — unknown key", () => {
-  it("should print error to stderr for 'config get nonExistentKey'", async () => {
-    await expect(runConfig(["get", "nonExistentKey"])).rejects.toThrow("process.exit");
+  it("should write error to stderr for 'config get nonExistentKey'", async () => {
+    await runConfig(["get", "nonExistentKey"]);
 
-    expect(mockConsoleError).toHaveBeenCalledWith('Error: unknown config key "nonExistentKey"');
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
+    const plain = stderrWrites.map(stripAnsi).join("");
+    expect(plain).toContain('unknown config key "nonExistentKey"');
+    expect(process.exitCode).toBe(1);
   });
 });

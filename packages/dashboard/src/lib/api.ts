@@ -1,662 +1,472 @@
 // ============================================================================
 // REST API Client
 //
-// Typed fetch wrapper for the Loomflo daemon REST API.
-// Uses Vite proxy in development (/api → daemon).
+// Typed fetch wrapper for the Loomflo daemon REST API. Provides one method
+// per endpoint surfaced by the daemon (Phase 4 backend).
+//
+// Auth: Bearer token in the Authorization header.
+// Mock mode: when `useMock` is true, project-scoped routes are rerouted to
+// the daemon's `/mock/*` fixtures (only when the daemon was started with
+// LOOMFLO_MOCK_API=1).
 // ============================================================================
 
 import type {
+  AgentCliName,
+  ChatHistoryEntry,
+  ChatResponse,
+  CliAvailability,
   Config,
-  Event,
+  CostsResponse,
+  CreateProjectBody,
+  DaemonStatusResponse,
+  Event as WorkflowEvent,
   EventType,
-  NodeStatus,
+  HealthResponse,
+  InitResponse,
+  InitWorkflowBody,
+  McpServerConfigEntry,
+  Memory,
+  ModelInfo,
+  Node as WorkflowNode,
+  ProjectSummary,
+  ProviderProfilePayload,
+  RedactedProfile,
   ReviewReport,
+  RuntimeListEntry,
+  Specs,
+  StartResponse,
   Workflow,
-  WorkflowStatus,
 } from "./types.js";
 
 // ============================================================================
-// Response Interfaces
+// Errors
 // ============================================================================
 
-/** Health-check workflow summary (subset of full Workflow). */
-export interface HealthWorkflowSummary {
-  /** Workflow identifier. */
-  id: string;
-  /** Current workflow status. */
-  status: WorkflowStatus;
-  /** Total nodes in the graph. */
-  nodeCount: number;
-  /** IDs of currently executing nodes. */
-  activeNodes: string[];
-}
-
-/** Response from GET /health. */
-export interface HealthResponse {
-  /** Daemon status indicator. */
-  status: string;
-  /** Daemon uptime in seconds. */
-  uptime: number;
-  /** Daemon version string. */
-  version: string;
-  /** Active workflow summary, or null if no workflow is loaded. */
-  workflow: HealthWorkflowSummary | null;
-}
-
-/** Response from POST /workflow/init. */
-export interface WorkflowInitResponse {
-  /** Newly created workflow identifier. */
-  id: string;
-  /** Initial workflow status (typically "spec"). */
-  status: WorkflowStatus;
-  /** Echo of the project description. */
-  description: string;
-}
-
-/** Response from POST /workflow/start, /workflow/pause, /workflow/resume. */
-export interface WorkflowActionResponse {
-  /** Resulting workflow status after the action. */
-  status: WorkflowStatus;
-  /** Node ID from which execution resumes (present on resume). */
-  resumingFrom?: string;
-}
-
-/** Summary of a node returned by the list endpoint. */
-export interface NodeSummary {
-  /** Unique node identifier. */
-  id: string;
-  /** Human-readable node title. */
-  title: string;
-  /** Current node status. */
-  status: NodeStatus;
-  /** Number of agents assigned to this node. */
-  agentCount: number;
-  /** Accumulated cost in USD. */
-  cost: number;
-  /** Number of retry cycles attempted. */
-  retryCount: number;
-}
-
-/** Response from GET /nodes. */
-export interface NodesListResponse {
-  /** All nodes in the workflow graph. */
-  nodes: NodeSummary[];
-}
-
-/** Response from GET /nodes/:id. */
-export interface NodeDetailResponse {
-  /** Unique node identifier. */
-  id: string;
-  /** Human-readable node title. */
-  title: string;
-  /** Current node status. */
-  status: NodeStatus;
-  /** Markdown instructions for this node. */
-  instructions: string;
-  /** Delay before activation. */
-  delay: string;
-  /** Number of retry cycles attempted. */
-  retryCount: number;
-  /** Maximum allowed retry cycles. */
-  maxRetries: number;
-  /** Accumulated cost in USD. */
-  cost: number;
-  /** ISO 8601 timestamp when the node started, or null. */
-  startedAt: string | null;
-  /** Agents assigned to this node. */
-  agents: {
-    /** Agent identifier. */
-    id: string;
-    /** Agent role. */
-    role: string;
-    /** Agent lifecycle state. */
-    status: string;
-    /** Description of the agent's task. */
-    taskDescription: string;
-    /** File write scope glob patterns. */
-    writeScope: string[];
-    /** Cumulative token usage. */
-    tokenUsage: { input: number; output: number };
-    /** Cumulative cost in USD. */
-    cost: number;
-  }[];
-  /** Agent ID to glob patterns mapping. */
-  fileOwnership: Record<string, string[]>;
-}
-
-/** Metadata for a spec artifact. */
-export interface SpecArtifact {
-  /** Artifact file name. */
-  name: string;
-  /** Relative path within the project. */
-  path: string;
-  /** File size in bytes. */
-  size: number;
-}
-
-/** Response from GET /specs. */
-export interface SpecsListResponse {
-  /** Available spec artifacts. */
-  artifacts: SpecArtifact[];
-}
-
-/** Metadata for a shared memory file. */
-export interface MemoryFile {
-  /** Memory file name. */
-  name: string;
-  /** Agent ID that last modified this file. */
-  lastModifiedBy: string;
-  /** ISO 8601 timestamp of last modification. */
-  lastModifiedAt: string;
-}
-
-/** Response from GET /memory. */
-export interface MemoryListResponse {
-  /** Shared memory files. */
-  files: MemoryFile[];
-}
-
-/** An action taken by Loom in response to a chat message. */
-export interface ChatAction {
-  /** Action type identifier (e.g., "graph_modified"). */
-  type: string;
-  /** Action-specific payload. */
-  details: Record<string, unknown>;
-}
-
-/** Response from POST /chat. */
-export interface ChatResponse {
-  /** Loom's textual response. */
-  response: string;
-  /** Action taken by Loom, or null if no action. */
-  action: ChatAction | null;
-}
-
-/** A single message in chat history. */
-export interface ChatMessage {
-  /** Message author: "user" or "assistant". */
-  role: "user" | "assistant";
-  /** Message text content. */
-  content: string;
-  /** ISO 8601 timestamp when the message was sent. */
-  timestamp: string;
-}
-
-/** Response from GET /chat/history. */
-export interface ChatHistoryResponse {
-  /** Full chat message history. */
-  messages: ChatMessage[];
-}
-
-/** Per-node cost summary entry. */
-export interface NodeCostEntry {
-  /** Node identifier. */
-  id: string;
-  /** Node title. */
-  title: string;
-  /** Cost in USD for this node. */
-  cost: number;
-  /** Number of retry cycles. */
-  retries: number;
-}
-
-/** Response from GET /costs. */
-export interface CostsResponse {
-  /** Total cost in USD across all nodes. */
-  total: number;
-  /** Configured budget limit in USD. */
-  budgetLimit: number | null;
-  /** Remaining budget in USD. */
-  budgetRemaining: number | null;
-  /** Per-node cost breakdown. */
-  nodes: NodeCostEntry[];
-  /** Cost in USD attributed to Loom (architect) interactions. */
-  loomCost: number;
-}
-
-/** Response from GET /events. */
-export interface EventsResponse {
-  /** Matching events. */
-  events: Event[];
-  /** Total number of events matching the filter (before pagination). */
-  total: number;
-}
-
-/** Query parameters for GET /events. */
-export interface EventsParams {
-  /** Filter by event type. */
-  type?: EventType;
-  /** Filter by node ID. */
-  nodeId?: string;
-  /** Maximum number of events to return. */
-  limit?: number;
-  /** Number of events to skip (for pagination). */
-  offset?: number;
-}
-
-/** Daemon error response body. */
-export interface ErrorBody {
-  /** Human-readable error message. */
-  error: string;
-  /** Additional error details. */
-  details?: unknown;
-}
-
-// ============================================================================
-// ApiError
-// ============================================================================
-
-/** Error thrown when the API returns a non-OK HTTP response. */
+/** Thrown for any non-2xx HTTP response. */
 export class ApiError extends Error {
-  /** HTTP status code. */
-  public readonly status: number;
-
-  /** Parsed response body, or raw text if JSON parsing failed. */
-  public readonly body: ErrorBody | string;
-
-  /**
-   * @param status - HTTP status code from the response.
-   * @param body - Parsed error body or raw response text.
-   * @param message - Human-readable error summary.
-   */
-  constructor(status: number, body: ErrorBody | string, message?: string) {
-    const msg = message ?? (typeof body === "object" ? body.error : `API error ${String(status)}`);
-    super(msg);
-    this.name = "ApiError";
+  readonly status: number;
+  readonly body: unknown;
+  constructor(status: number, message: string, body?: unknown) {
+    super(message);
     this.status = status;
     this.body = body;
   }
 }
 
+/** Thrown when the daemon returns 410 Gone (build / route mismatch). */
+export class DashboardOutdatedError extends Error {
+  readonly code = "DASHBOARD_OUTDATED";
+  readonly newRoute?: string;
+  constructor(message: string, newRoute?: string) {
+    super(message);
+    this.newRoute = newRoute;
+  }
+}
+
 // ============================================================================
-// ApiClient
+// Public API types
 // ============================================================================
 
-/**
- * Typed HTTP client for the Loomflo daemon REST API.
- *
- * In development the Vite dev server proxies `/api` to the daemon,
- * so the default base URL is an empty string. For direct connections
- * pass the full daemon origin (e.g., `http://127.0.0.1:3100`).
- */
+export interface ApiClientOptions {
+  /** Daemon base URL (no trailing slash). */
+  baseUrl: string;
+  /** Bearer token issued by the daemon. */
+  token: string;
+  /** When true, project-scoped GETs reroute to /mock/* fixtures. */
+  useMock?: boolean;
+}
+
+export interface EventsQuery {
+  type?: EventType;
+  nodeId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface EventsListResponse {
+  events: WorkflowEvent[];
+  total: number;
+}
+
+export interface MockSeedResponse {
+  workflow: Workflow;
+  events: WorkflowEvent[];
+  projects: ProjectSummary[];
+  clis: Record<AgentCliName, CliAvailability>;
+}
+
+// ============================================================================
+// Implementation
+// ============================================================================
+
 export class ApiClient {
-  private baseUrl: string;
-  private token: string | null = null;
+  private readonly baseUrl: string;
+  private readonly token: string;
+  /** When true, project-scoped GETs reroute to /mock/* fixtures. */
+  readonly useMock: boolean;
 
-  /**
-   * @param baseUrl - Base URL prepended to every request path.
-   *                  Defaults to `""` (uses Vite proxy in development).
-   */
-  constructor(baseUrl: string = "") {
-    this.baseUrl = baseUrl;
+  constructor(opts: ApiClientOptions) {
+    this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
+    this.token = opts.token;
+    this.useMock = opts.useMock === true;
   }
 
-  /**
-   * Set the Bearer token used for authenticated requests.
-   *
-   * @param token - The daemon auth token, or `null` to clear.
-   */
-  setToken(token: string | null): void {
-    this.token = token;
+  /** Resolved daemon base URL (no trailing slash). */
+  get baseUrlValue(): string {
+    return this.baseUrl;
+  }
+
+  /** Bearer token (read-only). */
+  get tokenValue(): string {
+    return this.token;
   }
 
   // --------------------------------------------------------------------------
-  // Internal helpers
+  // Core request helpers
   // --------------------------------------------------------------------------
 
-  /**
-   * Build request headers including Authorization when a token is set.
-   *
-   * @param extra - Additional headers to merge.
-   * @returns Merged headers object.
-   */
-  private buildHeaders(extra?: Record<string, string>): Record<string, string> {
-    const headers: Record<string, string> = { ...extra };
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.token}`,
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+    };
+    if (init.body !== undefined && headers["Content-Type"] === undefined) {
+      headers["Content-Type"] = "application/json";
     }
-    return headers;
-  }
+    const res = await fetch(url, { ...init, headers });
 
-  /**
-   * Execute an HTTP request and parse the response as JSON.
-   *
-   * @typeParam T - Expected JSON response type.
-   * @param path - Request path (e.g., `/api/health`).
-   * @param options - Fetch options (method, body, etc.).
-   * @returns Parsed JSON response body.
-   * @throws {ApiError} When the response status is not OK.
-   */
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers = this.buildHeaders({
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(options.headers as Record<string, string> | undefined),
-    });
-
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      let body: ErrorBody | string;
+    if (res.status === 410) {
+      let newRoute: string | undefined;
       try {
-        body = (await response.json()) as ErrorBody;
+        const body = (await res.json()) as { newRoute?: string };
+        newRoute = body.newRoute;
       } catch {
-        body = await response.text();
+        /* ignore */
       }
-      throw new ApiError(response.status, body);
+      throw new DashboardOutdatedError(
+        "Dashboard build is outdated — rebuild or update the daemon.",
+        newRoute,
+      );
     }
 
-    return (await response.json()) as T;
-  }
-
-  /**
-   * Execute an HTTP request and return the response as plain text.
-   *
-   * @param path - Request path (e.g., `/api/specs/spec.md`).
-   * @param options - Fetch options (method, body, etc.).
-   * @returns Raw response text.
-   * @throws {ApiError} When the response status is not OK.
-   */
-  private async requestText(path: string, options: RequestInit = {}): Promise<string> {
-    const headers = this.buildHeaders({
-      Accept: "text/markdown, text/plain",
-      ...(options.headers as Record<string, string> | undefined),
-    });
-
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      let body: ErrorBody | string;
-      try {
-        body = (await response.json()) as ErrorBody;
-      } catch {
-        body = await response.text();
-      }
-      throw new ApiError(response.status, body);
+    if (!res.ok) {
+      const text = await safeBody(res);
+      throw new ApiError(res.status, `HTTP ${String(res.status)} on ${path}`, text);
     }
 
-    return response.text();
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
   }
 
-  // --------------------------------------------------------------------------
-  // Health
-  // --------------------------------------------------------------------------
-
-  /**
-   * Check daemon health. No authentication required.
-   *
-   * @returns Daemon status, uptime, version, and optional workflow summary.
-   */
-  async getHealth(): Promise<HealthResponse> {
-    // Health endpoint does not require auth — bypass token injection.
-    const response = await fetch(`${this.baseUrl}/api/health`, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!response.ok) {
-      let body: ErrorBody | string;
-      try {
-        body = (await response.json()) as ErrorBody;
-      } catch {
-        body = await response.text();
-      }
-      throw new ApiError(response.status, body);
+  private async requestText(path: string, init: RequestInit = {}): Promise<string> {
+    const url = `${this.baseUrl}${path}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.token}`,
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+    };
+    const res = await fetch(url, { ...init, headers });
+    if (!res.ok) {
+      const text = await safeBody(res);
+      throw new ApiError(res.status, `HTTP ${String(res.status)} on ${path}`, text);
     }
-
-    return (await response.json()) as HealthResponse;
-  }
-
-  // --------------------------------------------------------------------------
-  // Workflow
-  // --------------------------------------------------------------------------
-
-  /**
-   * Retrieve the current workflow state.
-   *
-   * @returns Full workflow object including graph and configuration.
-   * @throws {ApiError} 404 if no active workflow exists.
-   */
-  async getWorkflow(): Promise<Workflow> {
-    return this.request<Workflow>("/api/workflow");
+    return res.text();
   }
 
   /**
-   * Initialize a new workflow from a natural language description.
+   * Reroute a project-scoped path to the daemon's `/mock/*` fixture if
+   * mock mode is on and a fixture is available.
    *
-   * @param description - Project description in natural language.
-   * @param projectPath - Absolute filesystem path for the project workspace.
-   * @param config - Optional partial configuration overrides.
-   * @returns The newly created workflow summary.
-   * @throws {ApiError} 409 if a workflow is already active.
+   * Only applies to GETs that have a 1:1 mock counterpart. Calls with no
+   * mock equivalent fall through to the real route.
    */
-  async initWorkflow(
-    description: string,
-    projectPath: string,
-    config?: Partial<Config>,
-  ): Promise<WorkflowInitResponse> {
-    return this.request<WorkflowInitResponse>("/api/workflow/init", {
-      method: "POST",
-      body: JSON.stringify({ description, projectPath, config }),
+  private resolvePath(path: string): string {
+    if (!this.useMock) return path;
+    if (path === "/projects") return "/mock/projects";
+    if (path.startsWith("/projects/") && path.endsWith("/workflow")) return "/mock/workflow";
+    if (path.startsWith("/projects/") && path.includes("/events")) return "/mock/events";
+    if (path === "/runtimes/availability") return "/mock/runtimes/availability";
+    return path;
+  }
+
+  // --------------------------------------------------------------------------
+  // Daemon-level
+  // --------------------------------------------------------------------------
+
+  health(): Promise<HealthResponse> {
+    return this.request<HealthResponse>("/health");
+  }
+
+  daemonStatus(): Promise<DaemonStatusResponse> {
+    return this.request<DaemonStatusResponse>("/daemon/status");
+  }
+
+  // --------------------------------------------------------------------------
+  // Runtimes
+  // --------------------------------------------------------------------------
+
+  listRuntimes(): Promise<{ runtimes: RuntimeListEntry[] }> {
+    return this.request("/runtimes");
+  }
+
+  runtimeAvailability(): Promise<{ clis: Record<AgentCliName, CliAvailability> }> {
+    return this.request(this.resolvePath("/runtimes/availability"));
+  }
+
+  runtimeAvailabilityFor(name: string): Promise<CliAvailability> {
+    return this.request(`/runtimes/${encodeURIComponent(name)}/availability`);
+  }
+
+  runtimeModels(name: string): Promise<{ models: ModelInfo[] }> {
+    return this.request(`/runtimes/${encodeURIComponent(name)}/models`);
+  }
+
+  // --------------------------------------------------------------------------
+  // Credentials
+  // --------------------------------------------------------------------------
+
+  listCredentials(): Promise<{ credentials: RedactedProfile[] }> {
+    return this.request("/credentials");
+  }
+
+  upsertCredential(
+    name: string,
+    body: ProviderProfilePayload,
+  ): Promise<{ credential: RedactedProfile }> {
+    return this.request(`/credentials/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
     });
   }
 
-  /**
-   * Confirm the spec and begin workflow execution (Phase 2).
-   *
-   * @returns Updated workflow status.
-   * @throws {ApiError} 400 if the workflow is not in the "building" state.
-   */
-  async startWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>("/api/workflow/start", {
+  deleteCredential(name: string): Promise<void> {
+    return this.request(`/credentials/${encodeURIComponent(name)}`, { method: "DELETE" });
+  }
+
+  // --------------------------------------------------------------------------
+  // Projects (daemon-level CRUD)
+  // --------------------------------------------------------------------------
+
+  listProjects(): Promise<ProjectSummary[]> {
+    if (this.useMock) {
+      return this.request<{ projects: ProjectSummary[] }>("/mock/projects").then(
+        (res) => res.projects,
+      );
+    }
+    return this.request<ProjectSummary[]>("/projects");
+  }
+
+  createProject(body: CreateProjectBody): Promise<ProjectSummary> {
+    return this.request<ProjectSummary>("/projects", {
       method: "POST",
+      body: JSON.stringify(body),
     });
   }
 
-  /**
-   * Pause the running workflow. Active agent calls finish; no new calls are dispatched.
-   *
-   * @returns Updated workflow status.
-   * @throws {ApiError} 400 if the workflow is not running.
-   */
-  async pauseWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>("/api/workflow/pause", {
-      method: "POST",
-    });
+  getProject(id: string): Promise<ProjectSummary> {
+    return this.request<ProjectSummary>(`/projects/${encodeURIComponent(id)}`);
   }
 
-  /**
-   * Resume a paused or interrupted workflow.
-   *
-   * @returns Updated workflow status and the node from which execution resumes.
-   * @throws {ApiError} 400 if there is nothing to resume.
-   */
-  async resumeWorkflow(): Promise<WorkflowActionResponse> {
-    return this.request<WorkflowActionResponse>("/api/workflow/resume", {
-      method: "POST",
-    });
+  deleteProject(id: string): Promise<void> {
+    return this.request(`/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   // --------------------------------------------------------------------------
-  // Nodes
+  // Per-project: workflow lifecycle
   // --------------------------------------------------------------------------
 
-  /**
-   * List all nodes in the workflow graph.
-   *
-   * @returns Array of node summaries.
-   */
-  async getNodes(): Promise<NodesListResponse> {
-    return this.request<NodesListResponse>("/api/nodes");
+  getWorkflow(projectId: string): Promise<Workflow> {
+    const path = this.resolvePath(`/projects/${encodeURIComponent(projectId)}/workflow`);
+    if (this.useMock && path === "/mock/workflow") {
+      return this.request<{ workflow: Workflow }>(path).then((r) => r.workflow);
+    }
+    return this.request<Workflow>(path);
   }
 
-  /**
-   * Retrieve detailed information for a single node.
-   *
-   * @param id - Node identifier (e.g., "node-1").
-   * @returns Full node detail including agents and file ownership.
-   * @throws {ApiError} 404 if the node does not exist.
-   */
-  async getNode(id: string): Promise<NodeDetailResponse> {
-    return this.request<NodeDetailResponse>(`/api/nodes/${encodeURIComponent(id)}`);
+  initWorkflow(projectId: string, body: InitWorkflowBody): Promise<InitResponse> {
+    return this.request<InitResponse>(
+      `/projects/${encodeURIComponent(projectId)}/workflow/init`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
   }
 
-  /**
-   * Retrieve the Loomex review report for a completed node.
-   *
-   * @param id - Node identifier.
-   * @returns Structured review report with verdict and task verifications.
-   * @throws {ApiError} 404 if no review report exists for this node.
-   */
-  async getNodeReview(id: string): Promise<ReviewReport> {
-    return this.request<ReviewReport>(`/api/nodes/${encodeURIComponent(id)}/review`);
+  startWorkflow(projectId: string): Promise<StartResponse> {
+    return this.request<StartResponse>(
+      `/projects/${encodeURIComponent(projectId)}/workflow/start`,
+      { method: "POST" },
+    );
   }
 
-  // --------------------------------------------------------------------------
-  // Specs
-  // --------------------------------------------------------------------------
-
-  /**
-   * List available spec artifacts.
-   *
-   * @returns Array of spec artifact metadata.
-   */
-  async getSpecs(): Promise<SpecsListResponse> {
-    return this.request<SpecsListResponse>("/api/specs");
+  pauseWorkflow(projectId: string): Promise<StartResponse> {
+    return this.request<StartResponse>(
+      `/projects/${encodeURIComponent(projectId)}/workflow/pause`,
+      { method: "POST" },
+    );
   }
 
-  /**
-   * Read a specific spec artifact as raw markdown.
-   *
-   * @param name - Artifact file name (e.g., "spec.md").
-   * @returns Raw markdown content of the artifact.
-   * @throws {ApiError} 404 if the artifact does not exist.
-   */
-  async getSpec(name: string): Promise<string> {
-    return this.requestText(`/api/specs/${encodeURIComponent(name)}`);
+  resumeWorkflow(projectId: string): Promise<StartResponse> {
+    return this.request<StartResponse>(
+      `/projects/${encodeURIComponent(projectId)}/workflow/resume`,
+      { method: "POST" },
+    );
   }
 
   // --------------------------------------------------------------------------
-  // Shared Memory
+  // Per-project: events
   // --------------------------------------------------------------------------
 
-  /**
-   * List shared memory files.
-   *
-   * @returns Array of memory file metadata.
-   */
-  async getMemory(): Promise<MemoryListResponse> {
-    return this.request<MemoryListResponse>("/api/memory");
+  getEvents(projectId: string, query: EventsQuery = {}): Promise<EventsListResponse> {
+    const qs = new URLSearchParams();
+    if (query.type !== undefined) qs.set("type", query.type);
+    if (query.nodeId !== undefined) qs.set("nodeId", query.nodeId);
+    if (query.limit !== undefined) qs.set("limit", String(query.limit));
+    if (query.offset !== undefined) qs.set("offset", String(query.offset));
+    const suffix = qs.size > 0 ? `?${qs.toString()}` : "";
+    const path = this.resolvePath(`/projects/${encodeURIComponent(projectId)}/events${suffix}`);
+
+    if (this.useMock && path === "/mock/events") {
+      return this.request<{ events: WorkflowEvent[] }>(path).then((r) => ({
+        events: r.events,
+        total: r.events.length,
+      }));
+    }
+    return this.request<EventsListResponse>(path);
   }
 
-  /**
-   * Read a specific shared memory file as raw markdown.
-   *
-   * @param name - Memory file name (e.g., "DECISIONS.md").
-   * @returns Raw markdown content of the memory file.
-   * @throws {ApiError} 404 if the memory file does not exist.
-   */
-  async getMemoryFile(name: string): Promise<string> {
-    return this.requestText(`/api/memory/${encodeURIComponent(name)}`);
-  }
-
   // --------------------------------------------------------------------------
-  // Chat
+  // Per-project: chat
   // --------------------------------------------------------------------------
 
-  /**
-   * Send a message to Loom and receive a response.
-   *
-   * @param message - Natural language message to Loom.
-   * @returns Loom's response text and any action taken.
-   */
-  async chat(message: string): Promise<ChatResponse> {
-    return this.request<ChatResponse>("/api/chat", {
+  postChat(projectId: string, message: string): Promise<ChatResponse> {
+    return this.request<ChatResponse>(`/projects/${encodeURIComponent(projectId)}/chat`, {
       method: "POST",
       body: JSON.stringify({ message }),
     });
   }
 
-  /**
-   * Retrieve the full chat message history.
-   *
-   * @returns Ordered list of all chat messages.
-   */
-  async getChatHistory(): Promise<ChatHistoryResponse> {
-    return this.request<ChatHistoryResponse>("/api/chat/history");
+  getChatHistory(projectId: string): Promise<{ messages: ChatHistoryEntry[] }> {
+    return this.request(`/projects/${encodeURIComponent(projectId)}/chat/history`);
   }
 
   // --------------------------------------------------------------------------
-  // Configuration
+  // Per-project: nodes
   // --------------------------------------------------------------------------
 
-  /**
-   * Retrieve the current merged configuration.
-   *
-   * @returns Full resolved configuration object.
-   */
-  async getConfig(): Promise<Config> {
-    return this.request<Config>("/api/config");
+  listNodes(projectId: string): Promise<WorkflowNode[]> {
+    return this.request<WorkflowNode[]>(`/projects/${encodeURIComponent(projectId)}/nodes`);
   }
 
-  /**
-   * Update configuration. Changes take effect at the next node activation.
-   *
-   * @param config - Partial configuration fields to update.
-   * @returns The full updated configuration object.
-   * @throws {ApiError} 400 if validation fails.
-   */
-  async updateConfig(config: Partial<Config>): Promise<Config> {
-    return this.request<Config>("/api/config", {
+  getNode(projectId: string, nodeId: string): Promise<WorkflowNode> {
+    return this.request<WorkflowNode>(
+      `/projects/${encodeURIComponent(projectId)}/nodes/${encodeURIComponent(nodeId)}`,
+    );
+  }
+
+  getReview(projectId: string, nodeId: string): Promise<ReviewReport> {
+    return this.request<ReviewReport>(
+      `/projects/${encodeURIComponent(projectId)}/nodes/${encodeURIComponent(nodeId)}/review`,
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Per-project: memory
+  // --------------------------------------------------------------------------
+
+  listMemory(projectId: string): Promise<Memory> {
+    return this.request<Memory>(`/projects/${encodeURIComponent(projectId)}/memory`);
+  }
+
+  /** Returns raw markdown (text/markdown, not JSON). */
+  readMemory(projectId: string, name: string): Promise<string> {
+    return this.requestText(
+      `/projects/${encodeURIComponent(projectId)}/memory/${encodeURIComponent(name)}`,
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Per-project: costs
+  // --------------------------------------------------------------------------
+
+  getCosts(projectId: string): Promise<CostsResponse> {
+    return this.request<CostsResponse>(`/projects/${encodeURIComponent(projectId)}/costs`);
+  }
+
+  // --------------------------------------------------------------------------
+  // Per-project: config
+  // --------------------------------------------------------------------------
+
+  getConfig(projectId: string): Promise<{ config: Config }> {
+    return this.request(`/projects/${encodeURIComponent(projectId)}/config`);
+  }
+
+  updateConfig(projectId: string, partial: Partial<Config>): Promise<{ config: Config }> {
+    return this.request(`/projects/${encodeURIComponent(projectId)}/config`, {
       method: "PUT",
-      body: JSON.stringify(config),
+      body: JSON.stringify(partial),
     });
   }
 
   // --------------------------------------------------------------------------
-  // Costs
+  // Per-project: specs
   // --------------------------------------------------------------------------
 
-  /**
-   * Retrieve the cost summary for the current workflow.
-   *
-   * @returns Total cost, budget info, per-node breakdown, and Loom cost.
-   */
-  async getCosts(): Promise<CostsResponse> {
-    return this.request<CostsResponse>("/api/costs");
+  listSpecs(projectId: string): Promise<Specs> {
+    return this.request<Specs>(`/projects/${encodeURIComponent(projectId)}/specs`);
+  }
+
+  readSpec(projectId: string, name: string): Promise<string> {
+    return this.requestText(
+      `/projects/${encodeURIComponent(projectId)}/specs/${encodeURIComponent(name)}`,
+    );
   }
 
   // --------------------------------------------------------------------------
-  // Events
+  // Per-project: MCP
   // --------------------------------------------------------------------------
 
-  /**
-   * Query the event log with optional filters.
-   *
-   * @param params - Optional filter and pagination parameters.
-   * @returns Matching events and total count.
-   */
-  async getEvents(params?: EventsParams): Promise<EventsResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.type) searchParams.set("type", params.type);
-    if (params?.nodeId) searchParams.set("nodeId", params.nodeId);
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
+  listMcp(projectId: string): Promise<{ servers: Record<string, McpServerConfigEntry> }> {
+    return this.request(`/projects/${encodeURIComponent(projectId)}/mcp`);
+  }
 
-    const query = searchParams.toString();
-    const path = query ? `/api/events?${query}` : "/api/events";
-    return this.request<EventsResponse>(path);
+  upsertMcp(
+    projectId: string,
+    name: string,
+    entry: McpServerConfigEntry,
+  ): Promise<{ server: McpServerConfigEntry }> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectId)}/mcp/${encodeURIComponent(name)}`,
+      { method: "PUT", body: JSON.stringify(entry) },
+    );
+  }
+
+  deleteMcp(projectId: string, name: string): Promise<void> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectId)}/mcp/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Mock helpers (only useful in mock mode)
+  // --------------------------------------------------------------------------
+
+  mockSeed(): Promise<MockSeedResponse> {
+    return this.request<MockSeedResponse>("/mock/seed");
   }
 }
 
 // ============================================================================
-// Singleton
+// Helpers
 // ============================================================================
 
-/** Pre-configured API client instance for use throughout the dashboard. */
-export const apiClient = new ApiClient();
+async function safeBody(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    try {
+      return await res.text();
+    } catch {
+      return undefined;
+    }
+  }
+}

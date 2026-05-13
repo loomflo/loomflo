@@ -1,85 +1,44 @@
-import type { ReactElement } from "react";
-import { Routes, Route, NavLink, Outlet } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { ProjectsPage } from "./pages/ProjectsPage.js";
+import { NotFoundPage } from "./pages/NotFoundPage.js";
 
-import { ChatPage } from "./pages/Chat.js";
-import { ConfigPage } from "./pages/Config.js";
-import { CostsPage } from "./pages/Costs.js";
-import { HomePage } from "./pages/Home.js";
-import { MemoryPage } from "./pages/Memory.js";
-import { NodePage } from "./pages/Node.js";
-import { SpecsPage } from "./pages/Specs.js";
+// The heavy routes (~1000+ LOC each) lazy-load to keep the initial bundle
+// small. ProjectsPage stays eager — it's the default entry and the user
+// always lands there first.
+const WizardPage = lazy(() =>
+  import("./pages/WizardPage.js").then((m) => ({ default: m.WizardPage })),
+);
+const BrainstormPage = lazy(() =>
+  import("./pages/BrainstormPage.js").then((m) => ({ default: m.BrainstormPage })),
+);
+const WorkflowPage = lazy(() =>
+  import("./pages/WorkflowPage.js").then((m) => ({ default: m.WorkflowPage })),
+);
+const NodeDetailPage = lazy(() =>
+  import("./pages/NodeDetailPage.js").then((m) => ({ default: m.NodeDetailPage })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage.js").then((m) => ({ default: m.SettingsPage })),
+);
 
-/** Navigation items displayed in the sidebar. */
-const NAV_ITEMS: readonly { path: string; label: string }[] = [
-  { path: "/", label: "Home" },
-  { path: "/graph", label: "Graph" },
-  { path: "/specs", label: "Specs" },
-  { path: "/memory", label: "Memory" },
-  { path: "/chat", label: "Chat" },
-  { path: "/costs", label: "Costs" },
-  { path: "/config", label: "Config" },
-] as const;
-
-/**
- * Shared layout component with a navigation sidebar and content area.
- *
- * @returns The layout wrapping all routed pages.
- */
-function Layout(): ReactElement {
-  return (
-    <div className="flex h-screen bg-gray-950 text-gray-100">
-      <nav className="flex w-56 flex-col border-r border-gray-800 bg-gray-900 p-4">
-        <h1 className="mb-6 text-lg font-bold tracking-tight">Loomflo</h1>
-        <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ path, label }) => (
-            <li key={path}>
-              <NavLink
-                to={path}
-                end={path === "/"}
-                className={({ isActive }) =>
-                  `block rounded px-3 py-2 text-sm transition-colors ${
-                    isActive
-                      ? "bg-gray-800 text-white"
-                      : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <main className="flex-1 overflow-auto p-6">
-        <Outlet />
-      </main>
-    </div>
-  );
+function PageFallback() {
+  return <div style={{ padding: 32, color: "var(--fg-3)" }}>Chargement…</div>;
 }
 
-/** Placeholder page component. */
-function Graph(): ReactElement {
-  return <h2 className="text-2xl font-semibold">Graph</h2>;
-}
-
-/**
- * Root application component with React Router route definitions.
- *
- * @returns The routed application tree.
- */
-export function App(): ReactElement {
+export function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<HomePage />} />
-        <Route path="graph" element={<Graph />} />
-        <Route path="node/:id" element={<NodePage />} />
-        <Route path="specs" element={<SpecsPage />} />
-        <Route path="memory" element={<MemoryPage />} />
-        <Route path="chat" element={<ChatPage />} />
-        <Route path="costs" element={<CostsPage />} />
-        <Route path="config" element={<ConfigPage />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/new/wizard" element={<WizardPage />} />
+        <Route path="/projects/:projectId/brainstorm" element={<BrainstormPage />} />
+        <Route path="/projects/:projectId/workflow" element={<WorkflowPage />} />
+        <Route path="/projects/:projectId/nodes/:nodeId" element={<NodeDetailPage />} />
+        <Route path="/projects/:projectId/settings" element={<SettingsPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
   );
 }

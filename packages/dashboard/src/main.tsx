@@ -1,18 +1,27 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { App } from "./App";
+import { App } from "./App.js";
+import { AppProvider } from "./context/AppContext.js";
+import { ThemeProvider } from "./context/ThemeContext.js";
+import { ProjectStoreProvider } from "./context/ProjectStoreContext.js";
 import "./index.css";
 
-const root = document.getElementById("root");
-if (!root) {
-  throw new Error("Root element not found");
+const container = document.getElementById("root");
+if (!container) {
+  throw new Error("Loomflo: #root element not found in index.html");
 }
 
-createRoot(root).render(
+createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AppProvider>
+        <ThemeProvider>
+          <ProjectStoreProvider>
+            <App />
+          </ProjectStoreProvider>
+        </ThemeProvider>
+      </AppProvider>
     </BrowserRouter>
   </StrictMode>,
 );

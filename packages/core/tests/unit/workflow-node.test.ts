@@ -47,6 +47,7 @@ function makeNodeData(overrides: Partial<Node> = {}): Node {
     cost: 0,
     startedAt: null,
     completedAt: null,
+    providerRetryState: null,
     ...overrides,
   };
 }
@@ -183,6 +184,8 @@ describe("WorkflowNode", () => {
         "done",
         "failed",
         "blocked",
+        "waiting_for_provider",
+        "failed_provider_exhausted",
       ]);
 
       expect(new WorkflowNode(makeNodeData({ status: "review" })).getValidTransitions()).toEqual([

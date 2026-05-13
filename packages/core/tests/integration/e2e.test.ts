@@ -147,6 +147,7 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
             cost: 0,
             startedAt: null,
             completedAt: null,
+            providerRetryState: null,
           },
           "node-impl": {
             id: "node-impl",
@@ -163,6 +164,7 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
             cost: 0,
             startedAt: null,
             completedAt: null,
+            providerRetryState: null,
           },
           "node-test": {
             id: "node-test",
@@ -179,6 +181,7 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
             cost: 0,
             startedAt: null,
             completedAt: null,
+            providerRetryState: null,
           },
         },
         edges: [
@@ -330,6 +333,7 @@ describe("End-to-end: init → spec → start → nodes (integration)", () => {
             cost: 0,
             startedAt: null,
             completedAt: null,
+            providerRetryState: null,
           },
         },
         edges: [],
