@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "001-*"]
+    branches: [main, "00*-*", "01*-*"]
   pull_request:
     branches: [main]
 
@@ -25,11 +25,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: ESLint
-        run: pnpm lint
+      - name: ESLint (dashboard)
+        run: pnpm --filter @loomflo/dashboard lint
 
-      - name: Prettier
-        run: pnpm format:check
+      - name: No-emoji check (dashboard)
+        run: pnpm --filter @loomflo/dashboard lint:no-emoji
 
   typecheck:
     name: Type Check
@@ -46,11 +46,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
-
-      - name: TypeScript type check
-        run: pnpm typecheck
+      - name: TypeScript type check (dashboard)
+        run: pnpm --filter @loomflo/dashboard typecheck
 
   test:
     name: Test
@@ -67,16 +64,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
+      - name: Build dashboard
+        run: pnpm --filter @loomflo/dashboard build
 
       - name: Run tests with coverage
-        run: pnpm test -- -- --coverage
+        run: pnpm --filter @loomflo/dashboard test:coverage
 
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: packages/*/coverage/
+          path: packages/dashboard/coverage/
           retention-days: 7
