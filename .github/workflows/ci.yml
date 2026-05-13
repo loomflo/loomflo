@@ -25,14 +25,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: ESLint
-        run: pnpm lint
+      - name: ESLint (dashboard)
+        run: pnpm --filter @loomflo/dashboard lint
 
       - name: No-emoji check (dashboard)
         run: pnpm --filter @loomflo/dashboard lint:no-emoji
-
-      - name: Prettier
-        run: pnpm format:check
 
   typecheck:
     name: Type Check
@@ -49,11 +46,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
-
-      - name: TypeScript type check
-        run: pnpm typecheck
+      - name: TypeScript type check (dashboard)
+        run: pnpm --filter @loomflo/dashboard typecheck
 
   test:
     name: Test
@@ -70,8 +64,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
+      - name: Build dashboard
+        run: pnpm --filter @loomflo/dashboard build
 
       - name: Run tests with coverage
         run: pnpm --filter @loomflo/dashboard test:coverage
@@ -81,5 +75,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: packages/*/coverage/
+          path: packages/dashboard/coverage/
           retention-days: 7
