@@ -12,7 +12,7 @@ import type { NodeStatus } from "./types.js";
 export interface BrainNode {
   id: string;
   name: string;
-  status?: NodeStatus | string;
+  status?: NodeStatus;
 }
 
 /** Workflow context passed in by the host. */

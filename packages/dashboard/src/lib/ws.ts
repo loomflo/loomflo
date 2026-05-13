@@ -89,7 +89,7 @@ export class WebSocketClient {
     let socket: WebSocket;
     try {
       socket = new WebSocket(this.url, wsSubprotocols(this.token));
-    } catch (err) {
+    } catch {
       this.setStatus("error");
       this.scheduleReconnect();
       return;
@@ -103,10 +103,11 @@ export class WebSocketClient {
     });
 
     socket.addEventListener("message", (msgEvent) => {
-      const raw = msgEvent.data;
+      const raw: unknown = msgEvent.data;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(typeof raw === "string" ? raw : raw.toString());
+        const text = typeof raw === "string" ? raw : String(raw);
+        parsed = JSON.parse(text);
       } catch {
         return;
       }
@@ -176,9 +177,10 @@ export class WebSocketClient {
       set = new Set();
       this.typedHandlers.set(type, set);
     }
-    set.add(handler);
+    const targetSet = set;
+    targetSet.add(handler);
     return () => {
-      set?.delete(handler);
+      targetSet.delete(handler);
     };
   }
 

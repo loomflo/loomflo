@@ -281,10 +281,10 @@ function formatDelay(d: WizardDraft): string {
     hours: "h",
     days: "j",
   };
-  return `${d.customDelay.value} ${labels[d.customDelay.unit]}`;
+  return `${String(d.customDelay.value)} ${labels[d.customDelay.unit]}`;
 }
 function detectCli(name: CliAgentId, state: CliState): CliDetect {
-  return state[name] ?? { installed: false, authenticated: false };
+  return state[name];
 }
 function providerIsValid(
   p: ProviderId,
@@ -410,7 +410,7 @@ function Step1({ draft, setDraft }: StepProps) {
               id="folder-input"
               className="input input--mono"
               value={draft.folder}
-              onChange={(e) => setDraft({ folder: e.target.value })}
+              onChange={(e) => { setDraft({ folder: e.target.value }); }}
               placeholder="/Users/adrien/projects/mon-projet"
               spellCheck={false}
               autoFocus
@@ -464,9 +464,9 @@ function Step2({
     { id: "copilot", name: "Copilot CLI" },
     { id: "codex", name: "Codex CLI" },
   ];
-  const select = (id: ProviderId) => setDraft({ primaryProvider: id });
+  const select = (id: ProviderId) => { setDraft({ primaryProvider: id }); };
   const shimmerStyle = (): CSSProperties =>
-    ({ "--shimmer-delay": `${-Math.random() * 6}s` }) as CSSProperties;
+    ({ "--shimmer-delay": `${String(-Math.random() * 6)}s` }) as CSSProperties;
 
   return (
     <div className="col gap-md">
@@ -484,7 +484,7 @@ function Step2({
               data-phase="worker"
               data-selected={selected}
               style={shimmerStyle()}
-              onClick={() => (configured ? select(p.id) : onOpenCred(p.id))}
+              onClick={() => { if (configured) select(p.id); else onOpenCred(p.id); }}
               title={!configured ? "Configure la clé API pour sélectionner ce provider" : ""}
             >
               <div className="cred-head">
@@ -626,7 +626,7 @@ interface Step3Props extends StepProps {
 
 function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
   const shimmerStyle = (): CSSProperties =>
-    ({ "--shimmer-delay": `${-Math.random() * 6}s` }) as CSSProperties;
+    ({ "--shimmer-delay": `${String(-Math.random() * 6)}s` }) as CSSProperties;
   return (
     <div className="col gap-md">
       <div className="card-group" data-cols="3">
@@ -639,7 +639,7 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
               data-phase="worker"
               data-selected={selected}
               style={shimmerStyle()}
-              onClick={() => setDraft({ level: l.id })}
+              onClick={() => { setDraft({ level: l.id }); }}
             >
               <div className="level-numeral">{l.numeral}</div>
               <div className="level-body">
@@ -662,7 +662,7 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
       <button
         className="advanced-toggle"
         data-open={advancedOpen}
-        onClick={() => setAdvancedOpen((o) => !o)}
+        onClick={() => { setAdvancedOpen((o) => !o); }}
       >
         <Icon.ChevronRight width="14" height="14" />
         <Icon.Settings width="14" height="14" /> Configuration personnalisée
@@ -678,10 +678,10 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
                 className="switch"
                 data-on={draft.advanced.reviewer}
                 onClick={() =>
-                  setDraft((d) => ({
+                  { setDraft((d) => ({
                     ...d,
                     advanced: { ...d.advanced, reviewer: !d.advanced.reviewer },
-                  }))
+                  })); }
                 }
                 aria-pressed={draft.advanced.reviewer}
               />
@@ -698,10 +698,10 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
                 className="slider"
                 value={draft.advanced.maxRetries}
                 onChange={(e) =>
-                  setDraft((d) => ({
+                  { setDraft((d) => ({
                     ...d,
                     advanced: { ...d.advanced, maxRetries: Number(e.target.value) },
-                  }))
+                  })); }
                 }
               />
               <span className="slider-val">{draft.advanced.maxRetries}</span>
@@ -713,13 +713,13 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
               className="select"
               value={draft.advanced.retryStrategy}
               onChange={(e) =>
-                setDraft((d) => ({
+                { setDraft((d) => ({
                   ...d,
                   advanced: {
                     ...d.advanced,
                     retryStrategy: e.target.value as WizardAdvanced["retryStrategy"],
                   },
-                }))
+                })); }
               }
             >
               <option value="adaptive">Adaptative — modifie le prompt</option>
@@ -737,10 +737,10 @@ function Step3({ draft, setDraft, advancedOpen, setAdvancedOpen }: Step3Props) {
                 className="slider"
                 value={draft.advanced.maxWorkers}
                 onChange={(e) =>
-                  setDraft((d) => ({
+                  { setDraft((d) => ({
                     ...d,
                     advanced: { ...d.advanced, maxWorkers: Number(e.target.value) },
-                  }))
+                  })); }
                 }
               />
               <span className="slider-val">
@@ -762,9 +762,9 @@ function Step4({ draft, setDraft }: StepProps) {
     hours: "h",
     days: "j",
   };
-  const preview = `Délai : ${draft.customDelay.value || 0} ${unitLabel[draft.customDelay.unit]}`;
+  const preview = `Délai : ${String(draft.customDelay.value || 0)} ${unitLabel[draft.customDelay.unit]}`;
   const shimmerStyle = (): CSSProperties =>
-    ({ "--shimmer-delay": `${-Math.random() * 6}s` }) as CSSProperties;
+    ({ "--shimmer-delay": `${String(-Math.random() * 6)}s` }) as CSSProperties;
   return (
     <div className="col gap-md">
       <div className="delay-grid">
@@ -776,7 +776,7 @@ function Step4({ draft, setDraft }: StepProps) {
             data-selected={draft.delayPreset === p.id}
             data-recommended={p.id === "10m"}
             style={shimmerStyle()}
-            onClick={() => setDraft({ delayPreset: p.id })}
+            onClick={() => { setDraft({ delayPreset: p.id }); }}
           >
             <span className="delay-value">{p.label}</span>
             <span className="delay-tag">{p.tag}</span>
@@ -795,21 +795,21 @@ function Step4({ draft, setDraft }: StepProps) {
           className="input num"
           value={draft.customDelay.value}
           onChange={(e) =>
-            setDraft({
+            { setDraft({
               delayPreset: "custom",
               customDelay: { ...draft.customDelay, value: Number(e.target.value) },
-            })
+            }); }
           }
-          onFocus={() => setDraft({ delayPreset: "custom" })}
+          onFocus={() => { setDraft({ delayPreset: "custom" }); }}
         />
         <select
           className="select"
           value={draft.customDelay.unit}
           onChange={(e) =>
-            setDraft({
+            { setDraft({
               delayPreset: "custom",
               customDelay: { ...draft.customDelay, unit: e.target.value as DelayUnit },
-            })
+            }); }
           }
         >
           <option value="seconds">secondes</option>
@@ -831,9 +831,9 @@ function Step4({ draft, setDraft }: StepProps) {
 function Step5({ draft, setDraft }: StepProps) {
   const valid = isValidName(draft.name);
   const suggested = slugify(pathTail(draft.folder) || "projet");
-  const useSuggestion = () => setDraft({ name: suggested });
+  const useSuggestion = () => { setDraft({ name: suggested }); };
   const shimmerStyle = (): CSSProperties =>
-    ({ "--shimmer-delay": `${-Math.random() * 6}s` }) as CSSProperties;
+    ({ "--shimmer-delay": `${String(-Math.random() * 6)}s` }) as CSSProperties;
   return (
     <div className="col gap-md">
       <div className="field">
@@ -846,7 +846,7 @@ function Step5({ draft, setDraft }: StepProps) {
               id="name-input"
               className="input input--mono"
               value={draft.name}
-              onChange={(e) => setDraft({ name: e.target.value })}
+              onChange={(e) => { setDraft({ name: e.target.value }); }}
               placeholder="mon-projet"
               spellCheck={false}
               autoFocus
@@ -892,7 +892,7 @@ function Step5({ draft, setDraft }: StepProps) {
           data-phase="worker"
           data-selected={draft.type === "scratch"}
           style={shimmerStyle()}
-          onClick={() => setDraft({ type: "scratch" })}
+          onClick={() => { setDraft({ type: "scratch" }); }}
         >
           <div className="type-icon">
             <Icon.Sparkles width="20" height="20" />
@@ -907,7 +907,7 @@ function Step5({ draft, setDraft }: StepProps) {
           data-phase="spec"
           data-selected={draft.type === "feature"}
           style={shimmerStyle()}
-          onClick={() => setDraft({ type: "feature" })}
+          onClick={() => { setDraft({ type: "feature" }); }}
         >
           <div className="type-icon">
             <Icon.GitBranch width="20" height="20" />
@@ -975,7 +975,7 @@ function Step6({ draft, onJumpTo, onCreate, creating, createError }: Step6Props)
           <div className="recap-row" key={i}>
             <span className="recap-key">{r.key}</span>
             <span className="recap-val">{r.val}</span>
-            <button className="recap-edit" onClick={() => onJumpTo(r.jump)}>
+            <button className="recap-edit" onClick={() => { onJumpTo(r.jump); }}>
               Modifier
             </button>
           </div>
@@ -1041,7 +1041,7 @@ function CredentialModal({
   const isEditing = !!existing;
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <h3>
           {isEditing ? "Modifier" : "Ajouter"} la clé {PROVIDER_NAMES[provider]}
         </h3>
@@ -1053,14 +1053,14 @@ function CredentialModal({
               className="input input--mono"
               type={show ? "text" : "password"}
               value={val}
-              onChange={(e) => setVal(e.target.value)}
+              onChange={(e) => { setVal(e.target.value); }}
               placeholder="sk-…"
               autoFocus
               spellCheck={false}
             />
             <button
               className="password-toggle"
-              onClick={() => setShow((s) => !s)}
+              onClick={() => { setShow((s) => !s); }}
               aria-label={show ? "Masquer" : "Afficher"}
             >
               {show ? (
@@ -1075,7 +1075,7 @@ function CredentialModal({
           {isEditing && (
             <button
               className="btn"
-              onClick={() => onSave("")}
+              onClick={() => { onSave(""); }}
               style={{
                 marginRight: "auto",
                 color: "var(--status-failed-fg)",
@@ -1091,7 +1091,7 @@ function CredentialModal({
           <button
             className="btn btn--primary"
             disabled={!valid}
-            onClick={() => onSave(val.trim())}
+            onClick={() => { onSave(val.trim()); }}
           >
             <Icon.Check width="14" height="14" /> Enregistrer
           </button>
@@ -1131,7 +1131,7 @@ function InstallDrawer({
               {info.install}
               <button
                 className="code-copy"
-                onClick={() => onCopy(info.install)}
+                onClick={() => { onCopy(info.install); }}
                 aria-label="Copier"
               >
                 <Icon.Copy width="14" height="14" />
@@ -1144,7 +1144,7 @@ function InstallDrawer({
               {info.loginCmd}
               <button
                 className="code-copy"
-                onClick={() => onCopy(info.loginCmd)}
+                onClick={() => { onCopy(info.loginCmd); }}
                 aria-label="Copier"
               >
                 <Icon.Copy width="14" height="14" />
@@ -1177,7 +1177,7 @@ function ConfirmCancelModal({
 }) {
   return (
     <div className="modal-bg" onClick={onCancel}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <h3>Annuler la création ?</h3>
         <p>
           Le brouillon sera sauvegardé. Tu pourras reprendre la création plus tard depuis l'écran
@@ -1238,7 +1238,7 @@ function Rail({
               key={num}
               className="step-row"
               data-state={state}
-              onClick={() => (state === "passed" ? onJump(num) : undefined)}
+              onClick={() => { if (state === "passed") onJump(num); }}
               aria-current={state === "active" ? "step" : undefined}
               tabIndex={state === "future" ? -1 : 0}
             >
@@ -1343,14 +1343,14 @@ export function WizardPage() {
   const { theme, toggleTheme } = useTheme();
 
   const [draft, setDraftState] = useState<WizardDraft>(loadDraft);
-  const [step, setStep] = useState<number>(draft.step || 1);
+  const [step, setStep] = useState(draft.step || 1);
   const [dir, setDir] = useState<"forward" | "back">("forward");
   const [credModal, setCredModal] = useState<ApiProviderId | null>(null);
   const [installDrawer, setInstallDrawer] = useState<CliAgentId | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [cliState, setCliState] = useState<CliState>(loadCliDetection);
+  const [cliState] = useState<CliState>(loadCliDetection);
   const [creds, setCreds] = useState<Record<ApiProviderId, string>>(() => loadCreds());
   const [created, setCreated] = useState<CreatedProject | null>(null);
 
@@ -1374,7 +1374,7 @@ export function WizardPage() {
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2800);
+    window.setTimeout(() => { setToast(null); }, 2800);
   }, []);
 
   const validity = useMemo<Record<number, boolean>>(() => {
@@ -1385,7 +1385,7 @@ export function WizardPage() {
       4:
         draft.delayPreset !== "custom"
           ? !!draft.delayPreset
-          : Number(draft.customDelay.value) > 0 && !!draft.customDelay.unit,
+          : draft.customDelay.value > 0 && !!draft.customDelay.unit,
       5: isValidName(draft.name) && !!draft.type,
       6: true,
     };
@@ -1419,7 +1419,7 @@ export function WizardPage() {
         if (credModal) setCredModal(null);
         else if (installDrawer) setInstallDrawer(null);
         else if (confirmCancel) setConfirmCancel(false);
-        else if (step === 1) navigate("/projects");
+        else if (step === 1) void navigate("/projects");
         else setConfirmCancel(true);
       } else if (e.key === "Enter" && !credModal && !installDrawer && !confirmCancel) {
         const active = document.activeElement;
@@ -1428,10 +1428,10 @@ export function WizardPage() {
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); };
   }, [step, credModal, installDrawer, confirmCancel, canNext, navigate, goNext]);
 
-  const [creating, setCreating] = useState<boolean>(false);
+  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const finalize = async () => {
@@ -1488,7 +1488,7 @@ export function WizardPage() {
           setDraftState({ ...DEFAULT_DRAFT });
           setStep(1);
         }}
-        onGo={() => navigate(`/projects/${created.id}/brainstorm`)}
+        onGo={() => { void navigate(`/projects/${created.id}/brainstorm`); }}
       />
     );
   }
@@ -1549,12 +1549,12 @@ export function WizardPage() {
                   setDraft={setDraft}
                   creds={creds}
                   cliState={cliState}
-                  onOpenCred={(p) => setCredModal(p)}
-                  onOpenInstall={(p) => setInstallDrawer(p)}
+                  onOpenCred={(p) => { setCredModal(p); }}
+                  onOpenInstall={(p) => { setInstallDrawer(p); }}
                   onLoginRequest={(name) =>
-                    showToast(
+                    { showToast(
                       `Lance \`${CLI_INFO[name].loginCmd}\` dans ton terminal pour t'authentifier`,
-                    )
+                    ); }
                   }
                 />
               )}
@@ -1584,7 +1584,7 @@ export function WizardPage() {
             <div className="actions">
               <button
                 className="btn btn--ghost"
-                onClick={() => (step === 1 ? navigate("/projects") : setConfirmCancel(true))}
+                onClick={() => { if (step === 1) void navigate("/projects"); else setConfirmCancel(true); }}
               >
                 <Icon.X width="14" height="14" /> Annuler
               </button>
@@ -1628,17 +1628,17 @@ export function WizardPage() {
             setCredModal(null);
             showToast(value ? `Clé ${credModal} enregistrée` : `Clé ${credModal} supprimée`);
           }}
-          onClose={() => setCredModal(null)}
+          onClose={() => { setCredModal(null); }}
         />
       )}
 
       {installDrawer && (
         <InstallDrawer
           cli={installDrawer}
-          onClose={() => setInstallDrawer(null)}
+          onClose={() => { setInstallDrawer(null); }}
           onCopy={(cmd) => {
             try {
-              void navigator.clipboard?.writeText(cmd);
+              void navigator.clipboard.writeText(cmd);
             } catch {
               /* clipboard unavailable */
             }
@@ -1649,11 +1649,11 @@ export function WizardPage() {
 
       {confirmCancel && (
         <ConfirmCancelModal
-          onCancel={() => setConfirmCancel(false)}
+          onCancel={() => { setConfirmCancel(false); }}
           onConfirm={() => {
             setConfirmCancel(false);
             showToast("Brouillon sauvegardé");
-            navigate("/projects");
+            void navigate("/projects");
           }}
         />
       )}

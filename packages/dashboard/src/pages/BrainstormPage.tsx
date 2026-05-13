@@ -129,7 +129,7 @@ const ORDER_BY_MODE: Record<ResonanceMode["id"], string[]> = {
 };
 
 function buildQuestionPlan(mode: ResonanceMode["id"]): PlanQuestion[] {
-  const order = ORDER_BY_MODE[mode] ?? ORDER_BY_MODE.medium;
+  const order = ORDER_BY_MODE[mode];
   const seen: Record<string, number> = {};
   const plan: PlanQuestion[] = [];
   for (const cat of order) {
@@ -176,7 +176,7 @@ function renderInline(text: string): ReactNode[] {
   let lastIdx = 0;
   let key = 0;
   for (const m of matches) {
-    const idx = m.index ?? 0;
+    const idx = m.index;
     if (idx > lastIdx) parts.push(text.slice(lastIdx, idx));
     const tok = m[0];
     if (tok.startsWith("**")) parts.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
@@ -334,7 +334,7 @@ function ConfirmLaunch({
   const modeLabel = RESONANCE_MODES.find((m) => m.id === resonance)?.label ?? resonance;
   return (
     <div className="bs-modal-bg" onClick={onCancel}>
-      <div className="bs-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div className="bs-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog" aria-modal="true">
         <div className="bs-modal-icon">
           <Icon.Sparkles width="22" height="22" />
         </div>
@@ -380,7 +380,7 @@ function ConfirmLaunch({
 function ConfirmSkip({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
   return (
     <div className="bs-modal-bg" onClick={onCancel}>
-      <div className="bs-modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="bs-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <div
           className="bs-modal-icon"
           style={{
@@ -413,7 +413,7 @@ function ConfirmSkip({ onCancel, onConfirm }: { onCancel: () => void; onConfirm:
 function ConfirmReset({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
   return (
     <div className="bs-modal-bg" onClick={onCancel}>
-      <div className="bs-modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="bs-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <div
           className="bs-modal-icon"
           style={{
@@ -465,7 +465,7 @@ export function BrainstormPage() {
     return projects.find((p) => p.id === projectId) ?? null;
   }, [projectId, projects]);
 
-  const projectType: "scratch" | "feature" = "scratch";
+  const [projectType] = useState<"scratch" | "feature">("scratch");
 
   const [resonance, setResonance] = useState<ResonanceMode["id"]>("medium");
   const plan = useMemo(() => buildQuestionPlan(resonance), [resonance]);
@@ -482,15 +482,15 @@ export function BrainstormPage() {
     return null;
   }, [projectId]);
 
-  const [messages, setMessages] = useState<BsMessage[]>(initialState?.messages ?? []);
-  const [questionsAsked, setQuestionsAsked] = useState<number>(initialState?.questionsAsked ?? 0);
+  const [messages, setMessages] = useState(initialState?.messages ?? []);
+  const [questionsAsked, setQuestionsAsked] = useState(initialState?.questionsAsked ?? 0);
   const [thinking, setThinking] = useState(false);
-  const [thinkingLabel, setThinkingLabel] = useState<string>(THINKING_LABELS[0] ?? "Loom réfléchit…");
+  const [thinkingLabel, setThinkingLabel] = useState(THINKING_LABELS[0] ?? "Loom réfléchit…");
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [streamingFull, setStreamingFull] = useState("");
-  const [hasBootstrapped, setHasBootstrapped] = useState<boolean>(
-    !!(initialState?.messages?.length),
+  const [hasBootstrapped, setHasBootstrapped] = useState(
+    !!initialState?.messages.length,
   );
   const [inputVal, setInputVal] = useState("");
   const [confirmLaunch, setConfirmLaunch] = useState(false);
@@ -498,7 +498,7 @@ export function BrainstormPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [stickyScroll, setStickyScroll] = useState(true);
-  const [analysis, setAnalysis] = useState<AnalysisLine[]>(initialState?.analysis ?? []);
+  const [analysis, setAnalysis] = useState(initialState?.analysis ?? []);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -519,7 +519,7 @@ export function BrainstormPage() {
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    window.setTimeout(() => { setToast(null); }, 2400);
   }, []);
 
   const beginStream = useCallback((fullText: string, onDone?: () => void) => {
@@ -586,7 +586,7 @@ export function BrainstormPage() {
           beginStream(`${intro}${item.q}`, () => {
             setQuestionsAsked((n) => n + 1);
           });
-          setCurrentSuggestions(item.suggestions ?? []);
+          setCurrentSuggestions(item.suggestions);
         },
         700 + Math.random() * 500,
       );
@@ -609,12 +609,12 @@ export function BrainstormPage() {
               () => {
                 FEATURE_ANALYSIS.forEach((label, idx) => {
                   window.setTimeout(() => {
-                    setAnalysis((a) => [...a, { label, done: false, key: "a_" + idx }]);
+                    setAnalysis((a) => [...a, { label, done: false, key: `a_${String(idx)}` }]);
                   }, idx * 900);
                   window.setTimeout(
                     () => {
                       setAnalysis((a) =>
-                        a.map((it) => (it.key === "a_" + idx ? { ...it, done: true } : it)),
+                        a.map((it) => (it.key === `a_${String(idx)}` ? { ...it, done: true } : it)),
                       );
                     },
                     idx * 900 + 850,
@@ -626,7 +626,7 @@ export function BrainstormPage() {
                     setThinkingLabel("Loom rédige le compte-rendu…");
                     window.setTimeout(() => {
                       setThinking(false);
-                      beginStream(FEATURE_REPORT_MD, () => askNextQuestion(0, plan));
+                      beginStream(FEATURE_REPORT_MD, () => { askNextQuestion(0, plan); });
                     }, 800);
                   },
                   FEATURE_ANALYSIS.length * 900 + 600,
@@ -655,7 +655,6 @@ export function BrainstormPage() {
     if (hasBootstrapped) return;
     setHasBootstrapped(true);
     runIntroSequence(projectType);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = (text: string) => {
@@ -669,7 +668,7 @@ export function BrainstormPage() {
     setCurrentSuggestions([]);
     const idx = questionsAsked;
     if (idx < plan.length) {
-      window.setTimeout(() => askNextQuestion(idx, plan), 350);
+      window.setTimeout(() => { askNextQuestion(idx, plan); }, 350);
       return;
     }
 
@@ -687,7 +686,7 @@ export function BrainstormPage() {
           setThinking(false);
           beginStream(res.response);
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           setThinking(false);
           beginStream(
             `Loom n'a pas répondu — ${
@@ -724,7 +723,7 @@ export function BrainstormPage() {
             RESONANCE_MODES.find((m) => m.id === id)?.label.toLowerCase() ?? ""
           }**. Je vais ${
             remaining > 0
-              ? `poser ${remaining} question${remaining > 1 ? "s" : ""} supplémentaire${
+              ? `poser ${String(remaining)} question${remaining > 1 ? "s" : ""} supplémentaire${
                   remaining > 1 ? "s" : ""
                 }`
               : "arrêter de poser des questions, tu as déjà ce qu'il faut"
@@ -763,11 +762,11 @@ export function BrainstormPage() {
   const launchSpec = () => {
     setConfirmLaunch(false);
     showToast("Génération de spec lancée — redirection vers /workflow");
-    if (projectId) navigate(`/projects/${projectId}/workflow`);
+    if (projectId) void navigate(`/projects/${projectId}/workflow`);
   };
   const skipBrainstorm = () => {
     setConfirmSkip(false);
-    if (projectId) navigate(`/projects/${projectId}/workflow`);
+    if (projectId) void navigate(`/projects/${projectId}/workflow`);
   };
 
   const onTextareaKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -786,7 +785,7 @@ export function BrainstormPage() {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 168) + "px";
+    ta.style.height = `${String(Math.min(ta.scrollHeight, 168))}px`;
   }, [inputVal]);
 
   if (!projectId || !project) {
@@ -831,7 +830,7 @@ export function BrainstormPage() {
           </span>
         </div>
         <div className="bs-header-right">
-          <button className="bs-skip" onClick={() => setConfirmSkip(true)}>
+          <button className="bs-skip" onClick={() => { setConfirmSkip(true); }}>
             Sauter le brainstorming
           </button>
           <button
@@ -949,7 +948,7 @@ export function BrainstormPage() {
                   <button
                     key={i}
                     className="bs-chip"
-                    onClick={() => setInputVal((v) => (v ? v + " " + s : s))}
+                    onClick={() => { setInputVal((v) => (v ? v + " " + s : s)); }}
                   >
                     {s} <span className="arrow">→</span>
                   </button>
@@ -966,7 +965,7 @@ export function BrainstormPage() {
                 ref={textareaRef}
                 className="bs-textarea"
                 value={inputVal}
-                onChange={(e) => setInputVal(e.target.value)}
+                onChange={(e) => { setInputVal(e.target.value); }}
                 onKeyDown={onTextareaKey}
                 placeholder="Décris ton projet, réponds aux questions, ou approfondis un point…"
                 rows={1}
@@ -975,7 +974,7 @@ export function BrainstormPage() {
               <div className="bs-input-actions">
                 <button
                   className="bs-send"
-                  onClick={() => submit(inputVal)}
+                  onClick={() => { submit(inputVal); }}
                   disabled={!inputVal.trim() || !!streamingId || thinking}
                   aria-label="Envoyer"
                   title="Envoyer (⌘ Enter)"
@@ -1002,7 +1001,7 @@ export function BrainstormPage() {
               <span>Contexte projet</span>
               <button
                 className="reset-btn"
-                onClick={() => setConfirmReset(true)}
+                onClick={() => { setConfirmReset(true); }}
                 title="Réinitialiser la conversation"
               >
                 <Icon.RotateCcw width="11" height="11" /> reset
@@ -1049,7 +1048,7 @@ export function BrainstormPage() {
                     className="bs-segment"
                     role="tab"
                     data-active={resonance === m.id}
-                    onClick={() => onResonanceChange(m.id)}
+                    onClick={() => { onResonanceChange(m.id); }}
                     aria-selected={resonance === m.id}
                   >
                     <span>{m.label}</span>
@@ -1069,7 +1068,7 @@ export function BrainstormPage() {
                   <div
                     className="bs-progress-fill"
                     style={{
-                      width: `${Math.min(100, (questionsAsked / Math.max(1, totalQ)) * 100)}%`,
+                      width: `${String(Math.min(100, (questionsAsked / Math.max(1, totalQ)) * 100))}%`,
                     }}
                   />
                 </div>
@@ -1096,7 +1095,7 @@ export function BrainstormPage() {
               </div>
               <button
                 className="bs-config-link"
-                onClick={() => navigate(`/projects/${project.id}/settings`)}
+                onClick={() => { void navigate(`/projects/${project.id}/settings`); }}
               >
                 Modifier dans les paramètres <Icon.ChevronRight width="14" height="14" />
               </button>
@@ -1107,14 +1106,14 @@ export function BrainstormPage() {
             <button
               className="bs-launch-btn"
               disabled={!ready}
-              onClick={() => setConfirmLaunch(true)}
+              onClick={() => { setConfirmLaunch(true); }}
             >
               <Icon.Sparkles width="14" height="14" /> Lancer la génération de la spec
             </button>
             <span className="bs-launch-hint">
               {ready
                 ? "Loom a posé toutes ses questions. Tu peux continuer ou lancer."
-                : `Disponible après ${Math.max(0, totalQ - questionsAsked)} question${
+                : `Disponible après ${String(Math.max(0, totalQ - questionsAsked))} question${
                     totalQ - questionsAsked > 1 ? "s" : ""
                   } restante${totalQ - questionsAsked > 1 ? "s" : ""}.`}
             </span>
@@ -1128,15 +1127,15 @@ export function BrainstormPage() {
           projectType={projectType}
           messages={messages}
           resonance={resonance}
-          onCancel={() => setConfirmLaunch(false)}
+          onCancel={() => { setConfirmLaunch(false); }}
           onConfirm={launchSpec}
         />
       )}
       {confirmSkip && (
-        <ConfirmSkip onCancel={() => setConfirmSkip(false)} onConfirm={skipBrainstorm} />
+        <ConfirmSkip onCancel={() => { setConfirmSkip(false); }} onConfirm={skipBrainstorm} />
       )}
       {confirmReset && (
-        <ConfirmReset onCancel={() => setConfirmReset(false)} onConfirm={doReset} />
+        <ConfirmReset onCancel={() => { setConfirmReset(false); }} onConfirm={doReset} />
       )}
 
       {toast && <div className="bs-toast">{toast}</div>}

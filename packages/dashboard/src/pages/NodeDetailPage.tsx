@@ -51,10 +51,10 @@ const STATUS_LABELS: Record<UiStatus, string> = {
 };
 
 function fmtDuration(sec: number): string {
-  if (sec < 60) return `${Math.round(sec)}s`;
+  if (sec < 60) return `${String(Math.round(sec))}s`;
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
-  return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
+  return s === 0 ? `${String(m)}m` : `${String(m)}m ${s.toString().padStart(2, "0")}s`;
 }
 
 function fmtClock(ts: number | string): string {
@@ -114,14 +114,14 @@ function eventToLogLine(ev: WsRuntimeSessionEvent): LogLine | null {
   // Best-effort log shaping. The runtime SessionEvent payload varies per
   // runtime (claude-agent vs copilot vs mock); stringify whatever lives
   // under common fields so the user sees something.
-  const payload = ev.event as Record<string, unknown>;
+  const payload = ev.event;
   const text =
     typeof payload["text"] === "string"
-      ? (payload["text"] as string)
+      ? (payload["text"])
       : typeof payload["message"] === "string"
-        ? (payload["message"] as string)
+        ? (payload["message"])
         : typeof payload["content"] === "string"
-          ? (payload["content"] as string)
+          ? (payload["content"])
           : `[${kind}] ${JSON.stringify(payload).slice(0, 280)}`;
 
   let level: LogLine["level"] = "info";
@@ -342,7 +342,7 @@ function LogsSection({ logs, onFullscreen }: { logs: LogLine[]; onFullscreen: ()
 function FullscreenLogs({ logs, onClose }: { logs: LogLine[]; onClose: () => void }) {
   return (
     <div className="nd-modal-bg" onClick={onClose}>
-      <div className="nd-fullscreen" onClick={(e) => e.stopPropagation()}>
+      <div className="nd-fullscreen" onClick={(e) => { e.stopPropagation(); }}>
         <div className="nd-fullscreen-head">
           <h3>Logs</h3>
           <button className="icon-btn" onClick={onClose} aria-label="Fermer">
@@ -375,19 +375,19 @@ function InstructionsModal({
   const [val, setVal] = useState(initial);
   return (
     <div className="nd-modal-bg" onClick={onClose}>
-      <div className="nd-modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="nd-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <h3>Modifier les instructions</h3>
         <textarea
           className="nd-textarea"
           value={val}
-          onChange={(e) => setVal(e.target.value)}
+          onChange={(e) => { setVal(e.target.value); }}
           rows={6}
         />
         <div className="nd-modal-actions">
           <button className="btn ghost" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn primary" onClick={() => onSave(val)}>
+          <button className="btn primary" onClick={() => { onSave(val); }}>
             <Icon.Check width="11" height="11" /> Enregistrer
           </button>
         </div>
@@ -408,17 +408,17 @@ function NodeFooter({
   return (
     <footer className="nd-footer">
       {status === "running" && (
-        <button className="btn danger" onClick={() => onAction("pause")} disabled={pending}>
+        <button className="btn danger" onClick={() => { onAction("pause"); }} disabled={pending}>
           <Icon.Pause width="11" height="11" /> Mettre le workflow en pause
         </button>
       )}
       {(status === "pending" || status === "waiting") && (
-        <button className="btn primary" onClick={() => onAction("resume")} disabled={pending}>
+        <button className="btn primary" onClick={() => { onAction("resume"); }} disabled={pending}>
           <Icon.Play width="11" height="11" /> Reprendre le workflow
         </button>
       )}
       {(status === "failed" || status === "blocked") && (
-        <button className="btn primary" onClick={() => onAction("retry")} disabled={pending}>
+        <button className="btn primary" onClick={() => { onAction("retry"); }} disabled={pending}>
           <Icon.RefreshCw width="11" height="11" /> Reprendre le workflow
         </button>
       )}
@@ -478,7 +478,7 @@ export function NodeDetailPage() {
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    window.setTimeout(() => { setToast(null); }, 2400);
   }, []);
 
   const onAction = useCallback(
@@ -592,7 +592,7 @@ export function NodeDetailPage() {
       <NodeHeader
         node={node}
         phase={phase}
-        onClose={() => navigate(`/projects/${projectId}/workflow`)}
+        onClose={() => { void navigate(`/projects/${projectId}/workflow`); }}
       />
 
       <div className="nd-main">
@@ -624,7 +624,7 @@ export function NodeDetailPage() {
 
         <InstructionsSection
           instructions={node.instructions}
-          onEdit={() => setEditing(true)}
+          onEdit={() => { setEditing(true); }}
         />
         <DependenciesSection parents={parents} />
         <AgentsSection agents={node.agents} />
@@ -635,20 +635,20 @@ export function NodeDetailPage() {
           totalCost={aggregate.totalCost === 0 ? node.cost : aggregate.totalCost}
           models={aggregate.models}
         />
-        <LogsSection logs={logs} onFullscreen={() => setFullscreen(true)} />
+        <LogsSection logs={logs} onFullscreen={() => { setFullscreen(true); }} />
       </div>
 
-      <NodeFooter status={ui} onAction={onAction} pending={actionPending} />
+      <NodeFooter status={ui} onAction={(kind) => { void onAction(kind); }} pending={actionPending} />
 
       {editing && (
         <InstructionsModal
           initial={node.instructions}
           onSave={onSaveInstructions}
-          onClose={() => setEditing(false)}
+          onClose={() => { setEditing(false); }}
         />
       )}
 
-      {fullscreen && <FullscreenLogs logs={logs} onClose={() => setFullscreen(false)} />}
+      {fullscreen && <FullscreenLogs logs={logs} onClose={() => { setFullscreen(false); }} />}
 
       {toast && <div className="nd-toast">{toast}</div>}
     </div>

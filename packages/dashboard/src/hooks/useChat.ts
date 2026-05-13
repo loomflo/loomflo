@@ -24,8 +24,8 @@ export function useChat(projectId: string | null | undefined): ChatResource {
   const ws = useWs();
 
   const [messages, setMessages] = useState<ChatHistoryEntry[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [sending, setSending] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const refresh = useCallback(async () => {
