@@ -28,14 +28,14 @@ function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "à l'instant";
-  if (m < 60) return `il y a ${m} min`;
+  if (m < 60) return `il y a ${String(m)} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `il y a ${h} h`;
+  if (h < 24) return `il y a ${String(h)} h`;
   const d = Math.floor(h / 24);
   if (d === 1) return "hier";
-  if (d < 7) return `il y a ${d} j`;
-  if (d < 30) return `il y a ${Math.floor(d / 7)} sem`;
-  return `il y a ${Math.floor(d / 30)} mois`;
+  if (d < 7) return `il y a ${String(d)} j`;
+  if (d < 30) return `il y a ${String(Math.floor(d / 7))} sem`;
+  return `il y a ${String(Math.floor(d / 30))} mois`;
 }
 
 function truncatePath(p: string, maxLen = 42): string {
@@ -43,10 +43,10 @@ function truncatePath(p: string, maxLen = 42): string {
   if (p.length <= maxLen) return p;
   const segments = p.split("/");
   if (segments.length <= 3) return "…" + p.slice(-(maxLen - 1));
-  const first = segments[1] ? "/" + segments[1] : segments[0];
+  const first = segments[1] ? `/${segments[1]}` : (segments[0] ?? "");
   const last = segments.slice(-2).join("/");
-  let out = first + "/…/" + last;
-  if (out.length > maxLen) out = "…/" + last;
+  let out = `${first}/…/${last}`;
+  if (out.length > maxLen) out = `…/${last}`;
   return out;
 }
 
@@ -82,9 +82,9 @@ interface StatusPillProps {
 
 function StatusPill({ status }: StatusPillProps) {
   return (
-    <span className="lf-pill" data-status={STATUS_SEMANTIC[status] ?? "pending"}>
+    <span className="lf-pill" data-status={STATUS_SEMANTIC[status]}>
       <span className="lf-pill-dot" data-pulse={status === "running" ? "1" : "0"} />
-      <span className="lf-pill-label">{STATUS_LABELS[status] ?? status}</span>
+      <span className="lf-pill-label">{STATUS_LABELS[status]}</span>
     </span>
   );
 }
@@ -112,7 +112,7 @@ function ShimmerBorder({
   children,
   ...rest
 }: ShimmerBorderProps & { [key: `data-${string}`]: string }) {
-  const style = { "--shimmer-delay": `${delay}s` } as CSSProperties;
+  const style = { "--shimmer-delay": `${String(delay)}s` } as CSSProperties;
   return (
     <div
       className={`lf-shimmer ${active ? "is-active" : ""} ${className}`.trim()}
@@ -141,7 +141,7 @@ function NodeProgress({ count }: { count: NodeCount }) {
   return (
     <div className="lf-progress">
       <div className="lf-progress-track">
-        <div className="lf-progress-fill" style={{ width: `${pct}%` }} />
+        <div className="lf-progress-fill" style={{ width: `${String(pct)}%` }} />
       </div>
       <div className="lf-progress-meta">
         <span>
@@ -173,7 +173,7 @@ function MiniGraph({ count, isRunning }: { count: NodeCount; isRunning: boolean 
         const cy = 8 + (i * 48) / Math.max(1, specDots.length - 1 || 1);
         return (
           <circle
-            key={`s${i}`}
+            key={`s${String(i)}`}
             cx="14"
             cy={specDots.length === 1 ? 32 : cy}
             r="3.5"
@@ -186,7 +186,7 @@ function MiniGraph({ count, isRunning }: { count: NodeCount; isRunning: boolean 
         const cy = 6 + (i * 52) / Math.max(1, workerDots.length - 1 || 1);
         return (
           <circle
-            key={`w${i}`}
+            key={`w${String(i)}`}
             cx="80"
             cy={workerDots.length === 1 ? 32 : cy}
             r={isRunning && i === count.done ? 4.5 : 3.5}
@@ -202,8 +202,8 @@ function MiniGraph({ count, isRunning }: { count: NodeCount; isRunning: boolean 
         const cy = specDots.length === 1 ? 32 : 8 + (i * 48) / Math.max(1, specDots.length - 1 || 1);
         return (
           <path
-            key={`e${i}`}
-            d={`M18 ${cy} Q 50 ${cy - 4} 76 32`}
+            key={`e${String(i)}`}
+            d={`M18 ${String(cy)} Q 50 ${String(cy - 4)} 76 32`}
             stroke="url(#lf-edge-grad)"
             strokeWidth="1"
             fill="none"
@@ -416,7 +416,7 @@ function ProjectSwitcher({ activeProjectId, onSelect, onAllProjects }: ProjectSw
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
+    return () => { document.removeEventListener("mousedown", handle); };
   }, [open]);
 
   const active = projects.find((p) => p.id === activeProjectId);
@@ -430,7 +430,7 @@ function ProjectSwitcher({ activeProjectId, onSelect, onAllProjects }: ProjectSw
     <div className="lf-switcher" ref={ref}>
       <button
         className="lf-switcher-trigger"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); }}
         aria-expanded={open}
       >
         <Icon.Layers width="14" height="14" />
@@ -446,7 +446,7 @@ function ProjectSwitcher({ activeProjectId, onSelect, onAllProjects }: ProjectSw
               autoFocus
               placeholder="Filtrer les projets…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); }}
             />
           </div>
           <div className="lf-switcher-list">
@@ -619,7 +619,7 @@ function CommandPalette({
         sub: truncatePath(p.projectPath, 38),
         icon: "Layers",
         status: p.status,
-        run: () => onSelectProject(p),
+        run: () => { onSelectProject(p); },
       }));
     if (projectItems.length) out.push({ title: "Projets", items: projectItems });
 
@@ -632,7 +632,7 @@ function CommandPalette({
           sub: "Lancer le wizard de création",
           icon: "Plus",
           shortcut: "⌘N",
-          run: () => onAction("new-project"),
+          run: () => { onAction("new-project"); },
         },
         {
           kind: "action",
@@ -640,7 +640,7 @@ function CommandPalette({
           label: "Paramètres",
           sub: "Préférences globales",
           icon: "Settings",
-          run: () => onAction("settings"),
+          run: () => { onAction("settings"); },
         },
         {
           kind: "action",
@@ -649,7 +649,7 @@ function CommandPalette({
           sub: "Bascule dark / light",
           icon: theme === "dark" ? "Sun" : "Moon",
           shortcut: "⌘\\",
-          run: () => onAction("toggle-theme"),
+          run: () => { onAction("toggle-theme"); },
         },
         {
           kind: "action",
@@ -657,7 +657,7 @@ function CommandPalette({
           label: "Documentation",
           sub: "Ouvrir la doc Loomflo",
           icon: "Book",
-          run: () => onAction("docs"),
+          run: () => { onAction("docs"); },
         },
       ] as PaletteItem[]
     ).filter((a) => matches(a.label));
@@ -672,7 +672,7 @@ function CommandPalette({
             label: "Workflow",
             sub: "Voir le DAG",
             icon: "GitBranch",
-            run: () => onAction("nav", "workflow"),
+            run: () => { onAction("nav", "workflow"); },
           },
           {
             kind: "nav",
@@ -680,7 +680,7 @@ function CommandPalette({
             label: "Brainstorm",
             sub: "Discussion avec Loom",
             icon: "MessageCircle",
-            run: () => onAction("nav", "brainstorm"),
+            run: () => { onAction("nav", "brainstorm"); },
           },
           {
             kind: "nav",
@@ -688,7 +688,7 @@ function CommandPalette({
             label: "Logs",
             sub: "Flux d'exécution",
             icon: "Terminal",
-            run: () => onAction("nav", "logs"),
+            run: () => { onAction("nav", "logs"); },
           },
           {
             kind: "nav",
@@ -696,7 +696,7 @@ function CommandPalette({
             label: "Paramètres du projet",
             sub: "Configuration",
             icon: "Settings",
-            run: () => onAction("nav", "project-settings"),
+            run: () => { onAction("nav", "project-settings"); },
           },
         ] as PaletteItem[]
       ).filter((a) => matches(a.label));
@@ -713,7 +713,7 @@ function CommandPalette({
         label: `Sauter au nœud actif — ${p.name}`,
         sub: p.runningNode || "nœud en cours",
         icon: "Activity",
-        run: () => onSelectProject(p),
+        run: () => { onSelectProject(p); },
       }));
     if (recentItems.length) out.push({ title: "Activité récente", items: recentItems });
 
@@ -761,7 +761,7 @@ function CommandPalette({
         className="lf-palette"
         role="dialog"
         aria-label="Palette de commandes"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); }}
         onKeyDown={onKeyDown}
       >
         <div className="lf-palette-search">
@@ -771,7 +771,7 @@ function CommandPalette({
             type="text"
             placeholder="Tape une commande, un projet, une action…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); }}
           />
           <kbd className="lf-kbd lf-mono">esc</kbd>
         </div>
@@ -790,13 +790,12 @@ function CommandPalette({
               {s.items.map((item) => {
                 const isActive = cursor === activeIdx;
                 const myCursor = cursor++;
-                const IconC: ComponentType<SVGProps<SVGSVGElement>> =
-                  Icon[item.icon] ?? Icon.ChevronRight;
+                const IconC: ComponentType<SVGProps<SVGSVGElement>> = Icon[item.icon];
                 return (
                   <div
                     key={item.id}
                     className={`lf-palette-item ${isActive ? "is-active" : ""}`}
-                    onMouseEnter={() => setActiveIdx(myCursor)}
+                    onMouseEnter={() => { setActiveIdx(myCursor); }}
                     onClick={() => {
                       item.run();
                       onClose();
@@ -849,7 +848,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
           {Array.from({ length: 11 }).map((_, x) =>
             Array.from({ length: 7 }).map((_, y) => (
               <circle
-                key={`${x}-${y}`}
+                key={`${String(x)}-${String(y)}`}
                 cx={10 + x * 20}
                 cy={10 + y * 20}
                 r="1"
@@ -958,7 +957,7 @@ export function ProjectsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => { setToast(null); }, 3500);
   };
 
   useEffect(() => {
@@ -969,22 +968,22 @@ export function ProjectsPage() {
       }
     };
     window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
+    return () => { window.removeEventListener("keydown", handle); };
   }, []);
 
   const goToProject = (project: UiProject) => {
     setActiveProjectId(project.id);
-    if (project.workflowStatus === "init") navigate(`/projects/${project.id}/brainstorm`);
-    else navigate(`/projects/${project.id}/workflow`);
+    if (project.workflowStatus === "init") void navigate(`/projects/${project.id}/brainstorm`);
+    else void navigate(`/projects/${project.id}/workflow`);
   };
 
   const handleAction = (action: string, payload?: string) => {
-    if (action === "new-project") navigate("/projects/new/wizard");
+    if (action === "new-project") void navigate("/projects/new/wizard");
     else if (action === "toggle-theme") toggleTheme();
     else if (action === "docs") showToast("Documentation — prompt suivant");
     else if (action === "settings") showToast("Paramètres globaux — prompt suivant");
     else if (action === "nav" && payload && activeProjectId) {
-      navigate(`/projects/${activeProjectId}/${payload}`);
+      void navigate(`/projects/${activeProjectId}/${payload}`);
     }
   };
 
@@ -998,14 +997,14 @@ export function ProjectsPage() {
         <TopBar
           activeProjectId={activeProjectId}
           onSelectProject={goToProject}
-          onAllProjects={() => setActiveProjectId(null)}
-          onOpenCommand={() => setPaletteOpen(true)}
-          onOpenWizard={() => navigate("/projects/new/wizard")}
+          onAllProjects={() => { setActiveProjectId(null); }}
+          onOpenCommand={() => { setPaletteOpen(true); }}
+          onOpenWizard={() => { void navigate("/projects/new/wizard"); }}
         />
 
         <main className="lf-main">
           {projects.length === 0 ? (
-            <EmptyState onCreate={() => navigate("/projects/new/wizard")} />
+            <EmptyState onCreate={() => { void navigate("/projects/new/wizard"); }} />
           ) : (
             <div className="lf-projects" data-density={density}>
               <div className="lf-projects-head">
@@ -1041,7 +1040,7 @@ export function ProjectsPage() {
                   </button>
                   <button
                     className="lf-btn lf-btn--primary"
-                    onClick={() => navigate("/projects/new/wizard")}
+                    onClick={() => { void navigate("/projects/new/wizard"); }}
                   >
                     <Icon.Plus width="14" height="14" /> Nouveau projet
                   </button>
@@ -1055,7 +1054,7 @@ export function ProjectsPage() {
                     project={p}
                     density={density}
                     shimmerDelay={(i * 0.83) % 6}
-                    onOpen={() => goToProject(p)}
+                    onOpen={() => { goToProject(p); }}
                   />
                 ))}
               </div>
@@ -1065,7 +1064,7 @@ export function ProjectsPage() {
 
         <CommandPalette
           open={paletteOpen}
-          onClose={() => setPaletteOpen(false)}
+          onClose={() => { setPaletteOpen(false); }}
           onSelectProject={(p) => {
             setActiveProjectId(p.id);
             goToProject(p);

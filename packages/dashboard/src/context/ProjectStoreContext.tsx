@@ -123,7 +123,7 @@ function summaryToUiProject(s: ProjectSummary, meta: UiProjectMeta | undefined):
     lastActivityAt: meta?.lastActivityAt ?? s.startedAt,
     status: meta?.workflowStatus
       ? statusFromWorkflow(meta.workflowStatus)
-      : (STATUS_MAP[s.status] ?? "pending"),
+      : STATUS_MAP[s.status],
     workflowStatus: meta?.workflowStatus ?? workflowStatusFromSummary(s),
     nodeCount: meta?.nodeCount ?? { spec: 0, worker: 0, done: 0 },
     config: meta?.config ?? { template: "—", stack: [], level: 1 },
@@ -246,7 +246,7 @@ export function ProjectStoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<UiProject[]>(() =>
     isOnline ? [] : readOffline(),
   );
-  const [loading, setLoading] = useState<boolean>(isOnline);
+  const [loading, setLoading] = useState(isOnline);
   const [error, setError] = useState<Error | null>(null);
   const subsRef = useRef(new Set<(p: UiProject[]) => void>());
 
@@ -337,17 +337,18 @@ export function ProjectStoreProvider({ children }: { children: ReactNode }) {
         }
 
         // Offline / mock: append a local-only entry so the wizard still works.
+        const nowIso = new Date().toISOString();
         const ui: UiProject = {
           id,
           name,
           projectPath,
-          createdAt: meta.createdAt!,
-          lastActivityAt: meta.lastActivityAt!,
+          createdAt: meta.createdAt ?? nowIso,
+          lastActivityAt: meta.lastActivityAt ?? nowIso,
           status: partial.status ?? "pending",
           workflowStatus: partial.workflowStatus ?? "init",
-          nodeCount: meta.nodeCount!,
+          nodeCount: meta.nodeCount ?? { spec: 0, worker: 0, done: 0 },
           config: meta.config ?? { template: "—", stack: [], level: 1 },
-          createdBy: meta.createdBy!,
+          createdBy: meta.createdBy ?? "user",
           ...(partial.runningNode ? { runningNode: partial.runningNode } : {}),
           ...(partial.runningAgent ? { runningAgent: partial.runningAgent } : {}),
         };
@@ -385,8 +386,9 @@ export function ProjectStoreProvider({ children }: { children: ReactNode }) {
         const next = projects.filter((p) => p.id !== id);
         if (!isOnline) writeOffline(next);
         const meta = readMeta();
-        delete meta[id];
-        writeMeta(meta);
+        const { [id]: _omitted, ...rest } = meta;
+        void _omitted;
+        writeMeta(rest);
         broadcast(next);
       },
       reset: () => {

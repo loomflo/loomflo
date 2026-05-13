@@ -26,7 +26,7 @@ export function useAsyncResource<T>(
   deps: ReadonlyArray<unknown>,
 ): AsyncResource<T> {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const activeRef = useRef(true);
   const fetcherRef = useRef(fetcher);
@@ -53,7 +53,6 @@ export function useAsyncResource<T>(
     return () => {
       activeRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   const refresh = useCallback(async () => {

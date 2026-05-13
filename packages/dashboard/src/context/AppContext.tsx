@@ -49,14 +49,14 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 function readBaseUrl(): string {
-  const fromEnv = import.meta.env["VITE_API_URL"];
+  const fromEnv: unknown = import.meta.env["VITE_API_URL"];
   if (typeof fromEnv === "string" && fromEnv.length > 0) return fromEnv.replace(/\/+$/, "");
   if (typeof window !== "undefined") return window.location.origin;
   return "http://localhost:3000";
 }
 
 function readUseMock(): boolean {
-  const env = import.meta.env["VITE_USE_MOCK"];
+  const env: unknown = import.meta.env["VITE_USE_MOCK"];
   return env === "1" || env === "true";
 }
 

@@ -96,7 +96,8 @@ function layoutGraph(nodes: WfNode[], edges: UiEdge[]): LaidOutGraph["pos"] {
   nodes.forEach((n) => {
     const r = rank.get(n.id) ?? 0;
     if (!byRank.has(r)) byRank.set(r, []);
-    byRank.get(r)!.push(n.id);
+    const bucket = byRank.get(r);
+    if (bucket) bucket.push(n.id);
   });
   const startX = 80;
   const gapX = 280;
@@ -114,15 +115,15 @@ function layoutGraph(nodes: WfNode[], edges: UiEdge[]): LaidOutGraph["pos"] {
 }
 
 function fmtDuration(sec: number): string {
-  if (sec < 60) return `${Math.round(sec)}s`;
+  if (sec < 60) return `${String(Math.round(sec))}s`;
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
-  return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, "0")}s`;
+  return s === 0 ? `${String(m)}m` : `${String(m)}m ${s.toString().padStart(2, "0")}s`;
 }
 
 function chatHistoryToSeedMessages(history: ChatHistoryEntry[]): SeedMessage[] {
   return history.map((entry, idx) => ({
-    id: `c${idx}`,
+    id: `c${String(idx)}`,
     from: entry.role === "user" ? "user" : "loom",
     ts: new Date(entry.timestamp).getTime(),
     text: entry.content,
@@ -180,7 +181,7 @@ function NodeCard({ node, phase, status, x, y, selected, onClick }: NodeCardProp
       data-status={status}
       data-idle={idle}
       data-selected={selected}
-      style={{ transform: `translate(${x}px, ${y}px)` }}
+      style={{ transform: `translate(${String(x)}px, ${String(y)}px)` }}
       onClick={onClick}
     >
       <div className="node-head">
@@ -224,7 +225,7 @@ function EdgePath({
   const dx = Math.max(40, Math.abs(tx - sx) * 0.5);
   const c1x = sx + dx;
   const c2x = tx - dx;
-  const d = `M ${sx} ${sy} C ${c1x} ${sy}, ${c2x} ${ty}, ${tx} ${ty}`;
+  const d = `M ${String(sx)} ${String(sy)} C ${String(c1x)} ${String(sy)}, ${String(c2x)} ${String(ty)}, ${String(tx)} ${String(ty)}`;
   return <path className="edge" d={d} data-done={done} />;
 }
 
@@ -330,7 +331,7 @@ export function WorkflowPage() {
   }
 
   const wfStatus = workflow?.status ?? project?.workflowStatus ?? "init";
-  const wfBadge = WORKFLOW_BADGE[wfStatus] ?? WORKFLOW_BADGE["running"]!;
+  const wfBadge = WORKFLOW_BADGE[wfStatus] ?? { label: "En cours", className: "running" };
   const isPaused = wfStatus === "paused";
 
   return (
@@ -396,7 +397,7 @@ export function WorkflowPage() {
           {isPaused ? (
             <button
               className="btn"
-              onClick={onResume}
+              onClick={() => { void onResume(); }}
               disabled={actionPending !== null || !projectId}
             >
               <Icon.Play width="14" height="14" />{" "}
@@ -405,7 +406,7 @@ export function WorkflowPage() {
           ) : (
             <button
               className="btn"
-              onClick={onPause}
+              onClick={() => { void onPause(); }}
               disabled={actionPending !== null || !projectId}
             >
               <Icon.Pause width="14" height="14" />{" "}
@@ -417,7 +418,7 @@ export function WorkflowPage() {
           </button>
           <button
             className="btn ghost"
-            onClick={() => navigate(`/projects/${project?.id ?? ""}/settings`)}
+            onClick={() => { void navigate(`/projects/${project?.id ?? ""}/settings`); }}
             aria-label="Configuration"
           >
             <Icon.Settings width="16" height="16" />
@@ -481,9 +482,9 @@ export function WorkflowPage() {
                   </dl>
                   <button
                     className="btn"
-                    onClick={() =>
-                      navigate(`/projects/${project?.id ?? ""}/nodes/${selectedNode.id}`)
-                    }
+                    onClick={() => {
+                      void navigate(`/projects/${project?.id ?? ""}/nodes/${selectedNode.id}`);
+                    }}
                   >
                     Voir le détail complet <Icon.ChevronRight width="11" height="11" />
                   </button>
@@ -578,7 +579,7 @@ export function WorkflowPage() {
                   x={pos.x}
                   y={pos.y}
                   selected={selectedId === n.id}
-                  onClick={() => setSelectedId(n.id)}
+                  onClick={() => { setSelectedId(n.id); }}
                 />
               );
             })}

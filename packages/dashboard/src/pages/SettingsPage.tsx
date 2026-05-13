@@ -227,7 +227,7 @@ function Modal({
   if (!open) return null;
   return (
     <div className="st-modal-bg" onClick={onClose}>
-      <div className="st-modal" onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className="st-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
         <div className="st-modal-head">
           <span className="st-modal-icon">{icon}</span>
           <div>{title}</div>
@@ -252,7 +252,7 @@ function Toggle({
     <button
       className="st-toggle"
       data-on={on}
-      onClick={() => onChange(!on)}
+      onClick={() => { onChange(!on); }}
       role="switch"
       aria-checked={on}
       aria-label={ariaLabel ?? "Toggle"}
@@ -357,7 +357,7 @@ function GeneralSection({ data, draft, setDraft, editing }: SectionEditProps) {
         <input
           className="input mono"
           value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          onChange={(e) => { setDraft({ ...draft, name: e.target.value }); }}
         />
       </div>
       <div className="field">
@@ -365,7 +365,7 @@ function GeneralSection({ data, draft, setDraft, editing }: SectionEditProps) {
         <input
           className="input mono"
           value={draft.folder}
-          onChange={(e) => setDraft({ ...draft, folder: e.target.value })}
+          onChange={(e) => { setDraft({ ...draft, folder: e.target.value }); }}
         />
       </div>
       <div className="field">
@@ -373,7 +373,7 @@ function GeneralSection({ data, draft, setDraft, editing }: SectionEditProps) {
         <input
           className="input"
           value={draft.template}
-          onChange={(e) => setDraft({ ...draft, template: e.target.value })}
+          onChange={(e) => { setDraft({ ...draft, template: e.target.value }); }}
         />
       </div>
     </>
@@ -390,7 +390,7 @@ function ProvidersSection({ data, draft, setDraft, editing }: SectionEditProps) 
       <select
         className="select"
         value={draft.primaryProvider}
-        onChange={(e) => setDraft({ ...draft, primaryProvider: e.target.value })}
+        onChange={(e) => { setDraft({ ...draft, primaryProvider: e.target.value }); }}
       >
         <option>Anthropic API</option>
         <option>OpenAI API</option>
@@ -431,7 +431,7 @@ function LevelSection({ data, draft, setDraft, editing }: SectionEditProps) {
               key={l.id}
               className="st-radio"
               data-on={draft.level.id === l.id}
-              onClick={() => setDraft({ ...draft, level: { id: l.id, name: l.name } })}
+              onClick={() => { setDraft({ ...draft, level: { id: l.id, name: l.name } }); }}
             >
               <span className="st-radio-name">{l.name}</span>
               <span className="st-radio-desc">{l.desc}</span>
@@ -443,7 +443,7 @@ function LevelSection({ data, draft, setDraft, editing }: SectionEditProps) {
         <span>Reviewer activé</span>
         <Toggle
           on={draft.reviewer}
-          onChange={(v) => setDraft({ ...draft, reviewer: v })}
+          onChange={(v) => { setDraft({ ...draft, reviewer: v }); }}
           ariaLabel="Reviewer"
         />
       </div>
@@ -459,7 +459,7 @@ function DelaysSection({ data, draft, setDraft, editing }: SectionEditProps) {
       <select
         className="select"
         value={draft.delayPreset}
-        onChange={(e) => setDraft({ ...draft, delayPreset: e.target.value })}
+        onChange={(e) => { setDraft({ ...draft, delayPreset: e.target.value }); }}
       >
         <option>Instantané</option>
         <option>1 minute</option>
@@ -508,7 +508,7 @@ function ToolsSection({
               <button
                 className="icon-btn"
                 aria-label="Supprimer"
-                onClick={() => onRemoveMcp(srv.name)}
+                onClick={() => { onRemoveMcp(srv.name); }}
               >
                 <Icon.Trash width="11" height="11" />
               </button>
@@ -539,10 +539,10 @@ function BudgetSection({ data, draft, setDraft, editing }: SectionEditProps) {
         step="0.50"
         value={draft.budgetUsd ?? ""}
         onChange={(e) =>
-          setDraft({
+          { setDraft({
             ...draft,
             budgetUsd: e.target.value === "" ? null : Number(e.target.value),
-          })
+          }); }
         }
         placeholder="Aucun plafond"
       />
@@ -573,7 +573,7 @@ function AdvancedSection({ data, draft, setDraft, editing }: SectionEditProps) {
           min="0"
           max="10"
           value={draft.maxRetries}
-          onChange={(e) => setDraft({ ...draft, maxRetries: Number(e.target.value) })}
+          onChange={(e) => { setDraft({ ...draft, maxRetries: Number(e.target.value) }); }}
         />
       </div>
       <div className="field">
@@ -582,10 +582,10 @@ function AdvancedSection({ data, draft, setDraft, editing }: SectionEditProps) {
           className="select"
           value={draft.retryStrategy}
           onChange={(e) =>
-            setDraft({
+            { setDraft({
               ...draft,
               retryStrategy: e.target.value as ProjectConfig["retryStrategy"],
-            })
+            }); }
           }
         >
           <option value="adaptive">Adaptative</option>
@@ -600,7 +600,7 @@ function AdvancedSection({ data, draft, setDraft, editing }: SectionEditProps) {
           min="1"
           max="12"
           value={draft.maxWorkers}
-          onChange={(e) => setDraft({ ...draft, maxWorkers: Number(e.target.value) })}
+          onChange={(e) => { setDraft({ ...draft, maxWorkers: Number(e.target.value) }); }}
         />
       </div>
     </>
@@ -744,7 +744,7 @@ export function SettingsPage() {
   };
   const showToast = (msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    window.setTimeout(() => { setToast(null); }, 2400);
   };
 
   const navigateTo = (id: SectionDef["id"]) => {
@@ -802,7 +802,7 @@ export function SettingsPage() {
       const el = document.getElementById(s.id);
       if (el) obs.observe(el);
     });
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); };
   }, []);
 
   if (!project) {
@@ -822,7 +822,7 @@ export function SettingsPage() {
     const editProps: SectionEditProps = {
       data,
       draft: draft ?? data,
-      setDraft: (next) => setDraft(next),
+      setDraft: (next) => { setDraft(next); },
       editing,
     };
     switch (s.id) {
@@ -838,8 +838,8 @@ export function SettingsPage() {
         return (
           <ToolsSection
             {...editProps}
-            onAddMcp={() => setModal("mcp")}
-            onRemoveMcp={onRemoveMcp}
+            onAddMcp={() => { setModal("mcp"); }}
+            onRemoveMcp={(name) => { void onRemoveMcp(name); }}
           />
         );
       case "budget":
@@ -849,8 +849,8 @@ export function SettingsPage() {
       case "danger":
         return (
           <DangerSection
-            onPause={() => setModal("pause")}
-            onReset={() => setModal("reset")}
+            onPause={() => { setModal("pause"); }}
+            onReset={() => { setModal("reset"); }}
             onDelete={() => {
               setDeleteConfirmName("");
               setModal("delete");
@@ -898,7 +898,7 @@ export function SettingsPage() {
         <div className="page-header-right">
           <button
             className="btn ghost"
-            onClick={() => navigate(`/projects/${project.id}/workflow`)}
+            onClick={() => { void navigate(`/projects/${project.id}/workflow`); }}
           >
             <Icon.ChevronLeft width="11" height="11" /> Retour au workflow
           </button>
@@ -914,7 +914,7 @@ export function SettingsPage() {
               className={`nav-item ${activeSection === s.id ? "active" : ""} ${
                 s.danger ? "danger" : ""
               }`}
-              onClick={() => navigateTo(s.id)}
+              onClick={() => { navigateTo(s.id); }}
               aria-current={activeSection === s.id ? "true" : undefined}
             >
               <span className="nav-icon">{s.icon}</span>
@@ -934,7 +934,7 @@ export function SettingsPage() {
               danger={s.danger}
               editing={editingId === s.id}
               canEdit={s.id !== "danger"}
-              onEdit={() => startEdit(s.id)}
+              onEdit={() => { startEdit(s.id); }}
               onSave={() => {
                 void saveEdit();
               }}
@@ -963,33 +963,35 @@ export function SettingsPage() {
         }
         foot={
           <>
-            <button className="btn ghost" onClick={() => setModal(null)}>
+            <button className="btn ghost" onClick={() => { setModal(null); }}>
               Annuler
             </button>
             <button
               className="btn danger"
               disabled={pausing || !projectId}
-              onClick={async () => {
+              onClick={() => {
                 if (!projectId) return;
                 setPausing(true);
-                try {
-                  await api.pauseWorkflow(projectId);
-                  showToast("Workflow mis en pause");
-                } catch (err) {
-                  showToast(
-                    `Échec — ${err instanceof Error ? err.message : String(err)}`,
-                  );
-                } finally {
-                  setPausing(false);
-                  setModal(null);
-                }
+                void (async () => {
+                  try {
+                    await api.pauseWorkflow(projectId);
+                    showToast("Workflow mis en pause");
+                  } catch (err) {
+                    showToast(
+                      `Échec — ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                  } finally {
+                    setPausing(false);
+                    setModal(null);
+                  }
+                })();
               }}
             >
               {pausing ? "…" : "Pauser"}
             </button>
           </>
         }
-        onClose={() => setModal(null)}
+        onClose={() => { setModal(null); }}
       />
 
       <Modal
@@ -1006,7 +1008,7 @@ export function SettingsPage() {
         }
         foot={
           <>
-            <button className="btn ghost" onClick={() => setModal(null)}>
+            <button className="btn ghost" onClick={() => { setModal(null); }}>
               Annuler
             </button>
             <button
@@ -1020,7 +1022,7 @@ export function SettingsPage() {
             </button>
           </>
         }
-        onClose={() => setModal(null)}
+        onClose={() => { setModal(null); }}
       />
 
       <Modal
@@ -1046,37 +1048,39 @@ export function SettingsPage() {
               className="input mono"
               placeholder={data.name}
               value={deleteConfirmName}
-              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              onChange={(e) => { setDeleteConfirmName(e.target.value); }}
               autoFocus
             />
           </>
         }
         foot={
           <>
-            <button className="btn ghost" onClick={() => setModal(null)}>
+            <button className="btn ghost" onClick={() => { setModal(null); }}>
               Annuler
             </button>
             <button
               className="btn danger solid"
               disabled={deleteConfirmName !== data.name}
-              onClick={async () => {
+              onClick={() => {
                 setModal(null);
-                try {
-                  await store.remove(project.id);
-                  showToast("Projet supprimé");
-                  navigate("/projects");
-                } catch (err) {
-                  showToast(
-                    `Échec — ${err instanceof Error ? err.message : String(err)}`,
-                  );
-                }
+                void (async () => {
+                  try {
+                    await store.remove(project.id);
+                    showToast("Projet supprimé");
+                    await navigate("/projects");
+                  } catch (err) {
+                    showToast(
+                      `Échec — ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                  }
+                })();
               }}
             >
               <Icon.Trash width="11" height="11" /> Supprimer définitivement
             </button>
           </>
         }
-        onClose={() => setModal(null)}
+        onClose={() => { setModal(null); }}
       />
 
       <Modal
@@ -1096,7 +1100,7 @@ export function SettingsPage() {
                 className="input"
                 placeholder="filesystem-mcp"
                 value={mcpForm.name}
-                onChange={(e) => setMcpForm({ ...mcpForm, name: e.target.value })}
+                onChange={(e) => { setMcpForm({ ...mcpForm, name: e.target.value }); }}
               />
             </div>
             <div className="field">
@@ -1105,7 +1109,7 @@ export function SettingsPage() {
                 className="select"
                 value={mcpForm.type}
                 onChange={(e) =>
-                  setMcpForm({ ...mcpForm, type: e.target.value as McpServer["type"] })
+                  { setMcpForm({ ...mcpForm, type: e.target.value as McpServer["type"] }); }
                 }
               >
                 <option value="stdio">stdio</option>
@@ -1119,7 +1123,7 @@ export function SettingsPage() {
                 className="input mono"
                 placeholder="npx @mcp/filesystem ./src"
                 value={mcpForm.command}
-                onChange={(e) => setMcpForm({ ...mcpForm, command: e.target.value })}
+                onChange={(e) => { setMcpForm({ ...mcpForm, command: e.target.value }); }}
               />
             </div>
             <div
@@ -1129,7 +1133,7 @@ export function SettingsPage() {
               <span>Activé pour ce projet</span>
               <Toggle
                 on={mcpForm.enabled}
-                onChange={(v) => setMcpForm({ ...mcpForm, enabled: v })}
+                onChange={(v) => { setMcpForm({ ...mcpForm, enabled: v }); }}
                 ariaLabel="Activé"
               />
             </div>
@@ -1137,19 +1141,19 @@ export function SettingsPage() {
         }
         foot={
           <>
-            <button className="btn ghost" onClick={() => setModal(null)}>
+            <button className="btn ghost" onClick={() => { setModal(null); }}>
               Annuler
             </button>
             <button
               className="btn primary"
-              onClick={addMcp}
+              onClick={() => { void addMcp(); }}
               disabled={!mcpForm.name || !mcpForm.command || !draft}
             >
               <Icon.Plus width="11" height="11" /> Ajouter
             </button>
           </>
         }
-        onClose={() => setModal(null)}
+        onClose={() => { setModal(null); }}
       />
     </div>
   );

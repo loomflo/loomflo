@@ -28,13 +28,13 @@ function fmtClock(ts: number): string {
 
 function fmtAgo(ms: number): string {
   const sec = Math.max(0, Math.round(ms / 1000));
-  if (sec < 60) return `il y a ${sec}s`;
+  if (sec < 60) return `il y a ${String(sec)}s`;
   const m = Math.floor(sec / 60);
-  if (m < 60) return `il y a ${m} min`;
+  if (m < 60) return `il y a ${String(m)} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `il y a ${h}h`;
+  if (h < 24) return `il y a ${String(h)}h`;
   const d = Math.floor(h / 24);
-  return `il y a ${d}j`;
+  return `il y a ${String(d)}j`;
 }
 
 /* ============================================================================
@@ -48,8 +48,10 @@ function renderInline(text: string): ReactNode {
   while (rest.length > 0) {
     const boldMatch = rest.match(/^(.*?)\*\*([^*]+)\*\*/);
     const codeMatch = rest.match(/^(.*?)`([^`]+)`/);
+    const boldIdx = boldMatch?.index ?? Number.POSITIVE_INFINITY;
+    const codeIdx = codeMatch?.index ?? Number.POSITIVE_INFINITY;
     const next =
-      boldMatch && (!codeMatch || boldMatch.index! <= codeMatch.index!)
+      boldMatch && boldIdx <= codeIdx
         ? { type: "bold" as const, m: boldMatch }
         : codeMatch
           ? { type: "code" as const, m: codeMatch }
@@ -231,7 +233,7 @@ function HistoryDrawer({
               type="text"
               placeholder="Rechercher une action…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); }}
             />
           </div>
           <div className="lc-drawer-tabs">
@@ -240,7 +242,7 @@ function HistoryDrawer({
                 key={f}
                 className="lc-drawer-tab"
                 data-active={filter === f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); }}
               >
                 {f === "all" ? "Tout" : f === "loom" ? "Loom" : "Toi"}
               </button>
@@ -288,7 +290,7 @@ function ConfirmModal({
   if (!open) return null;
   return (
     <div className="lc-modal-bg" onClick={onCancel}>
-      <div className="lc-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="lc-modal" onClick={(e) => { e.stopPropagation(); }}>
         <div className="head">
           <div className="ic">
             <Icon.AlertTriangle width="20" height="20" />
@@ -335,9 +337,9 @@ export function LoomChatPanel({
   focusToken,
   onApplyAction,
 }: LoomChatPanelProps) {
-  const [messages, setMessages] = useState<SeedMessage[]>(initialMessages);
-  const [history] = useState<SeedHistoryEntry[]>(initialHistory);
-  const [streamingText, setStreamingText] = useState<string>("");
+  const [messages, setMessages] = useState(initialMessages);
+  const [history] = useState(initialHistory);
+  const [streamingText, setStreamingText] = useState("");
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<BrainResponse | null>(null);
@@ -352,7 +354,7 @@ export function LoomChatPanel({
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(96, el.scrollHeight) + "px";
+    el.style.height = `${String(Math.min(96, el.scrollHeight))}px`;
   }, [input]);
 
   useEffect(() => {
@@ -461,7 +463,7 @@ export function LoomChatPanel({
           <button
             className="lc-mini-btn"
             data-active={historyOpen}
-            onClick={() => setHistoryOpen((o) => !o)}
+            onClick={() => { setHistoryOpen((o) => !o); }}
             aria-label="Timeline des actions"
             title="Timeline des actions"
           >
@@ -508,7 +510,7 @@ export function LoomChatPanel({
       <div className="lc-composer">
         <div className="lc-suggestions">
           {suggestions.slice(0, 4).map((s, i) => (
-            <button key={i} className="lc-chip" onClick={() => setInput(s)}>
+            <button key={i} className="lc-chip" onClick={() => { setInput(s); }}>
               <Icon.Sparkles width="11" height="11" /> {s}{" "}
               <Icon.ChevronRight className="arrow" width="11" height="11" />
             </button>
@@ -521,7 +523,7 @@ export function LoomChatPanel({
             rows={1}
             placeholder="Demande à Loom de modifier le workflow…"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); }}
             onKeyDown={onKeyDown}
           />
           <button
@@ -547,13 +549,13 @@ export function LoomChatPanel({
       <HistoryDrawer
         open={historyOpen}
         history={history}
-        onClose={() => setHistoryOpen(false)}
+        onClose={() => { setHistoryOpen(false); }}
       />
 
       <ConfirmModal
         open={!!pendingConfirm}
         target={pendingConfirm?.actionCardTarget ?? ""}
-        onCancel={() => setPendingConfirm(null)}
+        onCancel={() => { setPendingConfirm(null); }}
         onConfirm={() => {
           if (pendingConfirm) {
             const id = "lo_" + Math.random().toString(36).slice(2, 9);
