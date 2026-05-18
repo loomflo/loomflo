@@ -27,6 +27,7 @@ interface ResonanceMode {
   id: "light" | "medium" | "deep";
   label: string;
   tag: string;
+  /** Heuristic target number of Loom replies before the launch CTA unlocks. */
   questions: number;
   desc: string;
 }
@@ -37,133 +38,18 @@ const RESONANCE_MODES: ResonanceMode[] = [
   { id: "deep", label: "Profond", tag: "10+ questions", questions: 11, desc: "Exploration exhaustive." },
 ];
 
-interface Question {
-  q: string;
-  suggestions: string[];
-}
-interface PlanQuestion extends Question {
-  category: string;
-}
-
-const QUESTION_POOL: Record<string, Question[]> = {
-  scope: [
-    {
-      q: "Quel est le **périmètre minimum viable** ? Ce que le projet doit absolument faire dès la v1.",
-      suggestions: ["MVP très réduit", "Tout l'essentiel", "Je n'ai pas encore tranché"],
-    },
-    {
-      q: "Y a-t-il des features que tu veux **explicitement exclure** pour cette première itération ?",
-      suggestions: ["Pas d'auth pour l'instant", "Pas de paiement", "Rien à exclure"],
-    },
-  ],
-  users: [
-    {
-      q: "À **quel utilisateur** s'adresse ce projet ? Décris une persona type si possible.",
-      suggestions: ["Moi-même", "Une équipe interne", "Grand public"],
-    },
-    {
-      q: "Combien d'**utilisateurs simultanés** anticipes-tu sur les 6 premiers mois ?",
-      suggestions: ["Quelques dizaines", "Quelques centaines", "Pas critique"],
-    },
-  ],
-  stack: [
-    {
-      q: "As-tu une **préférence pour la stack technique** ? Sinon je pars sur React + Node.",
-      suggestions: ["React + Node", "Next.js", "À toi de décider"],
-    },
-    {
-      q: "Y a-t-il des **contraintes d'hébergement** (auto-hébergé, cloud spécifique, edge) ?",
-      suggestions: ["Vercel / cloud public", "Auto-hébergé", "Aucune contrainte"],
-    },
-  ],
-  data: [
-    {
-      q: "Quels **types de données** doivent être stockés ? Sensibles, volumineuses, structurées ?",
-      suggestions: ["Données utilisateur classiques", "Documents / fichiers", "Pas de stockage critique"],
-    },
-    {
-      q: "Y a-t-il des exigences **RGPD ou de souveraineté** des données ?",
-      suggestions: ["RGPD strict", "Nice-to-have", "Aucune"],
-    },
-  ],
-  ux: [
-    {
-      q: "Quel est le **flow utilisateur principal** que tu vises ? Décris-le en quelques étapes.",
-      suggestions: ["Voir un exemple", "Plusieurs flows en parallèle", "Encore flou"],
-    },
-    {
-      q: "Y a-t-il un **design existant** ou une référence esthétique à respecter ?",
-      suggestions: ["Linear-like", "Notion-like", "Pas de réf précise"],
-    },
-  ],
-  deadline: [
-    {
-      q: "Quelle est ta **deadline** ou la cadence souhaitée pour livrer la v1 ?",
-      suggestions: ["Cette semaine", "Ce mois-ci", "Pas de pression"],
-    },
-  ],
-  constraints: [
-    {
-      q: "Y a-t-il des **contraintes budgétaires** ou techniques à connaître dès maintenant ?",
-      suggestions: ["Budget serré", "Stack imposée", "Aucune"],
-    },
-  ],
-};
-
-const ORDER_BY_MODE: Record<ResonanceMode["id"], string[]> = {
-  light: ["scope", "deadline"],
-  medium: ["scope", "users", "stack", "ux", "deadline"],
-  deep: [
-    "scope",
-    "scope",
-    "users",
-    "users",
-    "stack",
-    "data",
-    "ux",
-    "ux",
-    "deadline",
-    "constraints",
-    "constraints",
-  ],
-};
-
-function buildQuestionPlan(mode: ResonanceMode["id"]): PlanQuestion[] {
-  const order = ORDER_BY_MODE[mode];
-  const seen: Record<string, number> = {};
-  const plan: PlanQuestion[] = [];
-  for (const cat of order) {
-    seen[cat] = seen[cat] ?? 0;
-    const pool = QUESTION_POOL[cat];
-    if (!pool) continue;
-    const item = pool[seen[cat] % pool.length];
-    if (!item) continue;
-    seen[cat] += 1;
-    plan.push({ category: cat, ...item });
-  }
-  return plan;
-}
-
-const TRANSITIONS = ["Compris.", "Noté.", "Ok, ça m'aide.", "Bien. Continuons.", "Parfait, je note ça."];
 const THINKING_LABELS = [
   "Loom analyse…",
   "Loom rédige…",
   "Loom réfléchit…",
   "Loom structure sa réponse…",
 ];
-const FEATURE_ANALYSIS = [
-  "Lecture de l'arborescence du projet",
-  "Identification des patterns et conventions",
-  "Analyse des dépendances et de l'architecture",
-];
-const FEATURE_REPORT_MD = `Analyse terminée. Voici ce que j'ai identifié :
 
-- **Stack** : React 19 + Vite, TypeScript strict
-- **Framework** : React Router v7, Tailwind v4
-- **Patterns** : composants atomiques dans \`src/components/ui/\`, store via \`projectStore\`
-- **Couverture tests** : ~62% (vitest)
+const WELCOME_TEXT = `Salut. Je suis **Loom**, l'architecte. Mon job : **clarifier ta vision** avant que les agents génèrent la spec.
 
-Maintenant, quelques questions sur la **nouvelle feature** :`;
+Décris-moi ton projet en quelques phrases — je te poserai ensuite des questions ciblées pour cadrer le tout.`;
+
+const OFFLINE_NOTICE = `Daemon non connecté. Lance \`loomflo daemon\` et reviens sur ce projet pour démarrer le brainstorming avec Loom.`;
 
 /* ============================================================================
    Tiny markdown renderer (paragraphs, **bold**, *italic*, `code`, lists, h2/h3)
@@ -255,16 +141,8 @@ interface BsMessage {
   ts: number;
 }
 
-interface AnalysisLine {
-  label: string;
-  done: boolean;
-  key: string;
-}
-
 interface PersistedState {
   messages: BsMessage[];
-  questionsAsked: number;
-  analysis: AnalysisLine[];
 }
 
 function formatTime(ts: number): string {
@@ -468,8 +346,10 @@ export function BrainstormPage() {
   const [projectType] = useState<"scratch" | "feature">("scratch");
 
   const [resonance, setResonance] = useState<ResonanceMode["id"]>("medium");
-  const plan = useMemo(() => buildQuestionPlan(resonance), [resonance]);
-  const totalQ = plan.length;
+  const targetExchanges = useMemo(
+    () => RESONANCE_MODES.find((m) => m.id === resonance)?.questions ?? 5,
+    [resonance],
+  );
 
   const initialState = useMemo<PersistedState | null>(() => {
     if (!projectId) return null;
@@ -483,7 +363,6 @@ export function BrainstormPage() {
   }, [projectId]);
 
   const [messages, setMessages] = useState(initialState?.messages ?? []);
-  const [questionsAsked, setQuestionsAsked] = useState(initialState?.questionsAsked ?? 0);
   const [thinking, setThinking] = useState(false);
   const [thinkingLabel, setThinkingLabel] = useState(THINKING_LABELS[0] ?? "Loom réfléchit…");
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -498,24 +377,24 @@ export function BrainstormPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [stickyScroll, setStickyScroll] = useState(true);
-  const [analysis, setAnalysis] = useState(initialState?.analysis ?? []);
-  const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const streamTimerRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const loomMessageCount = useMemo(
+    () => messages.filter((m) => m.from === "loom").length,
+    [messages],
+  );
+
   useEffect(() => {
     if (!projectId) return;
     try {
-      localStorage.setItem(
-        bsKey(projectId),
-        JSON.stringify({ messages, questionsAsked, analysis }),
-      );
+      localStorage.setItem(bsKey(projectId), JSON.stringify({ messages }));
     } catch {
       /* localStorage unavailable */
     }
-  }, [messages, questionsAsked, analysis, projectId]);
+  }, [messages, projectId]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -528,6 +407,7 @@ export function BrainstormPage() {
     setStreamingText("");
     setStreamingFull(fullText);
     let i = 0;
+    // ~40 chars/sec — matches the streaming UX from the constitution.
     const stepMs = 25;
     const tick = () => {
       i = Math.min(i + 1, fullText.length);
@@ -560,7 +440,7 @@ export function BrainstormPage() {
     if (!stickyScroll) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streamingText, thinking, analysis, stickyScroll]);
+  }, [messages, streamingText, thinking, stickyScroll]);
 
   const onScroll = (e: UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -568,94 +448,42 @@ export function BrainstormPage() {
     setStickyScroll(dist < 60);
   };
 
-  const askNextQuestion = useCallback(
-    (atIdx: number, currentPlan: PlanQuestion[]) => {
-      const item = currentPlan[atIdx];
-      if (!item) return;
-      setThinking(true);
-      setThinkingLabel(
-        THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
-      );
-      window.setTimeout(
-        () => {
-          setThinking(false);
-          const intro =
-            atIdx > 0
-              ? (TRANSITIONS[Math.floor(Math.random() * TRANSITIONS.length)] ?? "") + " "
-              : "";
-          beginStream(`${intro}${item.q}`, () => {
-            setQuestionsAsked((n) => n + 1);
-          });
-          setCurrentSuggestions(item.suggestions);
-        },
-        700 + Math.random() * 500,
-      );
-    },
-    [beginStream],
-  );
-
-  const runIntroSequence = useCallback(
-    (type: "scratch" | "feature") => {
-      if (type === "feature") {
-        window.setTimeout(() => {
-          setThinking(true);
-          setThinkingLabel("Loom analyse le projet existant…");
-          window.setTimeout(() => {
-            setThinking(false);
-            beginStream(
-              `Avant de te poser des questions, je vais analyser ton projet existant à \`${
-                project?.projectPath ?? ""
-              }\`.`,
-              () => {
-                FEATURE_ANALYSIS.forEach((label, idx) => {
-                  window.setTimeout(() => {
-                    setAnalysis((a) => [...a, { label, done: false, key: `a_${String(idx)}` }]);
-                  }, idx * 900);
-                  window.setTimeout(
-                    () => {
-                      setAnalysis((a) =>
-                        a.map((it) => (it.key === `a_${String(idx)}` ? { ...it, done: true } : it)),
-                      );
-                    },
-                    idx * 900 + 850,
-                  );
-                });
-                window.setTimeout(
-                  () => {
-                    setThinking(true);
-                    setThinkingLabel("Loom rédige le compte-rendu…");
-                    window.setTimeout(() => {
-                      setThinking(false);
-                      beginStream(FEATURE_REPORT_MD, () => { askNextQuestion(0, plan); });
-                    }, 800);
-                  },
-                  FEATURE_ANALYSIS.length * 900 + 600,
-                );
-              },
-            );
-          }, 700);
-        }, 250);
-      } else {
-        window.setTimeout(() => {
-          setThinking(true);
-          setThinkingLabel(THINKING_LABELS[0] ?? "Loom réfléchit…");
-          window.setTimeout(() => {
-            setThinking(false);
-            beginStream(
-              `Salut. Je suis **Loom**, l'architecte. Mon job : **clarifier ta vision** avant que les agents génèrent la spec.\n\nDécris-moi ton projet en quelques phrases — je vais ensuite te poser quelques questions ciblées pour cadrer le tout.`,
-            );
-          }, 700);
-        }, 250);
-      }
-    },
-    [askNextQuestion, beginStream, plan, project?.projectPath],
-  );
-
+  // Hydrate from /chat/history on first mount when authenticated, falling back
+  // to the persisted localStorage transcript if the daemon has nothing yet.
   useEffect(() => {
-    if (hasBootstrapped) return;
+    if (hasBootstrapped || !projectId) return;
     setHasBootstrapped(true);
-    runIntroSequence(projectType);
-  }, []);
+    if (!token) {
+      // No daemon connection — show offline notice once and stop.
+      beginStream(OFFLINE_NOTICE);
+      return;
+    }
+    let cancelled = false;
+    void api
+      .getChatHistory(projectId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.messages.length === 0) {
+          beginStream(WELCOME_TEXT);
+          return;
+        }
+        setMessages(
+          res.messages.map((entry, idx) => ({
+            id: `h_${String(idx)}`,
+            from: entry.role === "user" ? "user" : "loom",
+            text: entry.content,
+            ts: new Date(entry.timestamp).getTime(),
+          })),
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        beginStream(WELCOME_TEXT);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasBootstrapped, projectId, token, api, beginStream]);
 
   const submit = (text: string) => {
     const trimmed = text.trim();
@@ -665,84 +493,44 @@ export function BrainstormPage() {
       { id: "u_" + Math.random().toString(36).slice(2, 9), from: "user", text: trimmed, ts: Date.now() },
     ]);
     setInputVal("");
-    setCurrentSuggestions([]);
-    const idx = questionsAsked;
-    if (idx < plan.length) {
-      window.setTimeout(() => { askNextQuestion(idx, plan); }, 350);
+
+    if (!token || !projectId) {
+      beginStream(OFFLINE_NOTICE);
       return;
     }
 
-    // Open-dialogue phase: if we have a daemon connection, route the
-    // user's free-form message through POST /chat. Otherwise fall back
-    // to the scripted closing message.
-    if (token && projectId) {
-      setThinking(true);
-      setThinkingLabel(
-        THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
-      );
-      api
-        .postChat(projectId, trimmed)
-        .then((res) => {
-          setThinking(false);
-          beginStream(res.response);
-        })
-        .catch((err: unknown) => {
-          setThinking(false);
-          beginStream(
-            `Loom n'a pas répondu — ${
-              err instanceof Error ? err.message : String(err)
-            }. On peut continuer en local ou réessayer.`,
-          );
-        });
-      return;
-    }
-
-    window.setTimeout(() => {
-      setThinking(true);
-      setThinkingLabel(
-        THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
-      );
-      window.setTimeout(() => {
+    setThinking(true);
+    setThinkingLabel(
+      THINKING_LABELS[Math.floor(Math.random() * THINKING_LABELS.length)] ?? "Loom réfléchit…",
+    );
+    api
+      .postChat(projectId, trimmed)
+      .then((res) => {
+        setThinking(false);
+        beginStream(res.response);
+      })
+      .catch((err: unknown) => {
         setThinking(false);
         beginStream(
-          `Bien noté. On a couvert l'essentiel — tu peux **lancer la génération de la spec** quand tu es prêt, ou continuer à approfondir ici.\n\nUn point que tu voudrais creuser ?`,
+          `Loom n'a pas répondu — ${
+            err instanceof Error ? err.message : String(err)
+          }.`,
         );
-      }, 700);
-    }, 300);
+      });
   };
 
   const onResonanceChange = (id: ResonanceMode["id"]) => {
     if (id === resonance) return;
-    const newPlan = buildQuestionPlan(id);
     setResonance(id);
-    if (questionsAsked > 0) {
-      const remaining = Math.max(0, newPlan.length - questionsAsked);
-      window.setTimeout(() => {
-        beginStream(
-          `Mode ajusté à **${
-            RESONANCE_MODES.find((m) => m.id === id)?.label.toLowerCase() ?? ""
-          }**. Je vais ${
-            remaining > 0
-              ? `poser ${String(remaining)} question${remaining > 1 ? "s" : ""} supplémentaire${
-                  remaining > 1 ? "s" : ""
-                }`
-              : "arrêter de poser des questions, tu as déjà ce qu'il faut"
-          }.`,
-        );
-      }, 200);
-    }
   };
 
   const doReset = () => {
     if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
     setMessages([]);
-    setQuestionsAsked(0);
     setStreamingId(null);
     setStreamingText("");
     setStreamingFull("");
     setThinking(false);
-    setAnalysis([]);
-    setCurrentSuggestions([]);
     setHasBootstrapped(false);
     if (projectId) {
       try {
@@ -753,10 +541,6 @@ export function BrainstormPage() {
     }
     setConfirmReset(false);
     showToast("Conversation réinitialisée");
-    window.setTimeout(() => {
-      setHasBootstrapped(true);
-      runIntroSequence(projectType);
-    }, 200);
   };
 
   const launchSpec = () => {
@@ -807,7 +591,7 @@ export function BrainstormPage() {
     );
   }
 
-  const ready = questionsAsked >= plan.length && !streamingId && !thinking;
+  const ready = loomMessageCount >= targetExchanges && !streamingId && !thinking;
 
   return (
     <div className="bs-app">
@@ -864,22 +648,6 @@ export function BrainstormPage() {
               {messages.map((m) => (
                 <MessageRow key={m.id} msg={m} />
               ))}
-
-              {analysis.length > 0 && (
-                <div className="bs-msg-row" data-from="system">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {analysis.map((a) => (
-                      <div className="bs-analyze-line" key={a.key} data-done={a.done}>
-                        <span className="spinner" />
-                        <span>
-                          {a.label}
-                          {a.done ? "" : "…"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {streamingId && (
                 <div className="bs-msg-row" data-from="loom">
@@ -942,20 +710,6 @@ export function BrainstormPage() {
           )}
 
           <div className="bs-composer">
-            {currentSuggestions.length > 0 && !streamingId && !thinking && (
-              <div className="bs-suggestions">
-                {currentSuggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    className="bs-chip"
-                    onClick={() => { setInputVal((v) => (v ? v + " " + s : s)); }}
-                  >
-                    {s} <span className="arrow">→</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             <div
               className="bs-input-wrap shimmer-host shimmer"
               data-phase="spec"
@@ -1059,16 +813,19 @@ export function BrainstormPage() {
 
               <div className="bs-progress">
                 <div className="bs-progress-row">
-                  <span>Questions posées</span>
+                  <span>Échanges avec Loom</span>
                   <span>
-                    <span className="num">{Math.min(questionsAsked, totalQ)}</span> / {totalQ}
+                    <span className="num">{Math.min(loomMessageCount, targetExchanges)}</span> /{" "}
+                    {targetExchanges}
                   </span>
                 </div>
                 <div className="bs-progress-bar">
                   <div
                     className="bs-progress-fill"
                     style={{
-                      width: `${String(Math.min(100, (questionsAsked / Math.max(1, totalQ)) * 100))}%`,
+                      width: `${String(
+                        Math.min(100, (loomMessageCount / Math.max(1, targetExchanges)) * 100),
+                      )}%`,
                     }}
                   />
                 </div>
@@ -1112,10 +869,10 @@ export function BrainstormPage() {
             </button>
             <span className="bs-launch-hint">
               {ready
-                ? "Loom a posé toutes ses questions. Tu peux continuer ou lancer."
-                : `Disponible après ${String(Math.max(0, totalQ - questionsAsked))} question${
-                    totalQ - questionsAsked > 1 ? "s" : ""
-                  } restante${totalQ - questionsAsked > 1 ? "s" : ""}.`}
+                ? "Tu as assez échangé pour cadrer la spec. Tu peux continuer ou lancer."
+                : `Encore ${String(Math.max(0, targetExchanges - loomMessageCount))} échange${
+                    targetExchanges - loomMessageCount > 1 ? "s" : ""
+                  } avant de pouvoir lancer la spec.`}
             </span>
           </div>
         </aside>
