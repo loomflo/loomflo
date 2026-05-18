@@ -154,11 +154,15 @@ describe("ProjectStoreProvider — online", () => {
 });
 
 describe("ProjectStoreProvider — offline (no token)", () => {
-  it("hydrates from local SEED_PROJECTS when no token", async () => {
+  it("renders an empty list when no token is available", async () => {
     token = null;
     api = makeFakeApi({});
+    const { result: storeResult } = renderHook(() => useProjectStore(), {
+      wrapper: ProjectStoreProvider,
+    });
+    await waitFor(() => expect(storeResult.current.loading).toBe(false));
     const { result } = renderHook(() => useProjects(), { wrapper: ProjectStoreProvider });
-    await waitFor(() => expect(result.current.length).toBeGreaterThan(0));
+    expect(result.current).toEqual([]);
   });
 
   it("create() appends a local-only project", async () => {

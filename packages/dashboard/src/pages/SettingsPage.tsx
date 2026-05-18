@@ -609,11 +609,9 @@ function AdvancedSection({ data, draft, setDraft, editing }: SectionEditProps) {
 
 function DangerSection({
   onPause,
-  onReset,
   onDelete,
 }: {
   onPause: () => void;
-  onReset: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -625,15 +623,6 @@ function DangerSection({
         </div>
         <button className="btn" onClick={onPause}>
           <Icon.Pause width="11" height="11" /> Pauser
-        </button>
-      </div>
-      <div className="st-danger-row">
-        <div>
-          <h4>Réinitialiser le workflow</h4>
-          <p>Efface l'état d'exécution (nœuds, edges, logs). La config reste intacte.</p>
-        </div>
-        <button className="btn danger" onClick={onReset}>
-          <Icon.RotateCcw width="11" height="11" /> Réinitialiser
         </button>
       </div>
       <div className="st-danger-row">
@@ -697,7 +686,7 @@ export function SettingsPage() {
   const [draft, setDraft] = useState<ProjectConfig | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<SectionDef["id"]>("general");
-  const [modal, setModal] = useState<"pause" | "reset" | "delete" | "mcp" | null>(null);
+  const [modal, setModal] = useState<"pause" | "delete" | "mcp" | null>(null);
   const [mcpForm, setMcpForm] = useState<McpServer>({
     name: "",
     type: "stdio",
@@ -850,7 +839,6 @@ export function SettingsPage() {
         return (
           <DangerSection
             onPause={() => { setModal("pause"); }}
-            onReset={() => { setModal("reset"); }}
             onDelete={() => {
               setDeleteConfirmName("");
               setModal("delete");
@@ -892,7 +880,7 @@ export function SettingsPage() {
         <div className="page-header-left">
           <h1>Configuration</h1>
           <div className="page-header-meta">
-            <span>Toutes les modifications sont enregistrées localement.</span>
+            <span>Synchronisée avec le daemon — chaque modification appelle le backend.</span>
           </div>
         </div>
         <div className="page-header-right">
@@ -988,37 +976,6 @@ export function SettingsPage() {
               }}
             >
               {pausing ? "…" : "Pauser"}
-            </button>
-          </>
-        }
-        onClose={() => { setModal(null); }}
-      />
-
-      <Modal
-        open={modal === "reset"}
-        icon={<Icon.RotateCcw width="16" height="16" />}
-        title={
-          <>
-            <h2>Réinitialiser le workflow ?</h2>
-            <p>
-              L'état d'exécution sera effacé : nœuds, edges, logs et historique. La configuration
-              de ce projet sera <strong>conservée</strong>.
-            </p>
-          </>
-        }
-        foot={
-          <>
-            <button className="btn ghost" onClick={() => { setModal(null); }}>
-              Annuler
-            </button>
-            <button
-              className="btn danger"
-              onClick={() => {
-                setModal(null);
-                showToast("Workflow réinitialisé");
-              }}
-            >
-              Réinitialiser
             </button>
           </>
         }
