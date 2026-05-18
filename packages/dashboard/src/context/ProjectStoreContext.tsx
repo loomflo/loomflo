@@ -309,7 +309,7 @@ export function ProjectStoreProvider({ children }: { children: ReactNode }) {
       get: (id) => projects.find((p) => p.id === id),
       create: async (partial) => {
         const name = partial.name ?? "nouveau-projet";
-        const projectPath = partial.projectPath ?? `/Users/adrien/dev/${name}`;
+        const projectPath = partial.projectPath ?? `~/${name}`;
         const id = makeProjectId();
         const meta: UiProjectMeta = {
           createdAt: new Date().toISOString(),

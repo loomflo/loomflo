@@ -39,8 +39,8 @@ interface ProjectConfig {
 const PROJECT_KEY = (id: string) => `loomflo.project.${id}`;
 
 const DEFAULT_CONFIG: ProjectConfig = {
-  name: "facture-flow",
-  folder: "/Users/adrien/projects/facture-flow",
+  name: "",
+  folder: "",
   template: "fullstack-saas",
   primaryProvider: "Anthropic API",
   level: { id: "standard", name: "Standard" },

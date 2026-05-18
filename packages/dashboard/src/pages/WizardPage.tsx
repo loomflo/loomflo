@@ -141,13 +141,13 @@ interface WizardDraft {
 
 const DEFAULT_DRAFT: WizardDraft = {
   step: 1,
-  folder: "/Users/adrien/projects/nouveau-projet",
+  folder: "",
   primaryProvider: null,
   level: "standard",
   advanced: { reviewer: true, maxRetries: 3, retryStrategy: "adaptive", maxWorkers: 4 },
   delayPreset: "10m",
   customDelay: { value: 30, unit: "minutes" },
-  name: "nouveau-projet",
+  name: "",
   type: "scratch",
 };
 
@@ -411,7 +411,7 @@ function Step1({ draft, setDraft }: StepProps) {
               className="input input--mono"
               value={draft.folder}
               onChange={(e) => { setDraft({ folder: e.target.value }); }}
-              placeholder="/Users/adrien/projects/mon-projet"
+              placeholder="~/projects/mon-projet"
               spellCheck={false}
               autoFocus
             />
@@ -880,8 +880,8 @@ function Step5({ draft, setDraft }: StepProps) {
         )}
         {draft.name.length === 0 && (
           <span className="field-help">
-            Slug-friendly. Ex: <code className="mono">facture-flow</code>,{" "}
-            <code className="mono">site-vitrine</code>.
+            Slug-friendly. Ex: <code className="mono">mon-projet</code>,{" "}
+            <code className="mono">api-service</code>.
           </span>
         )}
       </div>
