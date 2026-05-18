@@ -10,7 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { useStore } from "../context/ProjectStoreContext.js";
 import { useApi, useAppContext } from "../context/AppContext.js";
-import type { ProviderProfilePayload } from "../lib/types.js";
+import { useRuntimeAvailability } from "../hooks/useRuntimes.js";
+import type { AgentCliName, CliAvailability, ProviderProfilePayload } from "../lib/types.js";
 import { useTheme } from "../context/ThemeContext.js";
 import "./WizardPage.css";
 
@@ -73,39 +74,19 @@ const CLI_INFO: Record<
 };
 
 /* ============================================================================
-   Mock CLI detection (Phase B replaces with /runtimes/availability)
+   Live CLI detection — sourced from GET /runtimes/availability
    ============================================================================ */
 
-const CLI_DETECTION_KEY = "loomflo.cliDetection";
+type CliState = Partial<Record<CliAgentId, CliAvailability>>;
 
-interface CliDetect {
-  installed: boolean;
-  authenticated: boolean;
-  version?: string;
-}
-type CliState = Record<CliAgentId, CliDetect>;
+const EMPTY_CLI_AVAILABILITY: CliAvailability = { installed: false, authenticated: false };
 
-const DEFAULT_CLI_STATE: CliState = {
-  "claude-code": { installed: true, authenticated: true, version: "1.4.2" },
-  copilot: { installed: true, authenticated: false, version: "0.4.0" },
-  codex: { installed: false, authenticated: false },
-};
-
-function loadCliDetection(): CliState {
-  try {
-    const raw = localStorage.getItem(CLI_DETECTION_KEY);
-    if (raw) return { ...DEFAULT_CLI_STATE, ...(JSON.parse(raw) as Partial<CliState>) };
-  } catch {
-    /* localStorage unavailable */
-  }
-  return { ...DEFAULT_CLI_STATE };
-}
-function saveCliDetection(d: CliState): void {
-  try {
-    localStorage.setItem(CLI_DETECTION_KEY, JSON.stringify(d));
-  } catch {
-    /* localStorage unavailable */
-  }
+function asCliState(clis: Partial<Record<AgentCliName, CliAvailability>>): CliState {
+  return {
+    "claude-code": clis["claude-code"],
+    copilot: clis.copilot,
+    codex: clis.codex,
+  };
 }
 
 /* ============================================================================
@@ -283,8 +264,8 @@ function formatDelay(d: WizardDraft): string {
   };
   return `${String(d.customDelay.value)} ${labels[d.customDelay.unit]}`;
 }
-function detectCli(name: CliAgentId, state: CliState): CliDetect {
-  return state[name];
+function detectCli(name: CliAgentId, state: CliState): CliAvailability {
+  return state[name] ?? EMPTY_CLI_AVAILABILITY;
 }
 function providerIsValid(
   p: ProviderId,
@@ -1350,9 +1331,11 @@ export function WizardPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [cliState] = useState<CliState>(loadCliDetection);
   const [creds, setCreds] = useState<Record<ApiProviderId, string>>(() => loadCreds());
   const [created, setCreated] = useState<CreatedProject | null>(null);
+
+  const { clis: liveClis } = useRuntimeAvailability();
+  const cliState = useMemo<CliState>(() => asCliState(liveClis), [liveClis]);
 
   const setDraft = useCallback(
     (patch: Partial<WizardDraft> | ((d: WizardDraft) => WizardDraft)) => {
@@ -1368,9 +1351,6 @@ export function WizardPage() {
   useEffect(() => {
     setDraft({ step });
   }, [step, setDraft]);
-  useEffect(() => {
-    saveCliDetection(cliState);
-  }, [cliState]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
