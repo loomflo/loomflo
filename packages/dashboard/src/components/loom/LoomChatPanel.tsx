@@ -327,6 +327,19 @@ export interface LoomChatPanelProps {
   initialHistory?: SeedHistoryEntry[];
   focusToken?: number;
   onApplyAction?: (response: BrainResponse) => void;
+  /**
+   * When provided, user submissions are sent through this callback instead of
+   * going through the local intent detector. The string returned is streamed
+   * back as Loom's reply. Used by WorkflowPage to route messages through
+   * POST /chat.
+   */
+  onSendMessage?: (text: string) => Promise<string>;
+  /**
+   * When provided, displayed messages mirror this prop (controlled mode).
+   * Used by callers that already track chat history via useChat — the panel
+   * shows whatever they hand over rather than maintaining its own copy.
+   */
+  liveMessages?: SeedMessage[];
 }
 
 export function LoomChatPanel({
@@ -336,8 +349,18 @@ export function LoomChatPanel({
   initialHistory = [],
   focusToken,
   onApplyAction,
+  onSendMessage,
+  liveMessages,
 }: LoomChatPanelProps) {
-  const [messages, setMessages] = useState(initialMessages);
+  const controlled = liveMessages !== undefined;
+  const [localMessages, setLocalMessages] = useState(initialMessages);
+  const messages = controlled ? liveMessages : localMessages;
+  const setMessages = controlled
+    ? (_updater: SeedMessage[] | ((prev: SeedMessage[]) => SeedMessage[])): void => {
+        // Controlled mode: parent owns the message list — we cannot append.
+        void _updater;
+      }
+    : setLocalMessages;
   const [history] = useState(initialHistory);
   const [streamingText, setStreamingText] = useState("");
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -368,15 +391,54 @@ export function LoomChatPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, streamingText, thinking, stick]);
 
-  const handleSubmit = (text: string) => {
-    const userMsg: SeedMessage = {
-      id: "u_" + Math.random().toString(36).slice(2, 9),
-      from: "user",
-      ts: Date.now(),
-      text,
+  const streamReply = (reply: string, onDone?: () => void): void => {
+    const id = "lo_" + Math.random().toString(36).slice(2, 9);
+    setStreamingId(id);
+    setStreamingText("");
+    let acc = "";
+    let idx = 0;
+    const tick = () => {
+      acc += reply[idx] ?? "";
+      idx++;
+      setStreamingText(acc);
+      if (idx >= reply.length) {
+        clearInterval(handle);
+        setStreamingId(null);
+        setStreamingText("");
+        if (onDone) onDone();
+      }
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const handle = window.setInterval(tick, 25);
+  };
+
+  const handleSubmit = (text: string) => {
+    if (!controlled) {
+      const userMsg: SeedMessage = {
+        id: "u_" + Math.random().toString(36).slice(2, 9),
+        from: "user",
+        ts: Date.now(),
+        text,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+    }
     setThinking(true);
+
+    // Daemon-backed path: route to /chat via the supplied callback. The user
+    // and assistant messages are owned by the parent's useChat hook.
+    if (onSendMessage) {
+      void onSendMessage(text)
+        .then((reply) => {
+          setThinking(false);
+          streamReply(reply);
+        })
+        .catch((err: unknown) => {
+          setThinking(false);
+          streamReply(
+            `Loom n'a pas répondu — ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      return;
+    }
 
     const ctx: BrainContext = { nodes };
     const intent = detectIntent(text, ctx);
@@ -388,37 +450,21 @@ export function LoomChatPanel({
       return;
     }
 
-    const id = "lo_" + Math.random().toString(36).slice(2, 9);
-    setStreamingId(id);
-    setStreamingText("");
-
-    let acc = "";
-    let idx = 0;
-    const reply = response.reply;
-    const tick = () => {
-      acc += reply[idx] ?? "";
-      idx++;
-      setStreamingText(acc);
-      if (idx >= reply.length) {
-        clearInterval(handle);
-        setThinking(false);
-        setStreamingId(null);
-        setStreamingText("");
-        const loomMsg: SeedMessage = {
-          id,
-          from: "loom",
-          ts: Date.now(),
-          text: reply,
-          ...(response.actionCardLabel ? { actionCardLabel: response.actionCardLabel } : {}),
-          ...(response.actionCardTone ? { actionCardTone: response.actionCardTone } : {}),
-          ...(response.actionCardTarget ? { actionCardTarget: response.actionCardTarget } : {}),
-          ...(response.diff ? { diff: response.diff } : {}),
-        };
-        setMessages((prev) => [...prev, loomMsg]);
-        if (onApplyAction) onApplyAction(response);
-      }
-    };
-    const handle = window.setInterval(tick, 25);
+    streamReply(response.reply, () => {
+      setThinking(false);
+      const loomMsg: SeedMessage = {
+        id: "lo_" + Math.random().toString(36).slice(2, 9),
+        from: "loom",
+        ts: Date.now(),
+        text: response.reply,
+        ...(response.actionCardLabel ? { actionCardLabel: response.actionCardLabel } : {}),
+        ...(response.actionCardTone ? { actionCardTone: response.actionCardTone } : {}),
+        ...(response.actionCardTarget ? { actionCardTarget: response.actionCardTarget } : {}),
+        ...(response.diff ? { diff: response.diff } : {}),
+      };
+      setMessages((prev) => [...prev, loomMsg]);
+      if (onApplyAction) onApplyAction(response);
+    });
   };
 
   const submit = () => {

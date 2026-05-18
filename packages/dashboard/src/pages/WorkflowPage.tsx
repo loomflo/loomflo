@@ -250,7 +250,15 @@ export function WorkflowPage() {
   const { projects } = useProjectStore();
   const { theme, toggleTheme } = useTheme();
   const { workflow, loading, error } = useWorkflow(projectId ?? null);
-  const { messages: chatMessages } = useChat(projectId ?? null);
+  const { messages: chatMessages, send: sendChat } = useChat(projectId ?? null);
+
+  const onSendMessage = useCallback(
+    (text: string): Promise<string> => {
+      if (!projectId) return Promise.resolve("Daemon non connecté.");
+      return sendChat(text);
+    },
+    [sendChat, projectId],
+  );
 
   const project = useMemo(
     () => projects.find((p) => p.id === projectId) ?? null,
@@ -511,8 +519,10 @@ export function WorkflowPage() {
               workflowState={
                 isPaused ? "idle" : wfStatus === "running" ? "running" : "idle"
               }
-              initialMessages={chatHistoryToSeedMessages(chatMessages)}
+              initialMessages={[]}
               initialHistory={[]}
+              liveMessages={chatHistoryToSeedMessages(chatMessages)}
+              onSendMessage={onSendMessage}
             />
           </div>
         </aside>

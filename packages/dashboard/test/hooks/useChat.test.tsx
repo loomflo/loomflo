@@ -88,7 +88,7 @@ describe("useChat", () => {
     expect(result.current.messages).toHaveLength(1);
   });
 
-  it("captures errors from postChat into error state", async () => {
+  it("captures errors from postChat into error state and rejects", async () => {
     api = makeFakeApi({
       getChatHistory: () => Promise.resolve({ messages: [] }),
       postChat: () => Promise.reject(new Error("boom")),
@@ -97,7 +97,7 @@ describe("useChat", () => {
     const { result } = renderHook(() => useChat("p1"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
-      await result.current.send("ping");
+      await expect(result.current.send("ping")).rejects.toThrow("boom");
     });
     expect(result.current.error?.message).toBe("boom");
   });

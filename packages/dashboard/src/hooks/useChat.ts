@@ -15,7 +15,8 @@ export interface ChatResource {
   sending: boolean;
   loading: boolean;
   error: Error | null;
-  send: (message: string) => Promise<void>;
+  /** Sends a user message; resolves with the assistant's reply text. */
+  send: (message: string) => Promise<string>;
   refresh: () => Promise<void>;
 }
 
@@ -47,8 +48,8 @@ export function useChat(projectId: string | null | undefined): ChatResource {
   }, [refresh]);
 
   const send = useCallback(
-    async (message: string) => {
-      if (!projectId) return;
+    async (message: string): Promise<string> => {
+      if (!projectId) return "";
       setSending(true);
       setError(null);
       const optimistic: ChatHistoryEntry = {
@@ -65,8 +66,11 @@ export function useChat(projectId: string | null | undefined): ChatResource {
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistant]);
+        return res.response;
       } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
+        const error = err instanceof Error ? err : new Error(String(err));
+        setError(error);
+        throw error;
       } finally {
         setSending(false);
       }
