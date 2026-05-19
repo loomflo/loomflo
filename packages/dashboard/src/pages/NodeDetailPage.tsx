@@ -179,19 +179,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function InstructionsSection({
-  instructions,
-  onEdit,
-}: {
-  instructions: string;
-  onEdit: () => void;
-}) {
+function InstructionsSection({ instructions }: { instructions: string }) {
   return (
     <Section title="Instructions">
       <p className="nd-instructions">{instructions || "Aucune instruction définie."}</p>
-      <button className="btn ghost" onClick={onEdit}>
-        <Icon.Edit width="11" height="11" /> Modifier les instructions
-      </button>
     </Section>
   );
 }
@@ -363,39 +354,6 @@ function FullscreenLogs({ logs, onClose }: { logs: LogLine[]; onClose: () => voi
   );
 }
 
-function InstructionsModal({
-  initial,
-  onSave,
-  onClose,
-}: {
-  initial: string;
-  onSave: (next: string) => void;
-  onClose: () => void;
-}) {
-  const [val, setVal] = useState(initial);
-  return (
-    <div className="nd-modal-bg" onClick={onClose}>
-      <div className="nd-modal" onClick={(e) => { e.stopPropagation(); }} role="dialog">
-        <h3>Modifier les instructions</h3>
-        <textarea
-          className="nd-textarea"
-          value={val}
-          onChange={(e) => { setVal(e.target.value); }}
-          rows={6}
-        />
-        <div className="nd-modal-actions">
-          <button className="btn ghost" onClick={onClose}>
-            Annuler
-          </button>
-          <button className="btn primary" onClick={() => { onSave(val); }}>
-            <Icon.Check width="11" height="11" /> Enregistrer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function NodeFooter({
   status,
   onAction,
@@ -445,7 +403,6 @@ export function NodeDetailPage() {
   const { workflow } = useWorkflow(projectId ?? null);
   const { node, loading, error, live } = useNode(projectId ?? null, nodeId ?? null);
 
-  const [editing, setEditing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState(false);
@@ -498,17 +455,6 @@ export function NodeDetailPage() {
     [api, projectId, showToast],
   );
 
-  const onSaveInstructions = useCallback(
-    (next: string) => {
-      // Per-node instruction editing is not yet exposed by the daemon — we
-      // only echo the change locally and toast so the user knows the limit.
-      void next;
-      setEditing(false);
-      showToast("L'API ne supporte pas encore l'édition d'instructions — Phase C");
-    },
-    [showToast],
-  );
-
   // Aggregate live runtime session events into a tail of log lines.
   const logs = useMemo<LogLine[]>(() => {
     return live.sessionEvents
@@ -519,7 +465,6 @@ export function NodeDetailPage() {
 
   // Reset transient UI state when the node changes.
   useEffect(() => {
-    setEditing(false);
     setFullscreen(false);
   }, [nodeId]);
 
@@ -622,10 +567,7 @@ export function NodeDetailPage() {
           </dl>
         </div>
 
-        <InstructionsSection
-          instructions={node.instructions}
-          onEdit={() => { setEditing(true); }}
-        />
+        <InstructionsSection instructions={node.instructions} />
         <DependenciesSection parents={parents} />
         <AgentsSection agents={node.agents} />
         <ToolsSection tools={tools} writeGlobs={writeGlobs} />
@@ -639,14 +581,6 @@ export function NodeDetailPage() {
       </div>
 
       <NodeFooter status={ui} onAction={(kind) => { void onAction(kind); }} pending={actionPending} />
-
-      {editing && (
-        <InstructionsModal
-          initial={node.instructions}
-          onSave={onSaveInstructions}
-          onClose={() => { setEditing(false); }}
-        />
-      )}
 
       {fullscreen && <FullscreenLogs logs={logs} onClose={() => { setFullscreen(false); }} />}
 
