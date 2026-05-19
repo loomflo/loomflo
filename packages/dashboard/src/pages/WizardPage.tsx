@@ -1419,21 +1419,43 @@ export function WizardPage() {
     setCreateError(null);
     try {
       const provider = draft.primaryProvider;
+      // Pick a credential name that matches the chosen provider so the daemon
+      // can resolve it. API keys → name = provider id ("anthropic", "openai",
+      // ...). Claude Code OAuth → name = "claude-code". Copilot/Codex CLIs
+      // don't have a registered credential type yet, so we fall back to
+      // "default" and let the daemon return provider_missing_credentials if
+      // none exists.
       const providerProfileId =
-        provider && isApiProvider(provider) ? provider : "default";
+        provider && isApiProvider(provider)
+          ? provider
+          : provider === "claude-code"
+            ? "claude-code"
+            : "default";
 
-      // When the user typed an API key in the wizard and we have a daemon
-      // token, push the credential first so POST /projects can attach it.
-      if (token && provider && isApiProvider(provider) && creds[provider]) {
-        const payload = buildProviderPayload(provider, creds[provider]);
-        try {
-          await api.upsertCredential(provider, payload);
-        } catch (err) {
-          throw new Error(
-            `Échec de l'enregistrement de la clé ${provider} — ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
+      if (token && provider) {
+        if (isApiProvider(provider) && creds[provider]) {
+          // API-key provider: push the credential before creating the project.
+          try {
+            await api.upsertCredential(provider, buildProviderPayload(provider, creds[provider]));
+          } catch (err) {
+            throw new Error(
+              `Échec de l'enregistrement de la clé ${provider} — ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        } else if (provider === "claude-code") {
+          // Claude Code OAuth: register an oauth credential so the daemon's
+          // profile lookup succeeds. The actual auth happens via the CLI.
+          try {
+            await api.upsertCredential("claude-code", { type: "anthropic-oauth" });
+          } catch (err) {
+            throw new Error(
+              `Échec de l'enregistrement du profil Claude Code — ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
         }
       }
 
