@@ -377,6 +377,7 @@ export function BrainstormPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [stickyScroll, setStickyScroll] = useState(true);
+  const [launching, setLaunching] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const streamTimerRef = useRef<number | null>(null);
@@ -543,14 +544,69 @@ export function BrainstormPage() {
     showToast("Conversation réinitialisée");
   };
 
+  const buildDescription = useCallback((): string => {
+    // Concatenate the user-side conversation as the spec brief. Loom's own
+    // replies are excluded so the description stays focused on the user's
+    // intent — the daemon's spec agent will re-read history via /chat if
+    // it needs more context.
+    const userText = messages
+      .filter((m) => m.from === "user")
+      .map((m) => m.text.trim())
+      .filter(Boolean)
+      .join("\n\n");
+    if (userText) return userText;
+    return project ? `Projet ${project.name}` : "Nouveau projet";
+  }, [messages, project]);
+
   const launchSpec = () => {
     setConfirmLaunch(false);
-    showToast("Génération de spec lancée — redirection vers /workflow");
-    if (projectId) void navigate(`/projects/${projectId}/workflow`);
+    if (!projectId || !project) return;
+    if (!token) {
+      showToast("Daemon non connecté — impossible de lancer la spec");
+      return;
+    }
+    setLaunching(true);
+    void api
+      .initWorkflow(projectId, {
+        description: buildDescription(),
+        projectPath: project.projectPath,
+      })
+      .then(() => {
+        showToast("Génération de spec lancée");
+        void navigate(`/projects/${projectId}/workflow`);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(`Échec — ${msg}`);
+      })
+      .finally(() => {
+        setLaunching(false);
+      });
   };
+
   const skipBrainstorm = () => {
     setConfirmSkip(false);
-    if (projectId) void navigate(`/projects/${projectId}/workflow`);
+    if (!projectId || !project) return;
+    if (!token) {
+      void navigate(`/projects/${projectId}/workflow`);
+      return;
+    }
+    setLaunching(true);
+    void api
+      .initWorkflow(projectId, {
+        description: buildDescription(),
+        projectPath: project.projectPath,
+      })
+      .then(() => {
+        void navigate(`/projects/${projectId}/workflow`);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(`Échec — ${msg}`);
+      })
+      .finally(() => {
+        setLaunching(false);
+      });
   };
 
   const onTextareaKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -862,10 +918,11 @@ export function BrainstormPage() {
           <div className="bs-launch" data-ready={ready}>
             <button
               className="bs-launch-btn"
-              disabled={!ready}
+              disabled={!ready || launching}
               onClick={() => { setConfirmLaunch(true); }}
             >
-              <Icon.Sparkles width="14" height="14" /> Lancer la génération de la spec
+              <Icon.Sparkles width="14" height="14" />{" "}
+              {launching ? "Lancement…" : "Lancer la génération de la spec"}
             </button>
             <span className="bs-launch-hint">
               {ready
