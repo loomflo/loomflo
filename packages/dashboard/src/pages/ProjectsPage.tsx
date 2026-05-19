@@ -489,7 +489,6 @@ interface TopBarProps {
   onSelectProject: (project: UiProject) => void;
   onAllProjects: () => void;
   onOpenCommand: () => void;
-  onOpenWizard?: () => void;
 }
 
 export function TopBar({
@@ -547,9 +546,6 @@ export function TopBar({
           ) : (
             <Icon.Moon width="16" height="16" />
           )}
-        </button>
-        <button className="lf-icon-btn" aria-label="Paramètres">
-          <Icon.Settings width="16" height="16" />
         </button>
       </div>
     </header>
@@ -636,28 +632,12 @@ function CommandPalette({
         },
         {
           kind: "action",
-          id: "a_settings",
-          label: "Paramètres",
-          sub: "Préférences globales",
-          icon: "Settings",
-          run: () => { onAction("settings"); },
-        },
-        {
-          kind: "action",
           id: "a_theme",
           label: theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre",
           sub: "Bascule dark / light",
           icon: theme === "dark" ? "Sun" : "Moon",
           shortcut: "⌘\\",
           run: () => { onAction("toggle-theme"); },
-        },
-        {
-          kind: "action",
-          id: "a_docs",
-          label: "Documentation",
-          sub: "Ouvrir la doc Loomflo",
-          icon: "Book",
-          run: () => { onAction("docs"); },
         },
       ] as PaletteItem[]
     ).filter((a) => matches(a.label));
@@ -684,19 +664,11 @@ function CommandPalette({
           },
           {
             kind: "nav",
-            id: "n_logs",
-            label: "Logs",
-            sub: "Flux d'exécution",
-            icon: "Terminal",
-            run: () => { onAction("nav", "logs"); },
-          },
-          {
-            kind: "nav",
             id: "n_settings",
             label: "Paramètres du projet",
             sub: "Configuration",
             icon: "Settings",
-            run: () => { onAction("nav", "project-settings"); },
+            run: () => { onAction("nav", "settings"); },
           },
         ] as PaletteItem[]
       ).filter((a) => matches(a.label));
@@ -980,8 +952,6 @@ export function ProjectsPage() {
   const handleAction = (action: string, payload?: string) => {
     if (action === "new-project") void navigate("/projects/new/wizard");
     else if (action === "toggle-theme") toggleTheme();
-    else if (action === "docs") showToast("Documentation — prompt suivant");
-    else if (action === "settings") showToast("Paramètres globaux — prompt suivant");
     else if (action === "nav" && payload && activeProjectId) {
       void navigate(`/projects/${activeProjectId}/${payload}`);
     }
@@ -999,7 +969,6 @@ export function ProjectsPage() {
           onSelectProject={goToProject}
           onAllProjects={() => { setActiveProjectId(null); }}
           onOpenCommand={() => { setPaletteOpen(true); }}
-          onOpenWizard={() => { void navigate("/projects/new/wizard"); }}
         />
 
         <main className="lf-main">
