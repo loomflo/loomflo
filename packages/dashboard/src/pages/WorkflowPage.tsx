@@ -6,11 +6,13 @@ import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useChat } from "../hooks/useChat.js";
+import { useEvents } from "../hooks/useEvents.js";
 import { useWorkflow } from "../hooks/useWorkflow.js";
 import type { BrainNode, SeedMessage } from "../lib/loomBrain.js";
 import type {
   ChatHistoryEntry,
   Edge as WfEdge,
+  Event as WfEvent,
   Node as WfNode,
   NodeStatus,
 } from "../lib/types.js";
@@ -243,6 +245,54 @@ const WORKFLOW_BADGE: Record<string, { label: string; className: string }> = {
   failed: { label: "Échec", className: "failed" },
 };
 
+function fmtEventTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toTimeString().slice(0, 8);
+}
+
+function EventsDrawer({
+  events,
+  loading,
+  onClose,
+}: {
+  events: WfEvent[];
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="nd-modal-bg" onClick={onClose}>
+      <div
+        className="nd-fullscreen"
+        onClick={(e) => { e.stopPropagation(); }}
+        role="dialog"
+        aria-label="Logs du workflow"
+      >
+        <div className="nd-fullscreen-head">
+          <h3>Logs du workflow ({events.length})</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Fermer">
+            <Icon.X width="16" height="16" />
+          </button>
+        </div>
+        <div className="nd-fullscreen-body">
+          {loading && events.length === 0 ? (
+            <p style={{ padding: 16, color: "var(--fg-3)" }}>Chargement…</p>
+          ) : events.length === 0 ? (
+            <p style={{ padding: 16, color: "var(--fg-3)" }}>Aucun événement enregistré.</p>
+          ) : (
+            events.map((e, idx) => (
+              <div key={`${e.ts}-${String(idx)}`} className="nd-log-line" data-level="info">
+                <span className="ts mono">{fmtEventTime(e.ts)}</span>
+                <span className="lvl">{e.type}</span>
+                <span className="msg mono">{e.nodeId ?? "—"}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WorkflowPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -251,6 +301,10 @@ export function WorkflowPage() {
   const { theme, toggleTheme } = useTheme();
   const { workflow, loading, error } = useWorkflow(projectId ?? null);
   const { messages: chatMessages, send: sendChat } = useChat(projectId ?? null);
+  const { events: workflowEvents, loading: eventsLoading } = useEvents({
+    projectId: projectId ?? null,
+    limit: 200,
+  });
 
   const onSendMessage = useCallback(
     (text: string): Promise<string> => {
@@ -265,8 +319,11 @@ export function WorkflowPage() {
     [projects, projectId],
   );
 
-  const [actionPending, setActionPending] = useState<"pause" | "resume" | null>(null);
+  const [actionPending, setActionPending] = useState<"pause" | "resume" | "start" | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
 
   const allNodes: WfNode[] = useMemo(() => {
     if (!workflow) return [];
@@ -321,6 +378,19 @@ export function WorkflowPage() {
     }
   }, [api, projectId]);
 
+  const onStart = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending("start");
+    setActionError(null);
+    try {
+      await api.startWorkflow(projectId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActionPending(null);
+    }
+  }, [api, projectId]);
+
   if (!project && !loading) {
     return (
       <div className="app">
@@ -341,6 +411,7 @@ export function WorkflowPage() {
   const wfStatus = workflow?.status ?? project?.workflowStatus ?? "init";
   const wfBadge = WORKFLOW_BADGE[wfStatus] ?? { label: "En cours", className: "running" };
   const isPaused = wfStatus === "paused";
+  const isReadyToStart = wfStatus === "building";
 
   return (
     <div className="app">
@@ -402,7 +473,16 @@ export function WorkflowPage() {
           )}
         </div>
         <div className="page-header-right">
-          {isPaused ? (
+          {isReadyToStart ? (
+            <button
+              className="btn"
+              onClick={() => { void onStart(); }}
+              disabled={actionPending !== null || !projectId}
+            >
+              <Icon.Play width="14" height="14" />{" "}
+              {actionPending === "start" ? "…" : "Démarrer le workflow"}
+            </button>
+          ) : isPaused ? (
             <button
               className="btn"
               onClick={() => { void onResume(); }}
@@ -421,7 +501,11 @@ export function WorkflowPage() {
               {actionPending === "pause" ? "…" : "Pause"}
             </button>
           )}
-          <button className="btn ghost">
+          <button
+            className="btn ghost"
+            onClick={() => { setLogsOpen((o) => !o); }}
+            aria-pressed={logsOpen}
+          >
             <Icon.Terminal width="14" height="14" /> Logs
           </button>
           <button
@@ -609,6 +693,14 @@ export function WorkflowPage() {
           </div>
         </div>
       </div>
+
+      {logsOpen && (
+        <EventsDrawer
+          events={workflowEvents}
+          loading={eventsLoading}
+          onClose={() => { setLogsOpen(false); }}
+        />
+      )}
     </div>
   );
 }
