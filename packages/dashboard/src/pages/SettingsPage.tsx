@@ -5,7 +5,9 @@ import { useApi } from "../context/AppContext.js";
 import { useProjectStore } from "../context/ProjectStoreContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useConfig } from "../hooks/useConfig.js";
+import { useCredentials } from "../hooks/useCredentials.js";
 import { useMcp } from "../hooks/useMcp.js";
+import { useRuntimeAvailability } from "../hooks/useRuntimes.js";
 import type { Config, McpServerConfigEntry, RetryStrategy } from "../lib/types.js";
 import "./SettingsPage.css";
 
@@ -380,25 +382,38 @@ function GeneralSection({ data, draft, setDraft, editing }: SectionEditProps) {
   );
 }
 
-function ProvidersSection({ data, draft, setDraft, editing }: SectionEditProps) {
+function ProvidersSection({
+  data,
+  draft,
+  setDraft,
+  editing,
+  options,
+}: SectionEditProps & { options: string[] }) {
   if (!editing) {
-    return <KeyVal k="Provider primaire" v={data.primaryProvider} />;
+    return <KeyVal k="Provider primaire" v={data.primaryProvider || "—"} />;
   }
+  const list = options.length > 0 ? options : [draft.primaryProvider].filter(Boolean);
   return (
     <div className="field">
       <label className="field-label">Provider primaire</label>
-      <select
-        className="select"
-        value={draft.primaryProvider}
-        onChange={(e) => { setDraft({ ...draft, primaryProvider: e.target.value }); }}
-      >
-        <option>Anthropic API</option>
-        <option>OpenAI API</option>
-        <option>Moonshot API</option>
-        <option>Claude Code (OAuth)</option>
-        <option>Copilot CLI (OAuth)</option>
-        <option>Codex CLI (OAuth)</option>
-      </select>
+      {list.length === 0 ? (
+        <p className="st-empty">
+          Aucun credential configuré sur le daemon. Ajoute une clé via le wizard ou{" "}
+          <code className="mono">loomflo credentials add</code>.
+        </p>
+      ) : (
+        <select
+          className="select"
+          value={draft.primaryProvider}
+          onChange={(e) => { setDraft({ ...draft, primaryProvider: e.target.value }); }}
+        >
+          {list.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
@@ -660,6 +675,17 @@ export function SettingsPage() {
     upsert: upsertMcp,
     remove: removeMcp,
   } = useMcp(projectId ?? null);
+  const { credentials } = useCredentials();
+  const { clis: liveClis } = useRuntimeAvailability();
+
+  // Live provider options: configured credentials + authenticated CLI runtimes.
+  const providerOptions = useMemo<string[]>(() => {
+    const fromCreds = credentials.map((c) => c.name);
+    const fromClis = Object.entries(liveClis)
+      .filter(([, av]) => av.installed && av.authenticated)
+      .map(([name]) => name);
+    return [...new Set([...fromCreds, ...fromClis])];
+  }, [credentials, liveClis]);
 
   const [data, setData] = useState<ProjectConfig>(() =>
     projectId ? loadProject(projectId) : { ...DEFAULT_CONFIG },
@@ -818,7 +844,7 @@ export function SettingsPage() {
       case "general":
         return <GeneralSection {...editProps} />;
       case "providers":
-        return <ProvidersSection {...editProps} />;
+        return <ProvidersSection {...editProps} options={providerOptions} />;
       case "level":
         return <LevelSection {...editProps} />;
       case "delays":
@@ -1104,7 +1130,7 @@ export function SettingsPage() {
             <button
               className="btn primary"
               onClick={() => { void addMcp(); }}
-              disabled={!mcpForm.name || !mcpForm.command || !draft}
+              disabled={!mcpForm.name || !mcpForm.command}
             >
               <Icon.Plus width="11" height="11" /> Ajouter
             </button>
